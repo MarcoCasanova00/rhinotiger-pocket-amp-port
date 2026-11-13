@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 hacha */
-/* RhinoTiger's engine (psy.h): the kick, the rolling FM bass and the percussion.
+/* RhinoTiger's engine (psy.h): the kick, the rolling FM bass, the percussion, the events (events.c) and an echo.
  *
  * The grid: 24 ticks a beat, so that both the sixteenth (6 ticks) and the sixteenth triplet (4) fall on it. The kick
  * is on a beat's first tick; the bass fills the beat's other sixteenths (K-B-B-B) or its other triplet sixteenths
@@ -9,8 +9,15 @@
  *
  * The percussion: closed hats on the sixteenths (the offbeat eighth left to the open hat), a clap on 2 and 4, a ride
  * on the eighths in some worlds. They come in over the first bars (hats, then the open hat, the clap, the ride) and
- * now and then one sits out a phrase (8 bars). A fill's beat (the bass resting) is a clap roll. */
-#define TPB 24u                        /* ticks a beat */
+ * now and then one sits out a phrase (8 bars). A fill's beat (the bass resting) is a clap roll.
+ *
+ * The macros (MAIN) lean several things at once, each from its middle (50: the world as it is):
+ *   Energy   the events' density, the hats' weak sixteenths, how often a part sits out
+ *   Detail   the events' runs (how often, how long, sixteenths or 32nds), the hats' 32nd flams
+ *   Dark     the events' families (low and middle against high) and notes (seconds and tritones against fifths
+ *            and octaves), the bass's brightness
+ *   Drift    how much of the events' loop changes as a phrase begins, how far the bass slowly opens and closes */
+#define TPB PS_TPB                     /* ticks a beat */
 #define TPBAR (4u * TPB)
 #include "psy.h"
 #include "fastmath.h"
@@ -47,6 +54,30 @@ static const world_t W[PS_NWORLD] = {
 
 const char *ps_world_name(int w) { return W[(unsigned)w % PS_NWORLD].name; }
 
+/* the parameters */
+static const ps_param_t PAR[P_NPARAMS] = {
+    {"ENERGY", 0, 100, 50}, {"DETAIL", 0, 100, 50}, {"DARK", 0, 100, 50}, {"DRIFT", 0, 100, 50},
+    {"TEMPO", -20, 20, 0}, {"ROOT", -5, 6, 0}, {"FILLS", 0, 4, 3}, {"SIT OUT", 0, 100, 25},
+    {"LEVEL", 0, 100, 80}, {"TUNE", -6, 6, 0}, {"LENGTH", 0, 100, 50}, {"PUNCH", 0, 100, 50},
+    {"LEVEL", 0, 100, 80}, {"BITE", 0, 100, 50}, {"LENGTH", 0, 100, 50}, {"DRIVE", 0, 100, 50},
+    {"LEVEL", 0, 100, 80}, {"HATS", 0, 100, 50}, {"TONE", 0, 100, 50}, {"CLAP", 0, 100, 50},
+    {"LEVEL", 0, 100, 80}, {"DENSITY", 0, 100, 50}, {"RUNS", 0, 100, 50}, {"ECHO", 0, 100, 50},
+    {"LEVEL", 0, 100, 50}, {"FEEDBACK", 0, 90, 42}, {"TONE", 0, 100, 50}, {"TIME", 0, 3, 0},
+};
+static volatile int16_t par[P_NPARAMS];
+const ps_param_t *ps_param(int p) { return &PAR[(unsigned)p % P_NPARAMS]; }
+int ps_get(int p) { return par[(unsigned)p % P_NPARAMS]; }
+void ps_set(int p, int v)
+{
+    const ps_param_t *d = ps_param(p);
+    par[(unsigned)p % P_NPARAMS] = (int16_t)(v < d->lo ? d->lo : v > d->hi ? d->hi : v);
+}
+static const uint8_t ECHO_TICKS[4] = {18, 12, 16, 9};   /* a dotted eighth, an eighth, a triplet quarter, a dotted sixteenth */
+static const char *const ECHO_TIME_NAME[4] = {"3/16", "1/8", "1/4T", "3/32"};
+const char *ps_echo_time_name(int v) { return ECHO_TIME_NAME[(unsigned)v % 4u]; }
+
+ps_ui_t ps_ui;
+
 static volatile int want_world, want_play;
 static int world, playing;
 
@@ -59,7 +90,6 @@ static struct {
     /* the bass */
     float b_t, b_gate;                 /* seconds since the note, how long it is held */
     float b_cph, b_mph, b_inc;         /* carrier and modulator phase (turns), the carrier's step */
-    float b_amp;                       /* the release's level */
     float lp;                          /* the bass's one-pole low-pass */
     float drift;                       /* the slow movement: 0..1 over 16 bars */
     /* the percussion: each a hit's age (s, < 0 silent) and level */
@@ -69,11 +99,19 @@ static struct {
     float r_ph[3];                     /* the ride's partials */
     uint32_t rng;
     uint8_t out;                       /* the part sitting out this phrase: 0 none, 1 hats, 2 open, 3 clap, 4 ride */
-    /* the echo: a dotted eighth, ping-pong */
+    /* the echo: ping-pong */
     float e_lp[2];
 } s;
 
-#define ECHO_N 16384u
+/* the macros, -1..1 from their middle (Drift 0..1), and what the parameters make of the world: set as a block
+ * begins (mods()) */
+static struct {
+    float energy, detail, dark, drift;
+    int root;
+    float bpm;
+} m;
+
+#define ECHO_N 16384u                  /* (a dotted eighth at 125 bpm, the slowest a world can be moved to: 15876) */
 static int16_t echo_buf[2][ECHO_N];
 static uint32_t echo_w;
 
@@ -88,15 +126,46 @@ static void cmd_post(uint32_t c)
     cmd_q[w % CMD_N] = c;
     cmd_w = w + 1u;
 }
-static uint32_t rnd(void);
-static float note_hz(int note);
+
+static uint32_t rnd(void)
+{
+    s.rng ^= s.rng << 13;
+    s.rng ^= s.rng >> 17;
+    s.rng ^= s.rng << 5;
+    return s.rng;
+}
+static float note_hz(int note) { return 440.0f * fm_exp2f((float)(note - 69) / 12.0f); }
+static int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+/* what events.c asks of the world, as the macros and the EVENTS page lean it */
+static int ev_density_now(const world_t *w)
+{
+    float k = (float)par[P_EV_DENSITY] / 50.0f * (1.0f + 0.6f * m.energy);
+    return clampi((int)((float)w->ev_density * k + 0.5f), 0, 24);
+}
+static int ev_runs_now(const world_t *w)
+{
+    float k = (float)par[P_EV_RUNS] / 50.0f * (1.0f + m.detail);
+    return clampi((int)((float)w->ev_runs * k + 0.5f), 0, 100);
+}
+static int ev_low_now(const world_t *w) { return clampi((int)w->ev_low + (int)(25.0f * m.dark), 0, 100); }
+static int ev_mid_now(const world_t *w) { return clampi((int)w->ev_mid + (int)(10.0f * m.dark), 0, 100 - ev_low_now(w)); }
+static int ev_run_step(void) { return m.detail > 0.4f ? 3 : 6; }   /* sixteenths, or 32nds at high Detail */
+static int ev_run_len(void) { return 3 + (m.detail > 0.0f ? (int)(2.0f * m.detail + 0.5f) : 0); }
+static int ev_changes(void)            /* recipes changed as a phrase begins: 0..3 */
+{
+    return clampi((int)(m.drift * 3.0f + (float)(rnd() % 100u) / 100.0f), 0, 3);
+}
+static float ev_dark(void) { return m.dark; }
+
 #include "events.c"
 
 void ps_key(int k, int down, int value)
 {
+    if (k < 0 || k >= 27)
+        return;
     if (down == 2) {                   /* pressure: straight into the events' table (a byte: no queue to fill) */
-        if (k >= 0 && k < 27)
-            ev.press[k] = (uint8_t)value;
+        ev.press[k] = (uint8_t)value;
         return;
     }
     if (down)
@@ -106,13 +175,18 @@ void ps_key(int k, int down, int value)
 
 void ps_init(void)
 {
+    int k;
     want_world = world = 0;
     want_play = playing = 1;
+    for (k = 0; k < P_NPARAMS; k++)
+        par[k] = PAR[k].def;
     s.k_t = s.b_t = -1.0f;
     s.h_t = s.o_t = s.c_t = s.r_t = -1.0f;
     s.rng = 0x9E3779B9u;
-    for (int k = 0; k < EV_NVOICE; k++)
+    for (k = 0; k < EV_NVOICE; k++)
         ev.v[k].t = -1.0f;
+    ev.last_type = -1;
+    ps_ui.thrown_type = -1;
     s.tick = 0;
     s.next = 0.0f;
 }
@@ -121,46 +195,65 @@ void ps_world(int w) { want_world = (int)((unsigned)w % PS_NWORLD); }
 void ps_play(int on) { want_play = on != 0; }
 int ps_playing(void) { return playing; }
 int ps_bar(void) { return (int)(s.tick / TPBAR); }
-
-static float note_hz(int note) { return 440.0f * fm_exp2f((float)(note - 69) / 12.0f); }
+int ps_bpm(void) { return (int)(W[want_world].bpm + (float)par[P_TEMPO]); }
+int ps_root(void) { return W[want_world].root + par[P_ROOT]; }
 int ps_stat(int which) { return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : ev.last_type; }
 const char *ps_event_name(int type) { return EV_NAME[(unsigned)type % EV_NTYPE]; }
 
-static uint32_t rnd(void)
+static void mods(const world_t *w)     /* the macros and the moved tempo and root, as a block begins */
 {
-    s.rng ^= s.rng << 13;
-    s.rng ^= s.rng >> 17;
-    s.rng ^= s.rng << 5;
-    return s.rng;
+    m.energy = (float)(par[P_ENERGY] - 50) / 50.0f;
+    m.detail = (float)(par[P_DETAIL] - 50) / 50.0f;
+    m.dark = (float)(par[P_DARK] - 50) / 50.0f;
+    m.drift = (float)par[P_DRIFT] / 100.0f;
+    m.root = w->root + par[P_ROOT];
+    m.bpm = w->bpm + (float)par[P_TEMPO];
 }
 
 static void perc_step(const world_t *w, uint32_t t, uint32_t beat, uint32_t bar, int fill)
 {
     uint32_t six = t / 6u;             /* the sixteenth in the beat */
     static const float HAT_V[4] = {0.55f, 0.80f, 0.0f, 1.0f};
-    if (t % 6u)
+    float hats = (float)par[P_HATS] / 50.0f;
+    if (t % 6u) {                      /* between sixteenths: at high Detail, a 32nd flam on the hats now and then */
+        if (t % 3u == 0u && six != 2u && m.detail > 0.3f && s.out != 1u && !fill &&
+            (float)(rnd() % 100u) < 60.0f * (m.detail - 0.3f)) {
+            s.h_t = 0.0f;
+            s.h_v = 0.35f * hats;
+            ps_ui.hits[HIT_PERC]++;
+        }
         return;
+    }
     if (t == 0u && beat == 0u && bar % 8u == 0u) {   /* a phrase begins: who sits it out */
+        float p = (float)par[P_SITOUT] * (1.0f - 0.7f * m.energy);
         s.out = 0;
-        if (bar >= 32u && rnd() % 4u == 0u)
+        if (bar >= 32u && (float)(rnd() % 100u) < p)
             s.out = (uint8_t)(1u + rnd() % (w->ride ? 4u : 3u));
+        ps_ui.sitting_out = (int8_t)s.out;
     }
     if (fill) {                        /* the fill's beat: a clap roll, rising */
         s.c_t = 0.0f;
         s.c_v = 0.45f + 0.18f * (float)six;
+        ps_ui.hits[HIT_PERC]++;
         return;
     }
-    if (six != 2u && s.out != 1u) {
-        s.h_t = 0.0f;
-        s.h_v = HAT_V[six] * (0.85f + 0.15f * (float)(rnd() % 100u) / 100.0f);
+    if (six != 2u && s.out != 1u && hats > 0.0f) {
+        int weak = six == 0u;          /* (on the kick) */
+        if (!(weak && m.energy < 0.0f && (float)(rnd() % 100u) < -70.0f * m.energy)) {   /* low Energy: fewer */
+            s.h_t = 0.0f;
+            s.h_v = HAT_V[six] * hats * (0.85f + 0.15f * (float)(rnd() % 100u) / 100.0f);
+            ps_ui.hits[HIT_PERC]++;
+        }
     }
-    if (six == 2u && bar >= 8u && s.out != 2u) {
+    if (six == 2u && bar >= 8u && s.out != 2u && hats > 0.0f) {
         s.o_t = 0.0f;
-        s.o_v = 1.0f;
+        s.o_v = hats > 1.0f ? 1.0f : hats;
+        ps_ui.hits[HIT_PERC]++;
     }
     if (six == 0u && (beat == 1u || beat == 3u) && bar >= 16u && s.out != 3u) {
         s.c_t = 0.0f;
-        s.c_v = 1.0f;
+        s.c_v = (float)par[P_CLAP] / 50.0f;
+        ps_ui.hits[HIT_PERC]++;
     }
     if (w->ride && six % 2u == 0u && bar >= 24u && s.out != 4u) {
         s.r_t = 0.0f;
@@ -168,11 +261,18 @@ static void perc_step(const world_t *w, uint32_t t, uint32_t beat, uint32_t bar,
     }
 }
 
+static int fill_now(uint32_t bar, uint32_t beat)   /* this beat a fill's (the bass rests) */
+{
+    static const uint8_t EVERY[5] = {0, 32, 16, 8, 4};
+    uint32_t e = EVERY[clampi(par[P_FILLS], 0, 4)];
+    return e && bar % e == e - 1u && beat == 3u;
+}
+
 static void step(const world_t *w)     /* a tick begins: what strikes on it */
 {
     uint32_t t = s.tick % TPB, beat = s.tick / TPB % 4u, bar = s.tick / TPBAR;
-    int bass_rests = bar % 8u == 7u && beat == 3u;     /* the 8th bar's last beat: the bass stops */
-    int kick_rests = bar % 32u == 31u && beat == 3u;   /* the 32nd's: the kick too */
+    int bass_rests = fill_now(bar, beat);
+    int kick_rests = par[P_FILLS] && bar % 32u == 31u && beat == 3u;   /* every 32nd bar's: the kick too */
     int bass;
     perc_step(w, t, beat, bar, bass_rests);
     ev_step(w, t, bar, (uint32_t)(s.tick / 6u), 0);
@@ -180,6 +280,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         if (!kick_rests) {
             s.k_t = 0.0f;
             s.k_ph = 0.0f;
+            ps_ui.hits[HIT_KICK]++;
         }
         return;
     }
@@ -188,35 +289,39 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         return;
     s.b_t = 0.0f;
     s.b_cph = s.b_mph = 0.0f;          /* every note from the same place: the roll is tight */
-    s.b_gate = w->gate * s.tick_len * (float)w->roll / PS_SR;
-    s.b_inc = note_hz(w->root) / PS_SR;
+    s.b_gate = w->gate * (0.6f + 0.8f * (float)par[P_BASS_LEN] / 100.0f) * s.tick_len * (float)w->roll / PS_SR;
+    if (s.b_gate > 0.95f * s.tick_len * (float)w->roll / PS_SR)
+        s.b_gate = 0.95f * s.tick_len * (float)w->roll / PS_SR;
+    s.b_inc = note_hz(m.root) / PS_SR;
+    ps_ui.hits[HIT_BASS]++;
 }
 
-static float kick(const world_t *w, float dt)
+static float kick(float dt)
 {
-    float f0, f, env, x, t = s.k_t;
+    float f0, f, env, x, t = s.k_t, punch = (float)par[P_KICK_PUNCH] / 50.0f;
     if (t < 0.0f)
         return 0.0f;
     if (t >= s.k_len) {
         s.k_t = -1.0f;
         return 0.0f;
     }
-    f0 = note_hz(w->root);                          /* tuned to the key */
-    f = f0 + f0 * 9.0f * fm_expf(-t / 0.011f);      /* the pitch falls from about 9 octaves' worth of sweep */
+    f0 = note_hz(m.root + par[P_KICK_TUNE]);        /* tuned to the key */
+    f = f0 + f0 * (4.0f + 5.0f * punch) * fm_expf(-t / 0.011f);   /* the pitch falls: Punch, from how high */
     s.k_ph += f * dt;
     if (s.k_ph >= 1.0f)
         s.k_ph -= 1.0f;
     env = fm_expf(-t / (s.k_len * 0.45f));
     env *= 1.0f - t / s.k_len;                      /* to nothing by its end: the bass's place stays clear */
     x = fm_sin_turns(s.k_ph) * env;
-    x += (t < 0.002f ? 0.35f * (1.0f - t / 0.002f) : 0.0f) * fm_sin_turns(s.k_ph * 7.0f);   /* the click */
+    x += (t < 0.002f ? 0.35f * punch * (1.0f - t / 0.002f) : 0.0f) * fm_sin_turns(s.k_ph * 7.0f);   /* the click */
     s.k_t = t + dt;
     return fm_tanhf(x * 1.8f);
 }
 
 static float bass(const world_t *w, float dt)
 {
-    float t = s.b_t, idx, env, x, m;
+    float t = s.b_t, idx, env, x, mo, bite = (float)par[P_BASS_BITE] / 50.0f;
+    float depth = 0.5f * m.drift * 2.0f;           /* the slow movement's depth: Drift (50: as the world has it) */
     if (t < 0.0f)
         return s.lp *= 0.99f;
     if (t < s.b_gate)
@@ -228,11 +333,10 @@ static float bass(const world_t *w, float dt)
             env = 0.0f;
         }
     }
-    s.b_amp = env;
-    idx = w->index * (0.75f + 0.5f * s.drift);     /* the slow movement opens and closes it */
-    idx = idx * fm_expf(-t * 1000.0f / w->index_ms) + w->floor;
-    m = fm_sin_turns(s.b_mph);
-    x = fm_sin_turns(s.b_cph + idx * m * 0.159155f) * env;
+    idx = w->index * bite * (1.0f - 0.5f * depth + depth * s.drift);   /* the slow movement opens and closes it */
+    idx = idx * fm_expf(-t * 1000.0f / w->index_ms) + w->floor * bite;
+    mo = fm_sin_turns(s.b_mph);
+    x = fm_sin_turns(s.b_cph + idx * mo * 0.159155f) * env;
     s.b_cph += s.b_inc;
     if (s.b_cph >= 1.0f)
         s.b_cph -= 1.0f;
@@ -241,8 +345,8 @@ static float bass(const world_t *w, float dt)
         s.b_mph -= 1.0f;
     if (s.b_t >= 0.0f)
         s.b_t = t + dt;
-    x = fm_tanhf(x * w->drive);
-    s.lp += (x - s.lp) * 0.45f;                    /* takes the edge off the drive (about 4 kHz) */
+    x = fm_tanhf(x * w->drive * (0.5f + (float)par[P_BASS_DRIVE] / 100.0f));
+    s.lp += (x - s.lp) * fm_clampf(0.45f - 0.2f * m.dark, 0.2f, 0.7f);   /* Dark: darker */
     return s.lp;
 }
 
@@ -251,11 +355,11 @@ static float noise(void) { return (float)(int32_t)rnd() * (1.0f / 2147483648.0f)
 /* the percussion, a sample: l and r added to */
 static void perc(const world_t *w, float dt, float *l, float *r)
 {
-    float n = noise(), hp, x;
+    float n = noise(), hp, x, a = fm_clampf(w->hat_hp + 0.002f * (float)(par[P_HAT_TONE] - 50) - 0.05f * m.dark, 0.5f, 0.97f);
     /* the hats: noise through two high-passes */
-    s.h_hp1 = w->hat_hp * (s.h_hp1 + n - s.h_x1);
+    s.h_hp1 = a * (s.h_hp1 + n - s.h_x1);
     s.h_x1 = n;
-    s.h_hp2 = w->hat_hp * (s.h_hp2 + s.h_hp1 - s.h_x2);
+    s.h_hp2 = a * (s.h_hp2 + s.h_hp1 - s.h_x2);
     s.h_x2 = s.h_hp1;
     hp = s.h_hp2;
     if (s.h_t >= 0.0f) {
@@ -293,15 +397,15 @@ static void perc(const world_t *w, float dt, float *l, float *r)
     /* the ride: three inharmonic partials and a little of the hats' noise */
     if (s.r_t >= 0.0f) {
         static const float RH[3] = {3120.0f, 4617.0f, 7394.0f};
-        float m = 0.0f, env = fm_expf(-s.r_t / 0.16f);
+        float mo = 0.0f, env = fm_expf(-s.r_t / 0.16f);
         int i;
         for (i = 0; i < 3; i++) {
             s.r_ph[i] += RH[i] * dt;
             if (s.r_ph[i] >= 1.0f)
                 s.r_ph[i] -= 1.0f;
-            m += fm_sin_turns(s.r_ph[i]);
+            mo += fm_sin_turns(s.r_ph[i]);
         }
-        x = (0.35f * m + 0.6f * hp) * env * s.r_v * 0.05f;
+        x = (0.35f * mo + 0.6f * hp) * env * s.r_v * 0.05f;
         *l += 1.15f * x;
         *r += 0.75f * x;
         if ((s.r_t += dt) > 0.9f)
@@ -311,14 +415,21 @@ static void perc(const world_t *w, float dt, float *l, float *r)
 
 static void tempo(const world_t *w)
 {
-    s.tick_len = PS_SR * 60.0f / w->bpm / (float)TPB;
-    s.k_len = w->kick_len * s.tick_len * (float)w->roll / PS_SR;
+    mods(w);
+    s.tick_len = PS_SR * 60.0f / m.bpm / (float)TPB;
+    s.k_len = w->kick_len * (0.7f + 0.6f * (float)par[P_KICK_LEN] / 100.0f) * s.tick_len * (float)w->roll / PS_SR;
+    if (s.k_len > 0.98f * s.tick_len * (float)w->roll / PS_SR)   /* never into the bass's first note */
+        s.k_len = 0.98f * s.tick_len * (float)w->roll / PS_SR;
 }
 
 void ps_render(float *outl, float *outr, uint32_t n)
 {
     const world_t *w = &W[world];
     float dt = 1.0f / PS_SR;
+    float kick_g = 0.85f * (float)par[P_KICK_LEVEL] / 80.0f, bass_g = 0.55f * (float)par[P_BASS_LEVEL] / 80.0f;
+    float perc_g = (float)par[P_PERC_LEVEL] / 80.0f, ev_g = (float)par[P_EV_LEVEL] / 80.0f;
+    float send_g = (float)par[P_EV_ECHO] / 50.0f, ret_g = 0.7f * (float)par[P_ECHO_LEVEL] / 50.0f;
+    float fb = (float)par[P_ECHO_FB] / 100.0f, tone = 0.12f + 0.46f * (float)par[P_ECHO_TONE] / 100.0f;
     uint32_t i;
     if (want_play != playing) {
         playing = want_play;
@@ -342,26 +453,27 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 s.drift = 0.5f - 0.5f * fm_cosf((float)(s.tick % (16u * TPBAR)) / (float)(16u * TPBAR) * 6.2831853f);
                 step(w);
                 s.tick++;
+                ps_ui.tick = s.tick;
                 s.next += s.tick_len;
             }
             s.next -= 1.0f;
         }
         {
-            float c = 0.85f * kick(w, dt) + 0.55f * bass(w, dt), l = c, r = c, send, el, er;
-            uint32_t d = (uint32_t)(s.tick_len * 18.0f);   /* a dotted eighth: 18 ticks */
+            float c = kick_g * kick(dt) + bass_g * bass(w, dt), l = 0.0f, r = 0.0f, el = 0.0f, er = 0.0f, send, xl, xr;
+            uint32_t d = (uint32_t)(s.tick_len * (float)ECHO_TICKS[par[P_ECHO_TIME] & 3]);
             perc(w, dt, &l, &r);
-            send = ev_render(dt, &l, &r);
+            send = ev_render(dt, &el, &er) * ev_g * send_g;
             if (d >= ECHO_N)
                 d = ECHO_N - 1u;
-            el = (float)echo_buf[0][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
-            er = (float)echo_buf[1][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
-            s.e_lp[0] += (er * 0.42f + send * 0.5f - s.e_lp[0]) * 0.35f;   /* into the left: the right's, and the send */
-            s.e_lp[1] += (el * 0.42f - s.e_lp[1]) * 0.35f;                  /* into the right: the left's */
+            xl = (float)echo_buf[0][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
+            xr = (float)echo_buf[1][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
+            s.e_lp[0] += (xr * fb + send * 0.5f - s.e_lp[0]) * tone;   /* into the left: the right's, and the send */
+            s.e_lp[1] += (xl * fb - s.e_lp[1]) * tone;                  /* into the right: the left's */
             echo_buf[0][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[0], -0.99f, 0.99f) * 32767.0f);
             echo_buf[1][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[1], -0.99f, 0.99f) * 32767.0f);
             echo_w++;
-            outl[i] = l + 0.7f * el;
-            outr[i] = r + 0.7f * er;
+            outl[i] = c + perc_g * l + ev_g * el + ret_g * xl;
+            outr[i] = c + perc_g * r + ev_g * er + ret_g * xr;
         }
     }
 }

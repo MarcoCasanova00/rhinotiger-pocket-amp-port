@@ -8,7 +8,7 @@ expect world 0
 expect bar >31
 # GLASS INSECTS, 176: sixteenths too, from the next bar
 listen
-turn ALGO 1
+turn PRESET 1
 said WORLD
 wait 1500
 expect world 1

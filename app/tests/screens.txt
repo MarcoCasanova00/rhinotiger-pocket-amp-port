@@ -1,16 +1,19 @@
-# The manual's screenshots (template/docs/img): tools/build.py template --host, then
-#   template/build/host/template_host template/tests/screens.txt template/docs/img
-wait 900
-shot screen-ready.png
-key 7 down 90 50
-press FX
-turn K3 3
-wait 1400
-shot screen-playing.png
-release FX
-key 7 up
-tap OCT+
-wait 30
-turn PRESET 1
-wait 30
-shot screen-settings.png
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The screens, for a look (build/host/*.png): ./test.sh screens
+jack in
+wait 9000
+shot screen-main.png
+tapkey w7
+wait 120
+shot screen-thrown.png
+tap SEQ
+tap SEQ
+wait 40
+turn K2 3
+wait 100
+shot screen-perc.png
+press SEL
+wait 40
+shot screen-sel.png
+release SEL

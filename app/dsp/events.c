@@ -2,7 +2,7 @@
  * Copyright (C) 2026 hacha */
 /* RhinoTiger's events: the one-shot FM sounds that dark psy and hi-tech are made of (zaps, gurgles, dives, a talking
  * growl, chirps, lasers), single or in runs (a staircase of pitches, a roll), and the generator that places them.
- * #included by psy.c (its rnd(), note_hz(), TPB, the world).
+ * #included by psy.c (its rnd(), note_hz(), TPB, the world, and the ev_*_now() that the macros lean).
  *
  * A recipe says what an event is (its type, its note, single or a run); a voice plays one note of it. The generator
  * keeps a 4-bar loop of recipes on sixteenths and changes one or two of them as a phrase (8 bars) begins. The keys
@@ -54,7 +54,7 @@ static struct {
     volatile uint8_t press[27];        /* each key's pressure (the UI writes it directly: not through the queue) */
     uint8_t vel[27];
     uint32_t fired;                    /* events begun (the host's checks) */
-    int last_type;                     /* the latest thrown (the screen) */
+    int last_type;                     /* the latest thrown (the host's checks) */
 } ev;
 
 static int key_black(int k) { int pc = (k + 5) % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
@@ -146,9 +146,9 @@ static void ev_start(const recipe_t *r, float bite, float level)   /* a recipe b
     for (k = 0; k < 4; k++)
         if (!ev.run[k].left) {
             ev.run[k].r = *r;
-            ev.run[k].left = 3;
-            ev.run[k].step = 6;        /* sixteenths */
-            ev.run[k].wait = 6;
+            ev.run[k].left = (uint8_t)ev_run_len();
+            ev.run[k].step = (uint8_t)ev_run_step();   /* sixteenths, or 32nds (Detail) */
+            ev.run[k].wait = ev.run[k].step;
             ev.run[k].i = 1;
             ev.run[k].bite = bite;
             return;
@@ -159,15 +159,21 @@ static void ev_start(const recipe_t *r, float bite, float level)   /* a recipe b
 static recipe_t ev_invent(const world_t *w)
 {
     static const int8_t SCALE[8] = {0, 1, 3, 6, 7, 10, 12, 13};   /* dark: seconds and tritones about the root */
+    static const int8_t OPEN[4] = {0, 7, 12, 19};                 /* (Dark turned down) fifths and octaves */
+    static const int8_t SHADE[4] = {1, 6, 13, 18};                /* (Dark turned up) seconds and tritones */
     recipe_t r;
-    uint32_t x = rnd();
+    uint32_t x = rnd(), low = (uint32_t)ev_low_now(w), mid = (uint32_t)ev_mid_now(w);
+    int8_t deg;
+    float dk = ev_dark();
     if (ev.nmem && x % 100u < 10u + 5u * ev.nmem)   /* something a key threw: more often the more were thrown (to 50%) */
         return ev.mem[(x >> 8) % ev.nmem];
     x = rnd() % 100u;
-    r.type = (uint8_t)(x < w->ev_low ? EV_DIVE + rnd() % 2u
-                       : x < w->ev_low + w->ev_mid ? EV_ZAP + rnd() % 2u : EV_CHIRP + rnd() % 2u);
-    r.note = (int8_t)(w->root + 36 + SCALE[rnd() % 8u] + (r.type >= EV_CHIRP ? 12 : r.type <= EV_GROWL ? -12 : 0));
-    r.run = rnd() % 100u < w->ev_runs ? (r.type <= EV_GROWL ? RUN_ROLL : RUN_STAIRS) : RUN_ONE;
+    r.type = (uint8_t)(x < low ? EV_DIVE + rnd() % 2u : x < low + mid ? EV_ZAP + rnd() % 2u : EV_CHIRP + rnd() % 2u);
+    deg = SCALE[rnd() % 8u];
+    if ((float)(rnd() % 100u) < 60.0f * (dk < 0.0f ? -dk : dk))   /* Dark leans the note one way or the other */
+        deg = dk < 0.0f ? OPEN[rnd() % 4u] : SHADE[rnd() % 4u];
+    r.note = (int8_t)(m.root + 36 + deg + (r.type >= EV_CHIRP ? 12 : r.type <= EV_GROWL ? -12 : 0));
+    r.run = rnd() % 100u < (uint32_t)ev_runs_now(w) ? (r.type <= EV_GROWL ? RUN_ROLL : RUN_STAIRS) : RUN_ONE;
     r.var = (uint8_t)rnd();
     return r;
 }
@@ -187,7 +193,7 @@ static void ev_place(const world_t *w)   /* one recipe into the loop, on an offb
 
 static void ev_phrase(const world_t *w, uint32_t bar)   /* a phrase begins: the loop changes a little */
 {
-    uint32_t n = 0, p, k;
+    uint32_t n = 0, p, k, changes = (uint32_t)ev_changes(), want = (uint32_t)ev_density_now(w);
     for (p = 0; p < EV_LOOP; p++)
         n += ev.on[p];
     if (bar == 0u) {
@@ -195,14 +201,14 @@ static void ev_phrase(const world_t *w, uint32_t bar)   /* a phrase begins: the 
             ev.on[p] = 0;
         n = 0;
     }
-    for (k = 0; n && k < 1u + rnd() % 2u; k++) {   /* one or two out */
+    for (k = 0; n && (k < changes || n > want); k++) {   /* Drift: none to three out (and any over the density) */
         p = rnd() % EV_LOOP;
         while (!ev.on[p])
             p = (p + 1u) % EV_LOOP;
         ev.on[p] = 0;
         n--;
     }
-    while (n < w->ev_density) {
+    while (n < want) {
         ev_place(w);
         n++;
     }
@@ -222,8 +228,10 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
         }
     if (t % 6u)
         return;
-    if (bar >= 4u && !quiet && ev.on[pos16 % EV_LOOP])
+    if (bar >= 4u && !quiet && ev.on[pos16 % EV_LOOP]) {
         ev_start(&ev.loop[pos16 % EV_LOOP], 0.0f, 0.7f);
+        ps_ui.hits[HIT_EVENT]++;
+    }
     if (ev.pending | ev.held) {        /* the keys: the newly pressed, and the held again */
         uint32_t keys = ev.pending | ev.held;
         ev.pending = 0;
@@ -233,6 +241,8 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
                 float bite = 0.5f * (float)ev.vel[k] / 127.0f + (float)ev.press[k] / 127.0f;
                 ev_start(&r, bite, 1.0f);
                 ev.last_type = r.type;
+                ps_ui.thrown_type = (int8_t)r.type;
+                ps_ui.hits[HIT_THROW]++;
             }
         ev.held = keys & ev.down;      /* still down: again on the next sixteenth */
     }
