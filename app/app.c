@@ -6,6 +6,10 @@
  * played with velocity and pressure (lib/touch.h), shown on them. One of each thing the platform offers, kept short. Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fastmath.h"
+#include "psy.h"
+
+static int world;                        /* RhinoTiger: the engine's world (ALGORITHM) */
+static float eng[APP_BLOCK];
 
 #define SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
@@ -68,6 +72,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     float inc = note >= 0 ? 440.0f * fm_exp2f((float)(note - 69) / 12.0f) / 44100.0f : 0.0f;
     float gain = (float)master_q12 / 4096.0f * 8300000.0f;   /* MASTER, read once a block */
     midi_in();
+    ps_render(eng, n);
     for (i = 0; i < n; i++) {
         float s;
         voice_level += (target - voice_level) * 0.002f;          /* ~10 ms attack and release */
@@ -76,7 +81,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         if (voice_phase >= 1.0f)
             voice_phase -= 1.0f;
         s = set.wave ? 4.0f * fm_fabsf(voice_phase - 0.5f) - 1.0f : fm_sinf(voice_phase * 6.2831853f);
-        s *= voice_level * gain_now;
+        s = (s * voice_level + 2.0f * eng[i]) * gain_now;
         lr[2 * i] = (int32_t)s;
         lr[2 * i + 1] = (int32_t)s;
     }
@@ -99,6 +104,7 @@ static void settings_defaults(void)
 
 void app_init(void)
 {
+    ps_init();
     if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
         || set.octave < -2 || set.octave > 2 || set.wave > 1u || set.ble_off > 1u)
         settings_defaults();
@@ -297,7 +303,10 @@ static void input(void)
             octave_step(1);
         else if (k == B_REC && FM1B_BLE)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
-        else if (k == B_SAVE) {
+        else if (k == B_PLAY) {
+            ps_play(!ps_playing());
+            app_say(ps_playing() ? "RESTING" : "PLAYING", "");   /* (it changes as the next block starts) */
+        } else if (k == B_SAVE) {
             if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
                 set_dirty = 0;
                 app_say("SAVED", "");
@@ -329,7 +338,11 @@ static void input(void)
         ui.turns[k] += e;
         ui.turned_at[k] = plat_ms();
         ui.redraw = 1;
-        if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
+        if (k == EN_ALGO && !(FM1B_BLE_CENTRAL && ui.looking)) {   /* RhinoTiger: the world, from the next bar */
+            world = (world + e % PS_NWORLD + PS_NWORLD) % PS_NWORLD;
+            ps_world(world);
+            app_say("WORLD", ps_world_name(world));
+        } else if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
         } else if (k == EN_PRESET) {
@@ -507,6 +520,12 @@ int app_expect(const char *what, int *got)
         *got = set.octave;
     else if (!strcmp(what, "wave"))
         *got = set.wave;
+    else if (!strcmp(what, "world"))
+        *got = world;
+    else if (!strcmp(what, "bar"))           /* bars since PLAY */
+        *got = ps_bar();
+    else if (!strcmp(what, "playing"))
+        *got = ps_playing();
     else if (!strcmp(what, "note"))
         *got = voice_note;
     else if (!strcmp(what, "dirty"))

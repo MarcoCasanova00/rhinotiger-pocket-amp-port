@@ -1,0 +1,20 @@
+# The first sketch: the kick and the rolling bass, a world each, recorded (build/host/*.wav) to listen to.
+# COLD SIGNAL, 152: sixteenths (K-B-B-B); 33 bars at 152 are about 52 s (the fills: bar 8, 16, 24, 32)
+wav cold-signal.wav
+wait 52200
+wavstop
+expect world 0
+expect bar >31
+# GLASS INSECTS, 176: the 32nd roll, from the next bar
+listen
+turn ALGO 1
+said WORLD
+wait 1500
+expect world 1
+wav glass-insects.wav
+wait 45500
+wavstop
+# PLAY rests it
+tap PLAY
+wait 50
+expect playing 0
