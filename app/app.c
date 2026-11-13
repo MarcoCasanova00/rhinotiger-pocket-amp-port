@@ -9,7 +9,7 @@
 #include "psy.h"
 
 static int world;                        /* RhinoTiger: the engine's world (ALGORITHM) */
-static float eng[APP_BLOCK];
+static float eng_l[APP_BLOCK], eng_r[APP_BLOCK];
 
 #define SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
@@ -72,7 +72,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     float inc = note >= 0 ? 440.0f * fm_exp2f((float)(note - 69) / 12.0f) / 44100.0f : 0.0f;
     float gain = (float)master_q12 / 4096.0f * 8300000.0f;   /* MASTER, read once a block */
     midi_in();
-    ps_render(eng, n);
+    ps_render(eng_l, eng_r, n);
     for (i = 0; i < n; i++) {
         float s;
         voice_level += (target - voice_level) * 0.002f;          /* ~10 ms attack and release */
@@ -81,9 +81,9 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         if (voice_phase >= 1.0f)
             voice_phase -= 1.0f;
         s = set.wave ? 4.0f * fm_fabsf(voice_phase - 0.5f) - 1.0f : fm_sinf(voice_phase * 6.2831853f);
-        s = (s * voice_level + 2.0f * eng[i]) * gain_now;
-        lr[2 * i] = (int32_t)s;
-        lr[2 * i + 1] = (int32_t)s;
+        s *= voice_level;
+        lr[2 * i] = (int32_t)((s + 2.0f * eng_l[i]) * gain_now);
+        lr[2 * i + 1] = (int32_t)((s + 2.0f * eng_r[i]) * gain_now);
     }
 }
 

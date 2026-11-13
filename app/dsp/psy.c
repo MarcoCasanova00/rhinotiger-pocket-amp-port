@@ -1,11 +1,15 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 hacha */
-/* RhinoTiger's engine (psy.h): the kick and the rolling FM bass.
+/* RhinoTiger's engine (psy.h): the kick, the rolling FM bass and the percussion.
  *
  * The grid: 24 ticks a beat, so that both the sixteenth (6 ticks) and the sixteenth triplet (4) fall on it. The kick
  * is on a beat's first tick; the bass fills the beat's other sixteenths (K-B-B-B) or its other triplet sixteenths
  * (K-b-b-b-b-b). The two never sound at once: the kick is over before the bass's first note, the bass does not start
- * before it. No side-chain, only places. */
+ * before it. No side-chain, only places.
+ *
+ * The percussion: closed hats on the sixteenths (the offbeat eighth left to the open hat), a clap on 2 and 4, a ride
+ * on the eighths in some worlds. They come in over the first bars (hats, then the open hat, the clap, the ride) and
+ * now and then one sits out a phrase (8 bars). A fill's beat (the bass resting) is a clap roll. */
 #define TPB 24u                        /* ticks a beat */
 #define TPBAR (4u * TPB)
 #include "psy.h"
@@ -23,13 +27,18 @@ typedef struct {
     float gate;                        /* the note's length, of its step */
     float drive;
     float kick_len;                    /* the kick's length, of the bass's step */
+    /* the percussion */
+    float hat_ms, open_ms;             /* the closed and the open hat's decay (ms to 1/e) */
+    float hat_hp;                      /* the hats' high-pass, 0..1 (higher: thinner) */
+    float clap_hz;                     /* the clap's band */
+    uint8_t ride;                      /* a ride on the eighths */
 } world_t;
 
 static const world_t W[PS_NWORLD] = {
     /* cold dark psy: hard, short sixteenths, a dry growl */
-    {"COLD SIGNAL", 152.0f, 30, 6, 1.0f, 3.2f, 14.0f, 0.35f, 0.72f, 1.6f, 0.95f},
+    {"COLD SIGNAL", 152.0f, 30, 6, 1.0f, 3.2f, 14.0f, 0.35f, 0.72f, 1.6f, 0.95f, 14.0f, 55.0f, 0.80f, 1100.0f, 0},
     /* bright hi-tech: sixteenths at 176, a metallic edge */
-    {"GLASS INSECTS", 176.0f, 30, 6, 2.0f, 2.4f, 9.0f, 0.25f, 0.76f, 1.3f, 0.92f},
+    {"GLASS INSECTS", 176.0f, 30, 6, 2.0f, 2.4f, 9.0f, 0.25f, 0.76f, 1.3f, 0.92f, 10.0f, 40.0f, 0.88f, 1500.0f, 1},
 };
 
 const char *ps_world_name(int w) { return W[(unsigned)w % PS_NWORLD].name; }
@@ -49,6 +58,13 @@ static struct {
     float b_amp;                       /* the release's level */
     float lp;                          /* the bass's one-pole low-pass */
     float drift;                       /* the slow movement: 0..1 over 16 bars */
+    /* the percussion: each a hit's age (s, < 0 silent) and level */
+    float h_t, h_v, o_t, o_v, c_t, c_v, r_t, r_v;
+    float h_hp1, h_hp2, h_x1, h_x2;    /* the hats' two one-pole high-passes (shared by closed and open) */
+    float c_low, c_band;               /* the clap's band-pass (state variable) */
+    float r_ph[3];                     /* the ride's partials */
+    uint32_t rng;
+    uint8_t out;                       /* the part sitting out this phrase: 0 none, 1 hats, 2 open, 3 clap, 4 ride */
 } s;
 
 void ps_init(void)
@@ -56,6 +72,8 @@ void ps_init(void)
     want_world = world = 0;
     want_play = playing = 1;
     s.k_t = s.b_t = -1.0f;
+    s.h_t = s.o_t = s.c_t = s.r_t = -1.0f;
+    s.rng = 0x9E3779B9u;
     s.tick = 0;
     s.next = 0.0f;
 }
@@ -67,12 +85,55 @@ int ps_bar(void) { return (int)(s.tick / TPBAR); }
 
 static float note_hz(int note) { return 440.0f * fm_exp2f((float)(note - 69) / 12.0f); }
 
+static uint32_t rnd(void)
+{
+    s.rng ^= s.rng << 13;
+    s.rng ^= s.rng >> 17;
+    s.rng ^= s.rng << 5;
+    return s.rng;
+}
+
+static void perc_step(const world_t *w, uint32_t t, uint32_t beat, uint32_t bar, int fill)
+{
+    uint32_t six = t / 6u;             /* the sixteenth in the beat */
+    static const float HAT_V[4] = {0.55f, 0.80f, 0.0f, 1.0f};
+    if (t % 6u)
+        return;
+    if (t == 0u && beat == 0u && bar % 8u == 0u) {   /* a phrase begins: who sits it out */
+        s.out = 0;
+        if (bar >= 32u && rnd() % 4u == 0u)
+            s.out = (uint8_t)(1u + rnd() % (w->ride ? 4u : 3u));
+    }
+    if (fill) {                        /* the fill's beat: a clap roll, rising */
+        s.c_t = 0.0f;
+        s.c_v = 0.45f + 0.18f * (float)six;
+        return;
+    }
+    if (six != 2u && s.out != 1u) {
+        s.h_t = 0.0f;
+        s.h_v = HAT_V[six] * (0.85f + 0.15f * (float)(rnd() % 100u) / 100.0f);
+    }
+    if (six == 2u && bar >= 8u && s.out != 2u) {
+        s.o_t = 0.0f;
+        s.o_v = 1.0f;
+    }
+    if (six == 0u && (beat == 1u || beat == 3u) && bar >= 16u && s.out != 3u) {
+        s.c_t = 0.0f;
+        s.c_v = 1.0f;
+    }
+    if (w->ride && six % 2u == 0u && bar >= 24u && s.out != 4u) {
+        s.r_t = 0.0f;
+        s.r_v = six == 2u ? 1.0f : 0.6f;
+    }
+}
+
 static void step(const world_t *w)     /* a tick begins: what strikes on it */
 {
     uint32_t t = s.tick % TPB, beat = s.tick / TPB % 4u, bar = s.tick / TPBAR;
     int bass_rests = bar % 8u == 7u && beat == 3u;     /* the 8th bar's last beat: the bass stops */
     int kick_rests = bar % 32u == 31u && beat == 3u;   /* the 32nd's: the kick too */
     int bass;
+    perc_step(w, t, beat, bar, bass_rests);
     if (t == 0u) {
         if (!kick_rests) {
             s.k_t = 0.0f;
@@ -143,13 +204,76 @@ static float bass(const world_t *w, float dt)
     return s.lp;
 }
 
+static float noise(void) { return (float)(int32_t)rnd() * (1.0f / 2147483648.0f); }
+
+/* the percussion, a sample: l and r added to */
+static void perc(const world_t *w, float dt, float *l, float *r)
+{
+    float n = noise(), hp, x;
+    /* the hats: noise through two high-passes */
+    s.h_hp1 = w->hat_hp * (s.h_hp1 + n - s.h_x1);
+    s.h_x1 = n;
+    s.h_hp2 = w->hat_hp * (s.h_hp2 + s.h_hp1 - s.h_x2);
+    s.h_x2 = s.h_hp1;
+    hp = s.h_hp2;
+    if (s.h_t >= 0.0f) {
+        x = hp * s.h_v * fm_expf(-s.h_t * 1000.0f / w->hat_ms) * 0.20f;
+        *l += 0.8f * x;
+        *r += 1.1f * x;
+        if ((s.h_t += dt) > w->hat_ms * 0.008f)
+            s.h_t = -1.0f;
+    }
+    if (s.o_t >= 0.0f) {
+        x = hp * s.o_v * fm_expf(-s.o_t * 1000.0f / w->open_ms) * 0.22f;
+        *l += 1.05f * x;
+        *r += 0.85f * x;
+        if ((s.o_t += dt) > w->open_ms * 0.008f)
+            s.o_t = -1.0f;
+    }
+    /* the clap: a band of noise, three quick bursts, then its tail */
+    if (s.c_t >= 0.0f) {
+        float t = s.c_t, f = 2.0f * fm_sinf(3.14159265f * w->clap_hz / PS_SR), hi, env;
+        hi = n - s.c_low - 0.9f * s.c_band;
+        s.c_band += f * hi;
+        s.c_low += f * s.c_band;
+        if (t < 0.024f) {
+            float u = t - 0.008f * fm_floorf(t / 0.008f);
+            env = fm_expf(-u / 0.0025f);
+        } else {
+            env = 0.8f * fm_expf(-(t - 0.024f) / 0.045f);
+        }
+        x = s.c_band * env * s.c_v * 1.4f;
+        *l += x;
+        *r += x;
+        if ((s.c_t += dt) > 0.3f)
+            s.c_t = -1.0f;
+    }
+    /* the ride: three inharmonic partials and a little of the hats' noise */
+    if (s.r_t >= 0.0f) {
+        static const float RH[3] = {3120.0f, 4617.0f, 7394.0f};
+        float m = 0.0f, env = fm_expf(-s.r_t / 0.16f);
+        int i;
+        for (i = 0; i < 3; i++) {
+            s.r_ph[i] += RH[i] * dt;
+            if (s.r_ph[i] >= 1.0f)
+                s.r_ph[i] -= 1.0f;
+            m += fm_sin_turns(s.r_ph[i]);
+        }
+        x = (0.35f * m + 0.6f * hp) * env * s.r_v * 0.05f;
+        *l += 1.15f * x;
+        *r += 0.75f * x;
+        if ((s.r_t += dt) > 0.9f)
+            s.r_t = -1.0f;
+    }
+}
+
 static void tempo(const world_t *w)
 {
     s.tick_len = PS_SR * 60.0f / w->bpm / (float)TPB;
     s.k_len = w->kick_len * s.tick_len * (float)w->roll / PS_SR;
 }
 
-void ps_render(float *out, uint32_t n)
+void ps_render(float *outl, float *outr, uint32_t n)
 {
     const world_t *w = &W[world];
     float dt = 1.0f / PS_SR;
@@ -175,6 +299,11 @@ void ps_render(float *out, uint32_t n)
             }
             s.next -= 1.0f;
         }
-        out[i] = 0.85f * kick(w, dt) + 0.55f * bass(w, dt);
+        {
+            float c = 0.85f * kick(w, dt) + 0.55f * bass(w, dt), l = c, r = c;
+            perc(w, dt, &l, &r);
+            outl[i] = l;
+            outr[i] = r;
+        }
     }
 }
