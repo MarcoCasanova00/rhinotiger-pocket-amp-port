@@ -4,14 +4,15 @@ jack in
 wav cold-signal.wav
 wait 52200
 wavstop
-expect world 0
+expect world 2
 expect bar >31
+expect lines >0
 # GLASS INSECTS, 176: sixteenths too, from the next bar
 listen
-turn PRESET 1
+turn PRESET 4
 said WORLD
 wait 1500
-expect world 1
+expect world 6
 wav glass-insects.wav
 wait 45500
 wavstop

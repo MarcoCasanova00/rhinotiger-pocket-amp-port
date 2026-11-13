@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# Every world, 30 s each from PLAY, recorded (build/host/world-*.wav) to listen to.
+jack in
+tap PLAY
+wait 100
+turn PRESET -2
+wait 100
+tap PLAY
+wait 200
+expect world 0
+wav world-swamp-radio.wav
+wait 30000
+wavstop
+tap PLAY
+wait 100
+turn PRESET 1
+wait 100
+tap PLAY
+wait 200
+expect world 1
+wav world-under-the-roots.wav
+wait 30000
+wavstop
+tap PLAY
+wait 100
+turn PRESET 1
+wait 100
+tap PLAY
+wait 200
+expect world 2
+wav world-cold-signal.wav
+wait 30000
+wavstop
+tap PLAY
+wait 100
+turn PRESET 1
+wait 100
+tap PLAY
+wait 200
+expect world 3
+wav world-rubber-circus.wav
+wait 30000
+wavstop
+tap PLAY
+wait 100
+turn PRESET 1
+wait 100
+tap PLAY
+wait 200
+expect world 4
+wav world-black-undertow.wav
+wait 30000
+wavstop
+tap PLAY
+wait 100
+turn PRESET 1
+wait 100
+tap PLAY
+wait 200
+expect world 5
+wav world-copper-nerve.wav
+wait 30000
+wavstop
+tap PLAY
+wait 100
+turn PRESET 1
+wait 100
+tap PLAY
+wait 200
+expect world 6
+wav world-glass-insects.wav
+wait 30000
+wavstop
+tap PLAY
+wait 100
+turn PRESET 1
+wait 100
+tap PLAY
+wait 200
+expect world 7
+wav world-chrome-swarm.wav
+wait 30000
+wavstop
+tap PLAY
+wait 100

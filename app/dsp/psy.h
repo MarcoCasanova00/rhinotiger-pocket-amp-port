@@ -2,8 +2,8 @@
  * Copyright (C) 2026 hacha */
 /* RhinoTiger's engine: the kick and the rolling FM bass sharing the grid, the percussion over them, and the events.
  *
- * STATUS: a sketch. Two worlds; the kick, the bass (a sixteenth roll, K-B-B-B), the percussion, the events and the
- * atmos, with the parameters the pages turn (four to a page) and the main page's four macros; the sections (a break,
+ * STATUS: a sketch. Eight worlds; the kick, the bass (a sixteenth roll, K-B-B-B), the percussion, the line, the events and
+ * the atmos, with the parameters the pages turn (four to a page) and the main page's four macros; the sections (a break,
  * its build, the drop), cued or on their own.
  *
  * Threads: ps_render() runs in the audio interrupt. The UI writes the parameters (single halfwords) and posts the
@@ -14,7 +14,7 @@
 
 #define PS_SR 44100.0f
 
-#define PS_NWORLD 2
+#define PS_NWORLD 8
 const char *ps_world_name(int w);
 void ps_init(void);
 void ps_world(int w);                  /* from the next bar */
@@ -32,6 +32,7 @@ enum { P_ENERGY, P_DETAIL, P_DARK, P_DRIFT,                  /* MAIN: the macros
        P_EV_LEVEL, P_EV_DENSITY, P_EV_RUNS, P_EV_ECHO,       /* EVENTS */
        P_ECHO_LEVEL, P_ECHO_FB, P_ECHO_TONE, P_ECHO_TIME,    /* ECHO */
        P_ATMOS_LEVEL, P_ATMOS_COLOUR, P_ATMOS_AIR, P_ATMOS_WASH,   /* ATMOS */
+       P_LINE_LEVEL, P_LINE_DENSITY, P_LINE_LEN, P_LINE_MUTATE,   /* LINE */
        P_NPARAMS };
 typedef struct {
     const char *name;
@@ -69,7 +70,7 @@ int ps_stat(int which);                /* 0 events begun, 1 thrown and remembere
 const char *ps_event_name(int type);
 
 /* for the screen: what struck, counted (the UI sees a count move), and where the music is */
-enum { HIT_KICK, HIT_BASS, HIT_PERC, HIT_EVENT, HIT_THROW, NHIT };
+enum { HIT_KICK, HIT_BASS, HIT_PERC, HIT_EVENT, HIT_THROW, HIT_LINE, NHIT };
 typedef struct {
     volatile uint32_t hits[NHIT];
     volatile uint32_t tick;            /* ticks since PLAY (24 a beat) */

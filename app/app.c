@@ -16,8 +16,9 @@
  *   5 BASS (LFO)             K1..K4 Level, Bite, Length, Drive
  *   6 ATMOS (LFO again)      K1..K4 Level, Colour, Air, Wash (the send)
  *   7 EVENTS (ARP)           K1..K4 Level, Density, Runs, Echo (the send)
- *   8 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
- *   9 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); SAVE here
+ *   8 LINE (ARP again)       K1..K4 Level, Density, Length, Mutate
+ *   9 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
+ *  10 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); SAVE here
  *                            keeps it all
  * SEL held: the knobs are MAIN's four on any page. PRESETS: the world, from the next bar. PLAY: play or rest.
  * SAVE (but on GLOBAL), after HYP-1's: tapped, the next section from the next bar (the groove: a break; a break: its
@@ -31,7 +32,7 @@
 #include "fastmath.h"
 #include "psy.h"
 
-#define SET_MAGIC 0x32544852u            /* "RHT2": the settings record (2: the atmos's four) */
+#define SET_MAGIC 0x33544852u            /* "RHT3": the settings record (2: the atmos's four; 3: the line's, 8 worlds) */
 typedef struct {
     uint32_t magic;
     uint8_t world;
@@ -67,7 +68,7 @@ static void settings_defaults(void)
 {
     int p;
     set.magic = SET_MAGIC;
-    set.world = 0;
+    set.world = 2;                       /* COLD SIGNAL */
     set.lights = 1;
     set.theme = APP_PALETTE;
     for (p = 0; p < P_NPARAMS; p++)
@@ -97,21 +98,23 @@ void app_init(void)
 }
 
 /* ------------------------------------------------------------------ pages --- */
-enum { PG_MAIN, PG_GROOVE, PG_KICK, PG_PERC, PG_BASS, PG_ATMOS, PG_EVENTS, PG_ECHO, PG_GLOBAL, NPAGE };
-static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "KICK", "PERC", "BASS", "ATMOS", "EVENTS", "ECHO", "GLOBAL"};
-static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEQ, B_LFO, B_LFO, B_ARP, B_FX, B_GLO};
+enum { PG_MAIN, PG_GROOVE, PG_KICK, PG_PERC, PG_BASS, PG_ATMOS, PG_EVENTS, PG_LINE, PG_ECHO, PG_GLOBAL, NPAGE };
+static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "KICK", "PERC", "BASS", "ATMOS", "EVENTS", "LINE", "ECHO",
+                                             "GLOBAL"};
+static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEQ, B_LFO, B_LFO, B_ARP, B_ARP, B_FX, B_GLO};
 /* a page's first parameter (P_*), or -1 */
 static int page_par(int p)
 {
     static const int8_t FIRST[NPAGE] = {P_ENERGY, P_TEMPO, P_KICK_LEVEL, P_PERC_LEVEL, P_BASS_LEVEL, P_ATMOS_LEVEL,
-                                        P_EV_LEVEL, P_ECHO_LEVEL, -1};
+                                        P_EV_LEVEL, P_LINE_LEVEL, P_ECHO_LEVEL, -1};
     return FIRST[clamp(p, 0, NPAGE - 1)];
 }
-enum { LANE_KICK, LANE_BASS, LANE_PERC, LANE_EVENTS, NLANE };
-static const char *const LANE_NAME[NLANE] = {"KICK", "BASS", "PERC", "EVENTS"};
+enum { LANE_KICK, LANE_BASS, LANE_PERC, LANE_LINE, LANE_EVENTS, NLANE };
+static const char *const LANE_NAME[NLANE] = {"KICK", "BASS", "PERC", "LINE", "EVENTS"};
 static int page_lane(int p)              /* the lane a page acts on (the screen brightens it), or -1 */
 {
-    return p == PG_KICK ? LANE_KICK : p == PG_BASS ? LANE_BASS : p == PG_PERC ? LANE_PERC : p == PG_EVENTS ? LANE_EVENTS : -1;
+    return p == PG_KICK ? LANE_KICK : p == PG_BASS ? LANE_BASS : p == PG_PERC ? LANE_PERC : p == PG_EVENTS ? LANE_EVENTS
+         : p == PG_LINE ? LANE_LINE : -1;
 }
 
 static struct {
@@ -356,8 +359,6 @@ static void key_down(int k, int vel)
     {
         int b = key_place(k), p;
         if (b < BK_FILL) {
-            if (b == PART_LINE)          /* (no line yet) */
-                return;
             ps_mute(b);
             pf.muted ^= (uint8_t)(1u << b);
             app_say(PART_NAME[b], pf.muted >> b & 1u ? "MUTED" : "BACK");
@@ -445,7 +446,7 @@ static void input(void)
     if (down & 1u << B_LFO)
         page_go(ui.page == PG_BASS ? PG_ATMOS : PG_BASS);
     if (down & 1u << B_ARP)
-        page_go(PG_EVENTS);
+        page_go(ui.page == PG_EVENTS ? PG_LINE : PG_EVENTS);
     if (down & 1u << B_FX)
         page_go(PG_ECHO);
     if (down & 1u << B_GLO)
@@ -514,7 +515,7 @@ static void draw_header(uint32_t now)
  * bars, and a thrown event's name */
 static void marks_update(void)
 {
-    static const uint8_t LANE_OF[NHIT] = {LANE_KICK, LANE_BASS, LANE_PERC, LANE_EVENTS, LANE_EVENTS};
+    static const uint8_t LANE_OF[NHIT] = {LANE_KICK, LANE_BASS, LANE_PERC, LANE_EVENTS, LANE_EVENTS, LANE_LINE};
     uint32_t tick = ps_ui.tick ? ps_ui.tick - 1u : 0u, h, thrown = ps_ui.hits[HIT_THROW];
     int32_t bar = (int32_t)(tick / (4u * PS_TPB)), six = (int32_t)(tick / 6u % 16u);
     if (thrown != ui.seen[HIT_THROW]) {      /* a key's event: named at once */
@@ -545,16 +546,13 @@ static void draw_grid(void)
             cv_text(x + (44 - tw) / 2, y + 4, &FONT_XS, ps_fx_name(id), on ? C_BLACK : C_WHITE);
         }
     }
-    cv_text(8, 106, &FONT_XS, "PARTS", C_GRAY);
-    for (i = 0, c = 56; i < NPART; i++) {    /* (c: x) */
+    for (i = 0, c = 8; i < NPART; i++) {     /* the parts, in the black keys' order (c: x) */
         int mu = ps_ui.muted >> i & 1u;
         int32_t tw = text_w(&FONT_XS, PART_NAME[i]);
-        if (i == PART_LINE)
-            continue;
         cv_text(c, 106, &FONT_XS, PART_NAME[i], mu ? C_LINE : C_HI);
         if (mu)
             cv_rect(c, 110, tw, 1, C_GRAY);
-        c += tw + 8;
+        c += tw + 10;
     }
     cv_text(8, 126, &FONT_XS, "BLACK: MUTE  FILL  OUT  ALL", C_DIM);
     cv_blit(0, 32);
@@ -567,15 +565,15 @@ static void draw_lanes(uint32_t now)
     int focus = page_lane(ui.page);
     cv_begin(240, 148, C_BLACK);
     for (lane = 0; lane < NLANE; lane++) {
-        int32_t y = 8 + lane * 26;
+        int32_t y = 4 + lane * 21;
         int f = lane == focus;
         cv_text(8, y + 3, &FONT_XS, LANE_NAME[lane], f ? C_HI : C_GRAY);
         for (i = 0; i < 16; i++) {
             int32_t x = 66 + i * 10, mk = ui.mark[lane][i];
             uint16_t c = mk == bar ? (f ? C_WHITE : C_HI) : mk == bar - 1 ? (f ? C_AMB : C_DIM) : C_LINE;
-            cv_rect(x, y + (i % 4 ? 4 : 2), 7, i % 4 ? 10 : 14, c);
+            cv_rect(x, y + (i % 4 ? 4 : 2), 7, i % 4 ? 8 : 12, c);
             if (ps_playing() && i == six)
-                cv_rect(x, y + 18, 7, 2, C_WHITE);
+                cv_rect(x, y + 16, 7, 2, C_WHITE);
         }
     }
     {   /* the phrase's eight bars; in a break, its bars (eight shown, then counting on); in a build, its four */
@@ -700,6 +698,8 @@ int app_expect(const char *what, int *got)
         *got = ps_section();
     else if (!strcmp(what, "drops"))
         *got = ps_ui.drops;
+    else if (!strcmp(what, "lines"))         /* the line's notes so far */
+        *got = (int)ps_ui.hits[HIT_LINE];
     else if (!strcmp(what, "muted"))         /* the parts muted, 1 << PART_* (the engine's) */
         *got = ps_ui.muted;
     else if (!strcmp(what, "fx"))            /* the grid's effects held, 1 << id */

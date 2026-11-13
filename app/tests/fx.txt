@@ -6,7 +6,7 @@ jack in
 wait 600
 tap FX
 wait 30
-expect page 7
+expect page 8
 key b0 down 90
 key w11 down 90
 wait 50

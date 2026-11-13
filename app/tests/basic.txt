@@ -5,7 +5,7 @@
 wait 600
 expect playing 1
 expect page 0
-expect world 0
+expect world 2
 expect bpm 152
 shot main.png
 # SELECT turns through every page; the buttons jump (HOME again: GROOVE; SEQ again: PERC)
@@ -17,7 +17,7 @@ wait 30
 expect page 8
 turn SELECT 3
 wait 30
-expect page 8
+expect page 9
 tap HOME
 wait 30
 expect page 0
@@ -39,12 +39,15 @@ expect page 5
 tap ARP
 wait 30
 expect page 6
-tap FX
+tap ARP
 wait 30
 expect page 7
-tap GLO
+tap FX
 wait 30
 expect page 8
+tap GLO
+wait 30
+expect page 9
 # the macros on MAIN, reaching the engine
 tap HOME
 wait 30
@@ -73,8 +76,8 @@ expect bpm 156
 # PRESETS: the world, from the next bar
 turn PRESET 1
 wait 1800
-expect world 1
-expect bpm 180
+expect world 3
+expect bpm 160
 shot world.png
 # SAVE keeps it all, on GLOBAL only (elsewhere it cues a break)
 tap SAVE
@@ -88,11 +91,11 @@ wait 30
 expect dirty 0
 reboot
 wait 600
-expect world 1
+expect world 3
 expect param0 60
 expect param2 30
 expect engine4 4
-expect bpm 180
+expect bpm 160
 # PLAY rests it
 tap PLAY
 wait 50
