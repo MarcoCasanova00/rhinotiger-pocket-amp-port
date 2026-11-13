@@ -51,7 +51,8 @@ static struct {
     } run[4];
     /* the keys: thrown on the next sixteenth; held, again each sixteenth */
     uint32_t held, pending, down;
-    uint8_t press[27];
+    volatile uint8_t press[27];        /* each key's pressure (the UI writes it directly: not through the queue) */
+    uint8_t vel[27];
     uint32_t fired;                    /* events begun (the host's checks) */
     int last_type;                     /* the latest thrown (the screen) */
 } ev;
@@ -98,13 +99,13 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
     v->pan1 = v->pan0;
     v->level = level;
     switch (r->type) {
-    case EV_DIVE:                      /* falls two octaves, growling */
-        v->f0 = f * 0.5f; v->oct = -2.0f; v->dur = 0.32f + 0.1f * b; v->tau = 0.18f;
+    case EV_DIVE:                      /* falls an octave and a half, growling (above the bass: no lower than it) */
+        v->f0 = f; v->oct = -1.5f; v->dur = 0.32f + 0.1f * b; v->tau = 0.18f;
         v->ratio = 0.5f; v->idx0 = 3.5f; v->idx1 = 1.0f;
         v->pan0 *= 0.3f; v->pan1 = v->pan0;
         break;
     case EV_GROWL:                     /* a low voice that seems to talk: its modulation wobbles */
-        v->f0 = f * 0.5f; v->oct = 0.0f; v->dur = 0.30f + 0.12f * b; v->tau = 0.25f;
+        v->f0 = f; v->oct = 0.0f; v->dur = 0.30f + 0.12f * b; v->tau = 0.25f;
         v->ratio = 1.0f; v->idx0 = v->idx1 = 1.6f;
         v->lfo_hz = 6.0f + 4.0f * a; v->lfo_idx = 2.4f;
         v->pan0 *= 0.4f; v->pan1 = -v->pan0;
@@ -160,7 +161,7 @@ static recipe_t ev_invent(const world_t *w)
     static const int8_t SCALE[8] = {0, 1, 3, 6, 7, 10, 12, 13};   /* dark: seconds and tritones about the root */
     recipe_t r;
     uint32_t x = rnd();
-    if (ev.nmem && x % 2u == 0u)       /* half the time, something a key threw */
+    if (ev.nmem && x % 100u < 10u + 5u * ev.nmem)   /* something a key threw: more often the more were thrown (to 50%) */
         return ev.mem[(x >> 8) % ev.nmem];
     x = rnd() % 100u;
     r.type = (uint8_t)(x < w->ev_low ? EV_DIVE + rnd() % 2u
@@ -229,26 +230,23 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
         for (k = 0; k < 27; k++)
             if (keys >> k & 1u) {
                 recipe_t r = key_recipe(k);
-                ev_start(&r, (float)ev.press[k] / 127.0f, 1.0f);
+                float bite = 0.5f * (float)ev.vel[k] / 127.0f + (float)ev.press[k] / 127.0f;
+                ev_start(&r, bite, 1.0f);
                 ev.last_type = r.type;
             }
         ev.held = keys & ev.down;      /* still down: again on the next sixteenth */
     }
 }
 
-static void ev_key(int k, int down, int press)   /* (render: from the command queue) */
+static void ev_key(int k, int down, int press)   /* (render: from the command queue): down 1 (press: velocity), 0 up */
 {
     if (k < 0 || k >= 27)
         return;
-    if (down == 2) {                   /* pressure */
-        ev.press[k] = (uint8_t)press;
-        return;
-    }
     if (down) {
         recipe_t r = key_recipe(k);
         ev.pending |= 1u << k;
         ev.down |= 1u << k;
-        ev.press[k] = 0;
+        ev.vel[k] = (uint8_t)press;    /* (on a press, the value is the velocity) */
         ev.mem[ev.memw] = r;           /* remembered: the generator takes it up later */
         ev.memw = (uint8_t)((ev.memw + 1u) % EV_MEM);
         if (ev.nmem < EV_MEM)
@@ -260,9 +258,22 @@ static void ev_key(int k, int down, int press)   /* (render: from the command qu
 }
 
 /* a sample of the events: l and r added to, and the echo's send */
+static float ev_hp[2][2], ev_hx[2][2];
+static float ev_highpass(int ch, float x)   /* ~180 Hz, 12 dB an octave: the events keep out of the bass's lane */
+{
+    const float a = 0.9747f;           /* exp(-2 pi 180 / 44100) */
+    float y1 = a * (ev_hp[ch][0] + x - ev_hx[ch][0]), y2;
+    ev_hx[ch][0] = x;
+    ev_hp[ch][0] = y1;
+    y2 = a * (ev_hp[ch][1] + y1 - ev_hx[ch][1]);
+    ev_hx[ch][1] = y1;
+    ev_hp[ch][1] = y2;
+    return y2;
+}
+
 static float ev_render(float dt, float *l, float *r)
 {
-    float send = 0.0f;
+    float send = 0.0f, el = 0.0f, er = 0.0f;
     int k;
     for (k = 0; k < EV_NVOICE; k++) {
         evoice_t *v = &ev.v[k];
@@ -295,10 +306,14 @@ static float ev_render(float dt, float *l, float *r)
         amp = (v->t < 0.001f ? v->t / 0.001f : 1.0f) * fm_expf(-v->t / v->tau) * (1.0f - u * u);
         x = fm_tanhf(1.4f * x) * amp * v->level * 0.28f;
         pan = v->pan0 + (v->pan1 - v->pan0) * u;
-        *l += x * (1.0f - 0.5f * pan);
-        *r += x * (1.0f + 0.5f * pan);
-        send += x;
+        el += x * (1.0f - 0.5f * pan);
+        er += x * (1.0f + 0.5f * pan);
         v->t += dt;
     }
+    el = ev_highpass(0, el);
+    er = ev_highpass(1, er);
+    *l += el;
+    *r += er;
+    send = 0.5f * (el + er);           /* the echo hears them high-passed too */
     return send;
 }

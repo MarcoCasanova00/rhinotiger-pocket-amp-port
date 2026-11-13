@@ -26,6 +26,7 @@ wait 600
 tapkey b9
 wait 800
 # a middle key held two seconds, pressed harder as it goes: thrown again every sixteenth
+expect events <40
 key w8 down 90
 wait 700
 key w8 down 90 60
@@ -35,6 +36,8 @@ wait 600
 key w8 up
 wait 2000
 expect thrown 7
+# held two seconds: thrown again each sixteenth (152: about 10 a second), the generator's on top
+expect events >50
 # the generator takes up what was thrown: let it run some phrases
 wait 30000
 wavstop

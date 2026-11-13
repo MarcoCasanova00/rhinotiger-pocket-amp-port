@@ -88,11 +88,21 @@ static void cmd_post(uint32_t c)
     cmd_q[w % CMD_N] = c;
     cmd_w = w + 1u;
 }
-void ps_key(int k, int down, int value) { cmd_post((uint32_t)(k & 31) | (uint32_t)(down & 3) << 5 | (uint32_t)(value & 127) << 8); }
-
 static uint32_t rnd(void);
 static float note_hz(int note);
 #include "events.c"
+
+void ps_key(int k, int down, int value)
+{
+    if (down == 2) {                   /* pressure: straight into the events' table (a byte: no queue to fill) */
+        if (k >= 0 && k < 27)
+            ev.press[k] = (uint8_t)value;
+        return;
+    }
+    if (down)
+        ev.press[k] = 0;
+    cmd_post((uint32_t)(k & 31) | (uint32_t)(down & 3) << 5 | (uint32_t)(value & 127) << 8);
+}
 
 void ps_init(void)
 {
