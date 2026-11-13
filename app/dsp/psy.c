@@ -208,6 +208,7 @@ static struct {
     /* the atmos */
     float a_lvl;                       /* its level now (glides between the sections) */
     float a_ph[3][2], a_mph[3];        /* the chord's notes, left and right; each note's modulator */
+    float a_vg[3];                     /* the chord's notes' gains (lighter: the upper two fade, and back) */
     float a_lfo, a_lp[2];              /* the slow wander; the chord's low-pass */
     float a_low, a_band;               /* the air's band-pass */
 } s;
@@ -443,6 +444,7 @@ void ps_init(void)
     s.h_t = s.o_t = s.c_t = s.r_t = -1.0f;
     s.rng = 0x9E3779B9u;
     s.lim = 1.0f;
+    s.a_vg[0] = s.a_vg[1] = s.a_vg[2] = 1.0f;
     for (k = 0; k < EV_NVOICE; k++)
         ev.v[k].t = -1.0f;
     ln.t = -1.0f;
@@ -834,12 +836,15 @@ static float atmos(const world_t *w, float n, float *l, float *r)
     if ((s.a_lfo += 0.05f / PS_SR) >= 1.0f)
         s.a_lfo -= 1.0f;
     wob = fm_sin_turns(s.a_lfo);
-    for (i = 0; i < (shed ? 1 : 3); i++) {   /* the chord: each note a little apart left and right, its modulator shared
-                                              * (lighter: its root alone) */
-        float inc = cf.a_inc[i], idx = (0.15f + 1.2f * colour) * (0.75f + 0.25f * wob), mo;
-        mo = fm_sin_turns(s.a_mph[i]) * idx * 0.159155f;
-        al += fm_sin_turns(s.a_ph[i][0] + mo);
-        ar += fm_sin_turns(s.a_ph[i][1] + mo);
+    for (i = 0; i < 3; i++) {          /* the chord: each note a little apart left and right, its modulator shared
+                                        * (lighter: its root alone, the others fading over ~20 ms, their phases on) */
+        float inc = cf.a_inc[i], idx = (0.15f + 1.2f * colour) * (0.75f + 0.25f * wob), mo,
+              g = (s.a_vg[i] += ((i && shed ? 0.0f : 1.0f) - s.a_vg[i]) * 0.0012f);
+        if (g > 0.0005f) {
+            mo = fm_sin_turns(s.a_mph[i]) * idx * 0.159155f;
+            al += fm_sin_turns(s.a_ph[i][0] + mo) * g;
+            ar += fm_sin_turns(s.a_ph[i][1] + mo) * g;
+        }
         if ((s.a_mph[i] += 2.0f * inc) >= 1.0f)
             s.a_mph[i] -= 1.0f;
         if ((s.a_ph[i][0] += inc * (1.0f - 0.0016f * (float)(i + 1))) >= 1.0f)
