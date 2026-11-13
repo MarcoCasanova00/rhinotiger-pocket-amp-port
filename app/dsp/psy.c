@@ -15,7 +15,8 @@ typedef struct {
     const char *name;
     float bpm;
     int root;                          /* MIDI note of the bass (and the kick's tuning) */
-    uint8_t roll;                      /* the bass's step in ticks: 6 sixteenths (K-B-B-B), 4 triplets (K-b-b-b-b-b) */
+    uint8_t roll;                      /* the bass's step in ticks: 6 sixteenths (K-B-B-B), the rule; 4 triplets
+                                        * (K-b-b-b-b-b), a rare colour (the user: "there may be some, but rare") */
     float ratio;                       /* the bass's modulator to carrier */
     float index, index_ms;             /* the modulation at the note's start, and how fast it falls (ms to 1/e) */
     float floor;                       /* the modulation it falls to */
@@ -29,8 +30,6 @@ static const world_t W[PS_NWORLD] = {
     {"COLD SIGNAL", 152.0f, 30, 6, 1.0f, 3.2f, 14.0f, 0.35f, 0.72f, 1.6f, 0.95f},
     /* bright hi-tech: sixteenths at 176, a metallic edge */
     {"GLASS INSECTS", 176.0f, 30, 6, 2.0f, 2.4f, 9.0f, 0.25f, 0.76f, 1.3f, 0.92f},
-    /* the same, rolled in triplet sixteenths (a sketch to compare) */
-    {"GLASS INSECTS 3", 176.0f, 30, 4, 2.0f, 2.4f, 8.0f, 0.25f, 0.80f, 1.3f, 0.95f},
 };
 
 const char *ps_world_name(int w) { return W[(unsigned)w % PS_NWORLD].name; }

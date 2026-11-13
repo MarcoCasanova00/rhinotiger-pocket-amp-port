@@ -14,13 +14,6 @@ expect world 1
 wav glass-insects.wav
 wait 45500
 wavstop
-# the same rolled in triplet sixteenths
-turn ALGO 1
-wait 1500
-expect world 2
-wav glass-insects-triplet.wav
-wait 45500
-wavstop
 # PLAY rests it
 tap PLAY
 wait 50
