@@ -191,6 +191,7 @@ static struct {
     uint8_t pat;                       /* the bass's shape this phrase: 0 K-B-B-B, 1 a gallop (K-.-B-B), 2 triplets */
     /* the echo: ping-pong */
     float e_lp[2];
+    float lim;                         /* the master limiter's gain */
     /* the sections */
     uint8_t sec, colour, drops;
     uint32_t origin;                   /* the bar the phrases count from: the last drop's */
@@ -420,6 +421,7 @@ void ps_init(void)
     s.k_t = s.b_t = -1.0f;
     s.h_t = s.o_t = s.c_t = s.r_t = -1.0f;
     s.rng = 0x9E3779B9u;
+    s.lim = 1.0f;
     for (k = 0; k < EV_NVOICE; k++)
         ev.v[k].t = -1.0f;
     ln.t = -1.0f;
@@ -686,6 +688,16 @@ static float bass(const world_t *w, float dt)
     return s.lp;
 }
 
+#define MASTER_TRIM 0.65f
+static float soft(float x)             /* as it is below 0.7, then rounding off towards 1 (never past it) */
+{
+    float a = fm_fabsf(x), y;
+    if (a <= 0.7f)
+        return x;
+    y = 0.7f + 0.3f * fm_tanhf((a - 0.7f) / 0.3f);
+    return x < 0.0f ? -y : y;
+}
+
 static float noise(void) { return (float)(int32_t)rnd() * (1.0f / 2147483648.0f); }
 
 /* the percussion, a sample: l and r added to */
@@ -932,14 +944,24 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 send = 0.0f;
             s.e_lp[0] += (xr * fb + send * 0.5f - s.e_lp[0]) * tone;   /* into the left: the right's, and the send */
             s.e_lp[1] += (xl * fb - s.e_lp[1]) * tone;                  /* into the right: the left's */
-            echo_buf[0][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[0], -0.99f, 0.99f) * 32767.0f);
-            echo_buf[1][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[1], -0.99f, 0.99f) * 32767.0f);
+            echo_buf[0][echo_w % ECHO_N] = (int16_t)(soft(s.e_lp[0]) * 32767.0f);   /* (a throw rounded, not cut) */
+            echo_buf[1][echo_w % ECHO_N] = (int16_t)(soft(s.e_lp[1]) * 32767.0f);
             echo_w++;
             ml = perc_g * l + ev_g * el + ll + al;     /* above the kick and the bass: THROW and WASH take it */
             mr = perc_g * r + ev_g * er + lr + ar;
             outl[i] = c + ml + ret_g * xl;
             outr[i] = c + mr + ret_g * xr;
             fx_send = fx_render(s.tick_len, &outl[i], &outr[i], ml, mr, n);
+            {   /* the master: trimmed (the groove's peaks near 0.88), a limiter over 0.89 (at once down, back in
+                 * ~90 ms, the two sides together), and a soft clip for what still gets past */
+                float ol = outl[i] * MASTER_TRIM, orr = outr[i] * MASTER_TRIM, pk = fm_maxf(fm_fabsf(ol), fm_fabsf(orr));
+                if (pk * s.lim > 0.89f)
+                    s.lim = 0.89f / pk;
+                else
+                    s.lim += (1.0f - s.lim) * 0.00025f;
+                outl[i] = soft(ol * s.lim);
+                outr[i] = soft(orr * s.lim);
+            }
         }
     }
 }

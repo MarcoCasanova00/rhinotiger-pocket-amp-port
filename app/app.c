@@ -59,12 +59,13 @@ static float gain_now;                   /* glides to MASTER: no step at a block
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
     uint32_t i;
-    float gain = (float)master_q12 / 4096.0f * 8300000.0f;   /* MASTER, read once a block */
+    float gain = (float)master_q12 / 4096.0f * 8388000.0f;   /* MASTER, read once a block: the engine's 1.0 (its
+                                                                * limit) is full scale at the top */
     ps_render(eng_l, eng_r, n);
     for (i = 0; i < n; i++) {
         gain_now += (gain - gain_now) * 0.004f;                  /* ~5 ms: turning MASTER does not click */
-        lr[2 * i] = (int32_t)(2.0f * eng_l[i] * gain_now);
-        lr[2 * i + 1] = (int32_t)(2.0f * eng_r[i] * gain_now);
+        lr[2 * i] = (int32_t)(eng_l[i] * gain_now);
+        lr[2 * i + 1] = (int32_t)(eng_r[i] * gain_now);
     }
 }
 
