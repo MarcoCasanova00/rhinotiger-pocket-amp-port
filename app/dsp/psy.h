@@ -2,7 +2,7 @@
  * Copyright (C) 2026 hacha */
 /* RhinoTiger's engine: the kick and the rolling FM bass sharing the grid, and the percussion over them.
  *
- * STATUS: the first sketch. The kick, the bass (a sixteenth roll, K-B-B-B) and the percussion, in two worlds;
+ * STATUS: the first sketch. The kick, the bass (a sixteenth roll, K-B-B-B), the percussion and the events, in two worlds;
  * the bass rests on the last beat of every 8th bar, and the kick too on that of every 32nd (the fills).
  *
  * Threads: ps_render() runs in the audio interrupt; ps_world() and ps_play() only set a value it reads at a block's
@@ -20,3 +20,8 @@ void ps_play(int on);
 int ps_playing(void);
 int ps_bar(void);                      /* bars since PLAY (the screen, the host's checks) */
 void ps_render(float *l, float *r, uint32_t n);   /* stereo, about -1..1 */
+
+/* the keys throw events (events.c): key 0..26 (F3..G5), down 1 (value: velocity), 0 up, 2 pressure (value 0..127) */
+void ps_key(int k, int down, int value);
+int ps_stat(int which);                /* 0 events begun, 1 thrown and remembered (up to 8), 2 the latest thrown's type */
+const char *ps_event_name(int type);

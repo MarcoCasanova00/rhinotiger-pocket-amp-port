@@ -32,7 +32,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* MIDI note, -1 = released */
 static volatile float voice_vel = 1.0f;      /* the note's velocity, 0..1 */
-static float voice_phase, voice_level, gain_now;   /* gain_now glides to MASTER: no step at a block's edge */
+static float gain_now;   /* gain_now glides to MASTER: no step at a block's edge */
 
 static void note_on(int32_t note, uint32_t vel)
 {
@@ -67,30 +67,19 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
     uint32_t i;
-    int32_t note = voice_note;
-    float target = note >= 0 ? 0.25f * voice_vel : 0.0f;
-    float inc = note >= 0 ? 440.0f * fm_exp2f((float)(note - 69) / 12.0f) / 44100.0f : 0.0f;
     float gain = (float)master_q12 / 4096.0f * 8300000.0f;   /* MASTER, read once a block */
     midi_in();
     ps_render(eng_l, eng_r, n);
     for (i = 0; i < n; i++) {
-        float s;
-        voice_level += (target - voice_level) * 0.002f;          /* ~10 ms attack and release */
         gain_now += (gain - gain_now) * 0.004f;                  /* ~5 ms: turning MASTER does not click */
-        voice_phase += inc;
-        if (voice_phase >= 1.0f)
-            voice_phase -= 1.0f;
-        s = set.wave ? 4.0f * fm_fabsf(voice_phase - 0.5f) - 1.0f : fm_sinf(voice_phase * 6.2831853f);
-        s *= voice_level;
-        lr[2 * i] = (int32_t)((s + 2.0f * eng_l[i]) * gain_now);
-        lr[2 * i + 1] = (int32_t)((s + 2.0f * eng_r[i]) * gain_now);
+        lr[2 * i] = (int32_t)(2.0f * eng_l[i] * gain_now);
+        lr[2 * i + 1] = (int32_t)(2.0f * eng_r[i] * gain_now);
     }
 }
 
 void app_panic(void)
 {
     voice_note = -1;
-    voice_level = 0.0f;
 }
 
 /* --------------------------------------------------------------- settings --- */
@@ -282,13 +271,16 @@ static void input(void)
             ui.prs[k] = 0;
             ui.last_key = (int32_t)k;
             note_on(note, v);
+            ps_key((int)k, 1, (int)v);          /* RhinoTiger: the key throws an event */
             plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note << 16 | v << 24, TO_USB | TO_BLE);   /* BLE: if built with it */
         } else if (!(keys & bit) && (ui.keys & bit)) {
             ui.prs[k] = 0;
             note_off(note);
+            ps_key((int)k, 0, 0);
             plat_midi_send(0x08u | 0x80u << 8 | (uint32_t)note << 16, TO_USB | TO_BLE);
         } else if ((keys & bit) && touch_pressure(k) != ui.prs[k]) {   /* pressure: poly aftertouch */
             ui.prs[k] = touch_pressure(k);
+            ps_key((int)k, 2, ui.prs[k]);
             ui.redraw = 1;
             plat_midi_send(0x0Au | 0xA0u << 8 | (uint32_t)note << 16 | (uint32_t)ui.prs[k] << 24, TO_USB | TO_BLE);
         }
@@ -526,6 +518,12 @@ int app_expect(const char *what, int *got)
         *got = ps_bar();
     else if (!strcmp(what, "playing"))
         *got = ps_playing();
+    else if (!strcmp(what, "events"))        /* events begun */
+        *got = ps_stat(0);
+    else if (!strcmp(what, "thrown"))        /* thrown by the keys and remembered (up to 8) */
+        *got = ps_stat(1);
+    else if (!strcmp(what, "thrown_type"))
+        *got = ps_stat(2);
     else if (!strcmp(what, "note"))
         *got = voice_note;
     else if (!strcmp(what, "dirty"))

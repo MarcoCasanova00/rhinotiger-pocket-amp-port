@@ -32,13 +32,17 @@ typedef struct {
     float hat_hp;                      /* the hats' high-pass, 0..1 (higher: thinner) */
     float clap_hz;                     /* the clap's band */
     uint8_t ride;                      /* a ride on the eighths */
+    /* the events (events.c) */
+    uint8_t ev_density;                /* recipes in the 4-bar loop */
+    uint8_t ev_low, ev_mid;            /* % of them low (dive, growl) and middle (zap, gurgle); the rest high */
+    uint8_t ev_runs;                   /* % of them runs */
 } world_t;
 
 static const world_t W[PS_NWORLD] = {
     /* cold dark psy: hard, short sixteenths, a dry growl */
-    {"COLD SIGNAL", 152.0f, 30, 6, 1.0f, 3.2f, 14.0f, 0.35f, 0.72f, 1.6f, 0.95f, 14.0f, 55.0f, 0.80f, 1100.0f, 0},
+    {"COLD SIGNAL", 152.0f, 30, 6, 1.0f, 3.2f, 14.0f, 0.35f, 0.72f, 1.6f, 0.95f, 14.0f, 55.0f, 0.80f, 1100.0f, 0, 5, 30, 55, 15},
     /* bright hi-tech: sixteenths at 176, a metallic edge */
-    {"GLASS INSECTS", 176.0f, 30, 6, 2.0f, 2.4f, 9.0f, 0.25f, 0.76f, 1.3f, 0.92f, 10.0f, 40.0f, 0.88f, 1500.0f, 1},
+    {"GLASS INSECTS", 176.0f, 30, 6, 2.0f, 2.4f, 9.0f, 0.25f, 0.76f, 1.3f, 0.92f, 10.0f, 40.0f, 0.88f, 1500.0f, 1, 9, 10, 40, 35},
 };
 
 const char *ps_world_name(int w) { return W[(unsigned)w % PS_NWORLD].name; }
@@ -65,7 +69,30 @@ static struct {
     float r_ph[3];                     /* the ride's partials */
     uint32_t rng;
     uint8_t out;                       /* the part sitting out this phrase: 0 none, 1 hats, 2 open, 3 clap, 4 ride */
+    /* the echo: a dotted eighth, ping-pong */
+    float e_lp[2];
 } s;
+
+#define ECHO_N 16384u
+static int16_t echo_buf[2][ECHO_N];
+static uint32_t echo_w;
+
+/* commands from the UI: keys (the render drains them as a block begins) */
+#define CMD_N 64u
+static volatile uint32_t cmd_q[CMD_N], cmd_w, cmd_r;
+static void cmd_post(uint32_t c)
+{
+    uint32_t w = cmd_w;
+    if (w - cmd_r >= CMD_N)
+        return;                        /* full: dropped */
+    cmd_q[w % CMD_N] = c;
+    cmd_w = w + 1u;
+}
+void ps_key(int k, int down, int value) { cmd_post((uint32_t)(k & 31) | (uint32_t)(down & 3) << 5 | (uint32_t)(value & 127) << 8); }
+
+static uint32_t rnd(void);
+static float note_hz(int note);
+#include "events.c"
 
 void ps_init(void)
 {
@@ -74,6 +101,8 @@ void ps_init(void)
     s.k_t = s.b_t = -1.0f;
     s.h_t = s.o_t = s.c_t = s.r_t = -1.0f;
     s.rng = 0x9E3779B9u;
+    for (int k = 0; k < EV_NVOICE; k++)
+        ev.v[k].t = -1.0f;
     s.tick = 0;
     s.next = 0.0f;
 }
@@ -84,6 +113,8 @@ int ps_playing(void) { return playing; }
 int ps_bar(void) { return (int)(s.tick / TPBAR); }
 
 static float note_hz(int note) { return 440.0f * fm_exp2f((float)(note - 69) / 12.0f); }
+int ps_stat(int which) { return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : ev.last_type; }
+const char *ps_event_name(int type) { return EV_NAME[(unsigned)type % EV_NTYPE]; }
 
 static uint32_t rnd(void)
 {
@@ -134,6 +165,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     int kick_rests = bar % 32u == 31u && beat == 3u;   /* the 32nd's: the kick too */
     int bass;
     perc_step(w, t, beat, bar, bass_rests);
+    ev_step(w, t, bar, (uint32_t)(s.tick / 6u), 0);
     if (t == 0u) {
         if (!kick_rests) {
             s.k_t = 0.0f;
@@ -283,6 +315,11 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.tick = 0;
         s.next = 0.0f;
     }
+    while (cmd_r != cmd_w) {           /* the keys */
+        uint32_t c = cmd_q[cmd_r % CMD_N];
+        cmd_r++;
+        ev_key((int)(c & 31u), (int)(c >> 5 & 3u), (int)(c >> 8 & 127u));
+    }
     tempo(w);
     for (i = 0; i < n; i++) {
         if (playing) {
@@ -300,10 +337,21 @@ void ps_render(float *outl, float *outr, uint32_t n)
             s.next -= 1.0f;
         }
         {
-            float c = 0.85f * kick(w, dt) + 0.55f * bass(w, dt), l = c, r = c;
+            float c = 0.85f * kick(w, dt) + 0.55f * bass(w, dt), l = c, r = c, send, el, er;
+            uint32_t d = (uint32_t)(s.tick_len * 18.0f);   /* a dotted eighth: 18 ticks */
             perc(w, dt, &l, &r);
-            outl[i] = l;
-            outr[i] = r;
+            send = ev_render(dt, &l, &r);
+            if (d >= ECHO_N)
+                d = ECHO_N - 1u;
+            el = (float)echo_buf[0][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
+            er = (float)echo_buf[1][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
+            s.e_lp[0] += (er * 0.42f + send * 0.5f - s.e_lp[0]) * 0.35f;   /* into the left: the right's, and the send */
+            s.e_lp[1] += (el * 0.42f - s.e_lp[1]) * 0.35f;                  /* into the right: the left's */
+            echo_buf[0][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[0], -0.99f, 0.99f) * 32767.0f);
+            echo_buf[1][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[1], -0.99f, 0.99f) * 32767.0f);
+            echo_w++;
+            outl[i] = l + 0.7f * el;
+            outr[i] = r + 0.7f * er;
         }
     }
 }

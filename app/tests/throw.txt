@@ -1,0 +1,40 @@
+# The keys throw events: recorded (build/host/throw-*.wav) to listen to.
+jack in
+wav throw-cold-signal.wav
+# the generator's own events from bar 4, a 4-bar loop (COLD SIGNAL, 152: a bar is 1.58 s): by bar 8 all of it
+wait 13000
+expect events >0
+# a low white key (F3): a dive or a growl, on the next sixteenth
+tapkey w0
+wait 400
+expect thrown 1
+expect thrown_type <2
+# a middle white key: a zap or a gurgle
+tapkey w7
+wait 400
+expect thrown_type >1
+expect thrown_type <4
+# a high white key: a chirp or a laser
+tapkey w14
+wait 400
+expect thrown_type >3
+# black keys: runs (a roll low, staircases above)
+tapkey b1
+wait 600
+tapkey b5
+wait 600
+tapkey b9
+wait 800
+# a middle key held two seconds, pressed harder as it goes: thrown again every sixteenth
+key w8 down 90
+wait 700
+key w8 down 90 60
+wait 700
+key w8 down 90 100
+wait 600
+key w8 up
+wait 2000
+expect thrown 7
+# the generator takes up what was thrown: let it run some phrases
+wait 30000
+wavstop
