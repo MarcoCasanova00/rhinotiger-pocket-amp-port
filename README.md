@@ -13,6 +13,7 @@ git submodule update --init --recursive
 ./test.sh                             # the host simulator, every script in app/tests
 ./build.sh --web                      # browser emulator (Emscripten)
 ./build.sh                            # device package (JieLi toolchain + AC79 SDK)
+./install.sh                          # device package, then installed over USB-MIDI (--no-build: as built)
 ```
 
 ## Licence
