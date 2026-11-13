@@ -302,6 +302,7 @@ static void ev_key(int k, int down, int press)   /* (render: from the command qu
 
 /* a sample of the events: l and r added to, and the echo's send */
 static float ev_hp[2][2], ev_hx[2][2];
+static hp2_t ev_hp2[2];
 static float ev_highpass(int ch, float x)   /* ~180 Hz, 12 dB an octave: the events keep out of the bass's lane */
 {
     const float a = 0.9747f;           /* exp(-2 pi 180 / 44100) */
@@ -353,8 +354,8 @@ static float ev_render(float dt, float *l, float *r)
         er += x * (1.0f + 0.5f * pan);
         v->t += dt;
     }
-    el = ev_highpass(0, el);
-    er = ev_highpass(1, er);
+    el = hp2(&ev_hp2[0], ev_highpass(0, el), 0.9747f);   /* (twice: 24 dB an octave, a dive's depths out) */
+    er = hp2(&ev_hp2[1], ev_highpass(1, er), 0.9747f);
     *l += el;
     *r += er;
     send = 0.5f * (el + er);           /* the echo hears them high-passed too */

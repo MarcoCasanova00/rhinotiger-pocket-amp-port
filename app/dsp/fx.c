@@ -22,6 +22,15 @@ static const char *const FX_NAME[FX_N] = {"1/8", "1/16", "1/32", "1/16T", "LOW",
 
 #define CAP_N 32768u                   /* frames: 0.74 s (a beat at 125 bpm is 21168) */
 static PLAT_POOL int16_t cap_buf[2][CAP_N];
+#define FL_N 512u                      /* FLANGE's own short ring: always written, held buffer or not */
+static int16_t fl_buf[2][FL_N];
+static uint32_t fl_w;
+static float fl_read(int ch, float d)  /* d frames ago, between two samples */
+{
+    uint32_t i = (uint32_t)d;
+    float f = d - (float)i, a = (float)fl_buf[ch][(fl_w - 1u - i) % FL_N], b = (float)fl_buf[ch][(fl_w - 2u - i) % FL_N];
+    return (a + (b - a) * f) * (2.0f / 32767.0f);
+}
 
 typedef struct {                       /* a buffer's effect playing */
     int8_t id;                         /* FX_* (-1 none) */
@@ -167,6 +176,9 @@ static void svf(float st[2], float x, float f, float q)   /* Chamberlin: st[0] l
 static float fx_render(float tick_len, float *l, float *r, float upper_l, float upper_r, float n)
 {
     float dl = *l, dr = *r, bl = 0.0f, br = 0.0f, send = 0.0f, g;
+    fl_buf[0][fl_w % FL_N] = (int16_t)(fm_clampf(dl * 0.5f, -1.0f, 1.0f) * 32767.0f);
+    fl_buf[1][fl_w % FL_N] = (int16_t)(fm_clampf(dr * 0.5f, -1.0f, 1.0f) * 32767.0f);
+    fl_w++;
     /* the buffer keeps the mix, unless a buffer's effect is replaying it */
     if (!fx.cap_hold) {
         cap_buf[0][fx.cap_w % CAP_N] = (int16_t)(fm_clampf(dl * 0.5f, -1.0f, 1.0f) * 32767.0f);
@@ -231,8 +243,8 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         if ((fx.fl_ph += 0.4f / PS_SR) >= 1.0f)
             fx.fl_ph -= 1.0f;
         d = 26.0f + 190.0f * (0.5f + 0.5f * fm_sin_turns(fx.fl_ph));
-        dl += 0.7f * fx.fl_g * cap_read(0, (float)(fx.cap_w % CAP_N) + (float)CAP_N - 1.0f - d);
-        dr += 0.7f * fx.fl_g * cap_read(1, (float)(fx.cap_w % CAP_N) + (float)CAP_N - 1.0f - d * 1.07f);
+        dl += 0.7f * fx.fl_g * fl_read(0, d);
+        dr += 0.7f * fx.fl_g * fl_read(1, d * 1.07f);
         dl *= 1.0f - 0.3f * fx.fl_g;
         dr *= 1.0f - 0.3f * fx.fl_g;
     }

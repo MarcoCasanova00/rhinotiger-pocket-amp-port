@@ -9,7 +9,8 @@
  * and as each phrase (8 bars) begins it plays or rests by the world's presence. In a break it stays, softer.
  *
  * The voice: the modulation falls from the accent's height to the world's floor (a wah in some worlds: it swings with
- * the note); the pitch glides on a slide; the note's length is Length's share of its step. */
+ * the note); the pitch glides on a slide; the note's length is Length's share of its step. Over 150 Hz only: a low
+ * line's growl is its harmonics, the sub stays the kick's and the bass's. */
 
 #define LN_STEPS 32u
 static struct {
@@ -25,6 +26,7 @@ static struct {
     float wah_ph;
     float lp;
     float pan;
+    hp2_t hp[2];                       /* over 150 Hz, 24 dB an octave: under it the kick's and the bass's */
 } ln;
 
 static const int8_t PHRYGIAN[7] = {0, 1, 3, 5, 7, 8, 10};
@@ -142,7 +144,7 @@ static float ln_render(const world_t *w, float dt, float *l, float *r)   /* retu
         ln.mph -= 1.0f;
     ln.t += dt;
     ln.lp += (x - ln.lp) * 0.6f;
-    x = ln.lp * 0.22f;
+    x = hp2(&ln.hp[1], hp2(&ln.hp[0], ln.lp, HP150), HP150) * 0.22f;
     *l += x * (1.0f - ln.pan);
     *r += x * (1.0f + ln.pan);
     return x;

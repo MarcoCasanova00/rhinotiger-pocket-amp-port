@@ -192,6 +192,9 @@ static struct {
     /* the echo: ping-pong */
     float e_lp[2];
     float lim;                         /* the master limiter's gain */
+#define NG 7
+    float g[NG];                       /* the levels, gliding: kick, bass, perc, events, line, the events' send, the echo */
+    float echo_d;                      /* the echo's delay in frames, gliding (a tempo moved, a time changed) */
     /* the sections */
     uint8_t sec, colour, drops;
     uint32_t origin;                   /* the bar the phrases count from: the last drop's */
@@ -234,7 +237,7 @@ static PLAT_POOL int16_t echo_buf[2][ECHO_N];
 static uint32_t echo_w;
 
 /* commands from the UI: keys (the render drains them as a block begins) */
-#define CMD_N 64u
+#define CMD_N 256u                     /* (a key's up must not be lost: room for a dense MIDI burst and the keys) */
 static volatile uint32_t cmd_q[CMD_N], cmd_w, cmd_r;
 static void cmd_post(uint32_t c)
 {
@@ -275,6 +278,21 @@ static int ev_changes(void)            /* recipes changed as a phrase begins: 0.
     return clampi((int)(m.drift * 3.0f + (float)(rnd() % 100u) / 100.0f), 0, 3);
 }
 static float ev_dark(void) { return m.dark; }
+
+/* a high-pass, 12 dB an octave (two one-poles): the sub kept to the kick and the bass */
+typedef struct { float y1, x1, y2, x2; } hp2_t;
+#define HP150 0.97885f                 /* exp(-2 pi 150 / 44100) */
+static float hp2(hp2_t *h, float x, float a)
+{
+    float y1 = a * (h->y1 + x - h->x1), y2;
+    h->x1 = x;
+    h->y1 = y1;
+    y2 = a * (h->y2 + y1 - h->x2);
+    h->x2 = y1;
+    h->y2 = y2;
+    return y2;
+}
+static hp2_t echo_hp;                  /* the echo's input */
 
 #include "events.c"
 #include "fx.c"
@@ -625,8 +643,11 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         s.b_t = 0.0f;
         s.b_cph = s.b_mph = 0.0f;      /* every note from the same place: the roll is tight */
         s.b_gate = w->gate * (0.6f + 0.8f * (float)par[P_BASS_LEN] / 100.0f) * s.tick_len * (float)roll / PS_SR;
-        if (s.b_gate > 0.95f * s.tick_len * (float)roll / PS_SR)
-            s.b_gate = 0.95f * s.tick_len * (float)roll / PS_SR;
+        {   /* room for its 3 ms release before the next */
+            float most = fm_minf(0.95f * s.tick_len * (float)roll / PS_SR, s.tick_len * (float)roll / PS_SR - 0.0035f);
+            if (s.b_gate > most)
+                s.b_gate = most;
+        }
         s.b_inc = note_hz(m.root + (w->jump && rnd() % 100u < w->jump ? ((rnd() & 1u) ? 12 : 7) : 0)) / PS_SR;
     }
     ps_ui.hits[HIT_BASS]++;
@@ -776,13 +797,14 @@ static void perc(const world_t *w, float dt, float *l, float *r)
 /* the build's riser: a band of noise rising over its four bars, gone for the breath; returns what goes to the echo */
 static float build_progress(void)      /* 0..1 through a build's four bars */
 {
-    return s.sec == SEC_BUILD ? ((float)s.sec_bar + (float)(s.tick % TPBAR) / (float)TPBAR) / 4.0f : 0.0f;
+    uint32_t tk = s.tick ? s.tick - 1u : 0u;   /* (the tick sounding: s.tick is the next's) */
+    return s.sec == SEC_BUILD ? ((float)s.sec_bar + (float)(tk % TPBAR) / (float)TPBAR) / 4.0f : 0.0f;
 }
 
 static float riser(float n, float *l, float *r)
 {
     float p = build_progress(), target = 0.0f, f, x;
-    if (s.sec == SEC_BUILD && !(s.sec_bar >= 3u && s.tick % TPBAR >= 3u * TPB))
+    if (s.sec == SEC_BUILD && !(s.sec_bar >= 3u && (s.tick ? s.tick - 1u : 0u) % TPBAR >= 3u * TPB))
         target = p * p;
     s.z_g += (target - s.z_g) * (target > s.z_g ? 0.0005f : 0.004f);
     if (s.z_g < 0.0003f)
@@ -837,6 +859,18 @@ static float atmos(const world_t *w, float n, float *l, float *r)
     return (al + ar) * s.a_lvl * (float)par[P_ATMOS_WASH] / 100.0f;
 }
 
+static void flush_states(void)         /* as a block begins: what decays towards nothing reaches it (no denormals) */
+{
+    s.lp = fm_flush(s.lp);
+    s.z_g = fm_flush(s.z_g), s.z_low = fm_flush(s.z_low), s.z_band = fm_flush(s.z_band);
+    s.a_lvl = fm_flush(s.a_lvl), s.a_lp[0] = fm_flush(s.a_lp[0]), s.a_lp[1] = fm_flush(s.a_lp[1]);
+    s.e_lp[0] = fm_flush(s.e_lp[0]), s.e_lp[1] = fm_flush(s.e_lp[1]);
+    s.c_low = fm_flush(s.c_low), s.c_band = fm_flush(s.c_band);
+    ln.lp = fm_flush(ln.lp);
+    fx.wet = fm_flush(fx.wet), fx.lo_g = fm_flush(fx.lo_g), fx.hi_g = fm_flush(fx.hi_g);
+    fx.band_g = fm_flush(fx.band_g), fx.fl_g = fm_flush(fx.fl_g), fx.riser_g = fm_flush(fx.riser_g), fx.spin_g = fm_flush(fx.spin_g);
+}
+
 static void coefs(const world_t *w)    /* as a block begins: what changes slowly */
 {
     static const int8_t IV[2][3] = {{24, 31, 36}, {24, 30, 25}};   /* the atmos over the root: fifths; dark, a tritone and a second */
@@ -866,10 +900,11 @@ void ps_render(float *outl, float *outr, uint32_t n)
 {
     const world_t *w = &W[world];
     float dt = 1.0f / PS_SR;
-    float kick_g = 0.85f * (float)par[P_KICK_LEVEL] / 80.0f, bass_g = 0.55f * (float)par[P_BASS_LEVEL] / 80.0f;
-    float perc_g = (float)par[P_PERC_LEVEL] / 80.0f, ev_g = (float)par[P_EV_LEVEL] / 80.0f;
-    float line_g = (float)par[P_LINE_LEVEL] / 70.0f;
-    float send_g = (float)par[P_EV_ECHO] / 50.0f, ret_g = 0.7f * (float)par[P_ECHO_LEVEL] / 50.0f;
+    /* the levels: targets, the gains gliding to them sample by sample (a knob turned quickly does not zip) */
+    float tg[NG] = {0.85f * (float)par[P_KICK_LEVEL] / 80.0f, 0.55f * (float)par[P_BASS_LEVEL] / 80.0f,
+                    (float)par[P_PERC_LEVEL] / 80.0f, (float)par[P_EV_LEVEL] / 80.0f, (float)par[P_LINE_LEVEL] / 70.0f,
+                    (float)par[P_EV_ECHO] / 50.0f, 0.7f * (float)par[P_ECHO_LEVEL] / 50.0f};
+    float *g = s.g, kick_g, bass_g, perc_g, ev_g, line_g, send_g, ret_g;
     float fb = (float)par[P_ECHO_FB] / 100.0f, tone = 0.12f + 0.46f * (float)par[P_ECHO_TONE] / 100.0f;
     uint32_t i;
     static float fx_send;              /* what the effects sent to the echo (the next frame takes it) */
@@ -882,6 +917,9 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.origin = s.last_drop = 0;
         s.cue_seen = cue_n;
         s.drop_seen = drop_n;
+        s.drops = 0;                   /* (the intro again: the events quiet its first bars) */
+        s.out = s.pat = s.fill_beat = 0;
+        ev.pending = ev.held = 0;      /* (keys pressed while resting are not thrown in a heap) */
     }
     while (cmd_r != cmd_w) {           /* the keys, the effects, the parts */
         uint32_t c = cmd_q[cmd_r % CMD_N];
@@ -898,7 +936,14 @@ void ps_render(float *outl, float *outr, uint32_t n)
         tone = 1.0f;
         send_g = 0.0f;
     }
+    flush_states();
     for (i = 0; i < n; i++) {
+        {
+            int k;
+            for (k = 0; k < NG; k++)
+                g[k] += (tg[k] - g[k]) * 0.002f;
+            kick_g = g[0], bass_g = g[1], perc_g = g[2], ev_g = g[3], line_g = g[4], send_g = g[5], ret_g = g[6];
+        }
         if (playing) {
             if (s.next <= 0.0f) {                  /* a tick begins on this sample */
                 if (s.tick % TPBAR == 0u && want_world != world) {   /* a world changes as a bar begins */
@@ -917,7 +962,8 @@ void ps_render(float *outl, float *outr, uint32_t n)
         {
             float s_kick = kick(dt), s_bass = bass(w, dt), c, l = 0.0f, r = 0.0f, el = 0.0f, er = 0.0f, send, xl, xr;
             float al = 0.0f, ar = 0.0f, ll = 0.0f, lr = 0.0f, n = noise(), *pg = s.part_g, ml, mr;
-            uint32_t d = (uint32_t)(s.tick_len * (float)ECHO_TICKS[par[P_ECHO_TIME] & 3]);
+            float dt_e = fm_minf(s.tick_len * (float)ECHO_TICKS[par[P_ECHO_TIME] & 3], (float)(ECHO_N - 2u)), ef;
+            uint32_t d;
             int k;
             for (k = 0; k < NPART; k++)        /* the parts' gains glide to their mutes (~3 ms) */
                 pg[k] += (((fx.muted | fx.out) >> k & 1u ? 0.0f : 1.0f) - pg[k]) * 0.008f;
@@ -937,12 +983,18 @@ void ps_render(float *outl, float *outr, uint32_t n)
             send += perc_g * riser(n, &l, &r) * 0.5f + atmos(w, n, &al, &ar) * pg[PART_ATMOS];
             al *= pg[PART_ATMOS];
             ar *= pg[PART_ATMOS];
-            if (d >= ECHO_N)
-                d = ECHO_N - 1u;
-            xl = (float)echo_buf[0][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
-            xr = (float)echo_buf[1][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
+            if (s.echo_d < 1.0f)
+                s.echo_d = dt_e;
+            s.echo_d += (dt_e - s.echo_d) * 0.0002f;   /* ~0.1 s: a new time a short tape-like slide, no jump */
+            d = (uint32_t)s.echo_d;
+            ef = s.echo_d - (float)d;
+            {   /* between two samples */
+                uint32_t a0 = (echo_w - d) % ECHO_N, a1 = (echo_w - d - 1u) % ECHO_N;
+                xl = ((float)echo_buf[0][a0] + ((float)echo_buf[0][a1] - (float)echo_buf[0][a0]) * ef) * (1.0f / 32768.0f);
+                xr = ((float)echo_buf[1][a0] + ((float)echo_buf[1][a1] - (float)echo_buf[1][a0]) * ef) * (1.0f / 32768.0f);
+            }
             if (fb < 1.0f)
-                send += fx_send;
+                send = hp2(&echo_hp, send + fx_send, HP150);   /* nothing under 150 Hz into the echo */
             else
                 send = 0.0f;
             s.e_lp[0] += (xr * fb + send * 0.5f - s.e_lp[0]) * tone;   /* into the left: the right's, and the send */

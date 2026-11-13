@@ -443,7 +443,8 @@ static void midi_poll(void)
 {
     uint32_t pkt;
     int port;
-    while (plat_midi_in(&pkt, &port)) {
+    int took = 0;
+    while (took++ < 48 && plat_midi_in(&pkt, &port)) {   /* (at most 48 a pass: the rest wait, the queue keeps room) */
         uint32_t st = pkt >> 8 & 0xFFu, d1 = pkt >> 16 & 0x7Fu, d2 = pkt >> 24 & 0x7Fu;
         if (!(set.flags & SET_MIDI))
             continue;
@@ -458,7 +459,7 @@ static void midi_poll(void)
                 md.beat_t24 = md.beat_t24 ? (uint32_t)((int32_t)md.beat_t24 + ((int32_t)(beat - md.beat_t24) >> 4)) : beat;
                 if (md.clocks >= 24u) {
                     float bpm = 60.0f * 1e6f * (float)PLAT_TICKS_PER_US / (float)md.beat_t24;
-                    ps_ext_bpm(bpm < 60.0f ? 60.0f : bpm > 240.0f ? 240.0f : bpm);
+                    ps_ext_bpm(bpm < 125.0f ? 125.0f : bpm > 220.0f ? 220.0f : bpm);   /* (the buffers' range) */
                 }
             } else
                 md.clocks = 0;

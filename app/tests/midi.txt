@@ -20,11 +20,11 @@ midi 90 18 64
 wait 300
 midi 80 18 00
 expect thrown 2
-# a clock at 21 ms: 119 bpm
-clock 96 21
+# a clock at 18 ms: 139 bpm (followed between 125 and 220)
+clock 96 18
 wait 30
-expect bpm >117
-expect bpm <121
+expect bpm >137
+expect bpm <141
 # stop, start
 midi FC
 wait 50
