@@ -493,6 +493,77 @@ static void input(void)
 void app_input_only(void) { input(); }
 
 /* ----------------------------------------------------------------- screen --- */
+/* The colours: psychedelic on black. Each part its own neon hue; the hues sway together over 32 bars, shade a little
+ * from step to step along a bar, sink (less saturated) in a break, turn faster and faster through a build and jump
+ * half way round at a drop, coming back over two bars. Hues are 0..1535 (six sextants of 256). */
+#define HUE_FULL 1536
+enum { HUE_MAGENTA = 1365, HUE_VIOLET = 1173, HUE_BLUE = 981, HUE_CYAN = 789, HUE_ACID = 405, HUE_GOLD = 162 };
+static const int16_t LANE_HUE[NLANE] = {HUE_MAGENTA, HUE_VIOLET, HUE_CYAN, HUE_ACID, HUE_GOLD};
+static const int16_t PART_HUE[NPART] = {HUE_MAGENTA, HUE_VIOLET, HUE_CYAN, HUE_ACID, HUE_GOLD, HUE_BLUE};
+
+static uint16_t hsv(int32_t h, int32_t sat, int32_t v)   /* sat, v 0..255 */
+{
+    int32_t f, p, q, t, r, g, b;
+    h %= HUE_FULL;
+    if (h < 0)
+        h += HUE_FULL;
+    f = h & 255;
+    p = v * (255 - sat) / 255;
+    q = v * (255 - sat * f / 255) / 255;
+    t = v * (255 - sat * (255 - f) / 255) / 255;
+    switch (h >> 8) {
+    case 0: r = v, g = t, b = p; break;
+    case 1: r = q, g = v, b = p; break;
+    case 2: r = p, g = v, b = t; break;
+    case 3: r = p, g = q, b = v; break;
+    case 4: r = t, g = p, b = v; break;
+    default: r = v, g = p, b = q; break;
+    }
+    return RGB(r, g, b);
+}
+
+static struct {
+    int32_t shift;                       /* the hues' movement now */
+    int32_t sat;                         /* their saturation now */
+    uint8_t drops_seen;
+    uint32_t drop_tick;                  /* the last drop's tick (its jump fades from there) */
+} hue;
+
+static void hue_update(void)             /* once a frame: the sway, the section's colour */
+{
+    uint32_t tick = ps_ui.tick, bar = 4u * PS_TPB;
+    int32_t sh = (int32_t)(110.0f * fm_sin_turns((float)(tick % (32u * bar)) / (float)(32u * bar)));
+    if (ps_ui.drops != hue.drops_seen) {
+        hue.drops_seen = ps_ui.drops;
+        hue.drop_tick = tick;
+    }
+    if (ps_ui.section == SEC_BUILD) {    /* turning, faster and faster */
+        float p = ((float)ps_ui.sec_bar + (float)(tick % bar) / (float)bar) / 4.0f;
+        sh += (int32_t)(2.0f * HUE_FULL * p * p);
+    }
+    if (hue.drops_seen && tick - hue.drop_tick < 2u * bar) {   /* the drop: half way round, back over two bars */
+        float k = 1.0f - (float)(tick - hue.drop_tick) / (float)(2u * bar);
+        sh += (int32_t)(HUE_FULL / 2 * k * k);
+    }
+    hue.shift = sh;
+    hue.sat = ps_ui.section == SEC_BREAK ? 130 : 225;
+}
+
+static uint16_t part_col(int32_t base, int32_t v) { return hsv(base + hue.shift, hue.sat, v); }
+
+/* a text, each character its own hue, from h on by dh */
+static int32_t text_rainbow(int32_t x, int32_t y, const felucca_font_t *f, const char *t, int32_t h, int32_t dh, int32_t sat,
+                            int32_t v)
+{
+    char c[2] = {0, 0};
+    for (; *t; t++) {
+        c[0] = *t;
+        x = cv_text(x, y, f, c, hsv(h, sat, v));
+        h += dh;
+    }
+    return x;
+}
+
 static void draw_header(uint32_t now)
 {
     char t[12];
@@ -505,12 +576,16 @@ static void draw_header(uint32_t now)
         cv_text(x + 8, y, big ? &FONT_B : &FONT_XS, ui.msg[1], C_HI);
     } else {
         uint32_t tick = ps_ui.tick, beat = tick / PS_TPB % 4u;
-        cv_text(10, 6, &FONT_B, ps_world_name(set.world), ps_playing() ? C_WHITE : C_GRAY);
+        if (ps_playing())                    /* the world's name, a rainbow drifting with the hues */
+            text_rainbow(10, 6, &FONT_B, ps_world_name(set.world), HUE_MAGENTA + hue.shift, -70, 150, 255);
+        else
+            cv_text(10, 6, &FONT_B, ps_world_name(set.world), C_GRAY);
         int_text(ps_bpm(), t);
         x = 230 - text_w(&FONT_B, t) - 14;
-        cv_text(x, 6, &FONT_B, t, C_HI);
-        if (ps_playing())                    /* the beat: a lamp, bright on the beat's first sixteenth */
-            cv_rect(222, 12, 8, 8, tick % PS_TPB < 6u ? (beat == 0u ? C_WHITE : C_HI) : C_LINE);
+        cv_text(x, 6, &FONT_B, t, C_WHITE);
+        if (ps_playing())                    /* the beat: a lamp, its hue a step round each beat, white on the bar's */
+            cv_rect(222, 12, 8, 8, tick % PS_TPB < 6u ? (beat == 0u ? C_WHITE : part_col(LANE_HUE[beat + 1u], 255))
+                                                      : part_col(LANE_HUE[beat + 1u], 60));
     }
     cv_blit(0, 0);
 }
@@ -540,18 +615,18 @@ static void draw_grid(void)
     cv_begin(240, 148, C_BLACK);
     for (r = 0; r < 4; r++) {
         int32_t y = 6 + r * 24;
-        cv_text(8, y + 4, &FONT_XS, FX_ROW[r], C_GRAY);
+        cv_text(8, y + 4, &FONT_XS, FX_ROW[r], part_col(LANE_HUE[r], 220));
         for (c = 0; c < 4; c++) {
             int id = (int)(r * 4 + c), on = pf.fx_held >> id & 1u;
             int32_t x = 56 + c * 46, tw = text_w(&FONT_XS, ps_fx_name(id));
-            cv_rect(x, y, 44, 18, on ? C_HI : c == 0 ? C_DIM : C_LINE);
+            cv_rect(x, y, 44, 18, part_col(LANE_HUE[r] + c * 40, on ? 255 : c == 0 ? 105 : 60));
             cv_text(x + (44 - tw) / 2, y + 4, &FONT_XS, ps_fx_name(id), on ? C_BLACK : C_WHITE);
         }
     }
     for (i = 0, c = 8; i < NPART; i++) {     /* the parts, in the black keys' order (c: x) */
         int mu = ps_ui.muted >> i & 1u;
         int32_t tw = text_w(&FONT_XS, PART_NAME[i]);
-        cv_text(c, 106, &FONT_XS, PART_NAME[i], mu ? C_LINE : C_HI);
+        cv_text(c, 106, &FONT_XS, PART_NAME[i], mu ? C_LINE : part_col(PART_HUE[i], 240));
         if (mu)
             cv_rect(c, 110, tw, 1, C_GRAY);
         c += tw + 10;
@@ -576,14 +651,15 @@ static void draw_lanes(uint32_t now)
         int f = lane == focus, muted = ps_ui.muted >> lane & 1u;   /* (the lanes in the parts' order) */
         int32_t cur = ps_playing() ? (int32_t)(n == 24 ? tick / 4u % 24u : tick / 6u % 16u) : -1;
         int flare = now - ui.struck_at[lane] < 90u;
-        uint16_t on = muted ? C_LINE : f ? C_HI : C_GRAY;
-        cv_text(8, y + 3, &FONT_XS, LANE_NAME[lane], muted ? C_LINE : f ? C_HI : C_GRAY);
+        int32_t v = f ? 255 : 210;           /* the page's lane brightest */
+        cv_text(8, y + 3, &FONT_XS, LANE_NAME[lane], muted ? C_LINE : part_col(LANE_HUE[lane], f ? 255 : 210));
         for (i = 0; i < n; i++) {
             int32_t x = 62 + i * (n == 24 ? 20 : 30) / 3 + i / per * 2, w = n == 24 ? 5 : 8;
             int here = i == cur;
-            uint16_t c = here ? (muted ? C_GRAY : C_WHITE) : on;
+            /* along the bar the hue shades on, a little each step */
+            uint16_t c = here ? (muted ? C_GRAY : C_WHITE) : muted ? C_LINE : part_col(LANE_HUE[lane] + i * 96 / per, v);
             if (!st[i]) {
-                cv_rect(x, base - 1, w, 1, here ? C_GRAY : C_LINE);
+                cv_rect(x, base - 1, w, 1, here ? C_GRAY : muted ? C_LINE : part_col(LANE_HUE[lane] + i * 96 / per, 55));
             } else if (lane == LANE_LINE) {
                 int32_t h = (st[i] - 1) * 11 / (range > 0 ? range : 1);
                 cv_rect(x, base - 3 - (h > 11 ? 11 : h), w, 3, c);
@@ -598,10 +674,12 @@ static void draw_lanes(uint32_t now)
     {   /* the phrase's eight bars; in a break, its bars (eight shown, then counting on); in a build, its four */
         int sec = ps_ui.section, sb = ps_ui.sec_bar, nb = sec == SEC_BUILD ? 4 : 8, inph = sec == SEC_BREAK ? sb % 8 : sb;
         static const char *const SEC_NAME[3] = {"PHRASE", "BREAK", "BUILD"};
-        cv_text(8, 112, &FONT_XS, SEC_NAME[clamp(sec, 0, 2)], sec == SEC_MAIN ? C_GRAY : C_AMB);
-        for (i = 0; i < nb; i++)
-            cv_rect(66 + i * (160 / nb), 116, 160 / nb - 4, 4,
-                    i == inph && ps_playing() ? (sec == SEC_MAIN ? C_HI : C_WHITE) : i < inph ? C_DIM : C_LINE);
+        cv_text(8, 112, &FONT_XS, SEC_NAME[clamp(sec, 0, 2)], sec == SEC_MAIN ? C_GRAY : C_WHITE);
+        for (i = 0; i < nb; i++) {           /* a bar a hue round the circle; the one playing lit, the rest faint */
+            int now_bar = i == inph && ps_playing();
+            cv_rect(62 + i * (168 / nb), now_bar ? 114 : 116, 168 / nb - 4, now_bar ? 6 : 3,
+                    hsv(HUE_MAGENTA + hue.shift - i * HUE_FULL / nb, hue.sat, now_bar ? 255 : 70));
+        }
         if (ps_ui.cued)                      /* a cue waiting for the next bar */
             cv_text(8, 126, &FONT_XS, ps_ui.cued == 2 ? "DROP >" : sec == SEC_MAIN ? "BREAK >" : "BUILD >", C_WHITE);
     }
@@ -655,8 +733,12 @@ static void draw_knobs(uint32_t now)
         cv_text(x, 14, &FONT_XS, name, lit ? C_WHITE : C_GRAY);
         cv_text(x, 29, &FONT_B, t, lit ? C_WHITE : C_HI);
         cv_rect(x, 51, w, 2, C_LINE);
-        if (span > 0)
-            cv_rect(x, 51, w * pos / span, 2, lit ? C_WHITE : C_HI);
+        if (span > 0) {                      /* the value: a run of hues, from the knob's own */
+            int32_t len = w * pos / span, j;
+            for (j = 0; j < len; j += 4)
+                cv_rect(x + j, 51, len - j < 4 ? len - j : 4, 2,
+                        lit ? C_WHITE : hsv(LANE_HUE[i] + hue.shift + j * 12, hue.sat, 255));
+        }
     }
     cv_blit(0, 180);
 }
@@ -672,7 +754,7 @@ static void draw(void)
     draw_knobs(now);
 }
 
-/* the logo: 犀 over 虎, each dot three pixels square, amber on black, the name small under them */
+/* the logo: 犀 over 虎, each dot three pixels square, a rainbow downwards on black, the name small under them */
 static void draw_logo(void)
 {
     int32_t ch, y, x;
@@ -682,11 +764,12 @@ static void draw_logo(void)
         for (y = 0; y < LOGO_N; y++)
             for (x = 0; x < LOGO_N; x++)
                 if (LOGO[ch][y] >> (LOGO_N - 1 - x) & 1u)
-                    cv_rect(120 - 3 * LOGO_N / 2 + 3 * x, 3 * y, 3, 3, APP_SPLASH_RGB);
+                    cv_rect(120 - 3 * LOGO_N / 2 + 3 * x, 3 * y, 3, 3,   /* down the two: magenta to acid green */
+                            hsv(HUE_MAGENTA - (ch * LOGO_N + y) * (HUE_MAGENTA - HUE_ACID) / (2 * LOGO_N), 230, 255));
         cv_blit(0, 22 + ch * (3 * LOGO_N + 6));
     }
     cv_begin(240, 16, RGB(0, 0, 0));
-    cv_text((240 - text_w(&FONT_XS, "R H I N O T I G E R")) / 2, 2, &FONT_XS, "R H I N O T I G E R", RGB(150, 100, 40));
+    text_rainbow((240 - text_w(&FONT_XS, "RHINOTIGER")) / 2, 2, &FONT_XS, "RHINOTIGER", HUE_MAGENTA, -96, 160, 200);
     cv_blit(0, 200);
 }
 
@@ -708,6 +791,7 @@ void app_frame(void)
     input();
     ann_tick(now);
     marks_update();
+    hue_update();
     if (ui.msg_until && now >= ui.msg_until) {
         ui.msg_until = 0;
         ui.redraw = 1;
