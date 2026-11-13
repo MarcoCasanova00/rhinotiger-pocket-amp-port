@@ -5,13 +5,20 @@ wait 52200
 wavstop
 expect world 0
 expect bar >31
-# GLASS INSECTS, 176: the 32nd roll, from the next bar
+# GLASS INSECTS, 176: sixteenths too, from the next bar
 listen
 turn ALGO 1
 said WORLD
 wait 1500
 expect world 1
 wav glass-insects.wav
+wait 45500
+wavstop
+# the same rolled in triplet sixteenths
+turn ALGO 1
+wait 1500
+expect world 2
+wav glass-insects-triplet.wav
 wait 45500
 wavstop
 # PLAY rests it

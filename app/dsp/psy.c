@@ -2,9 +2,12 @@
  * Copyright (C) 2026 hacha */
 /* RhinoTiger's engine (psy.h): the kick and the rolling FM bass.
  *
- * The grid is the 32nd note: eight ticks a beat. The kick is on a beat's first tick; the bass fills the beat's other
- * sixteenths (ticks 2, 4, 6: K-B-B-B) or its other 32nds (ticks 2..7: the roll). The two never sound at once: the
- * kick is over by the second sixteenth, the bass does not start before it. No side-chain, only places. */
+ * The grid: 24 ticks a beat, so that both the sixteenth (6 ticks) and the sixteenth triplet (4) fall on it. The kick
+ * is on a beat's first tick; the bass fills the beat's other sixteenths (K-B-B-B) or its other triplet sixteenths
+ * (K-b-b-b-b-b). The two never sound at once: the kick is over before the bass's first note, the bass does not start
+ * before it. No side-chain, only places. */
+#define TPB 24u                        /* ticks a beat */
+#define TPBAR (4u * TPB)
 #include "psy.h"
 #include "fastmath.h"
 
@@ -12,20 +15,22 @@ typedef struct {
     const char *name;
     float bpm;
     int root;                          /* MIDI note of the bass (and the kick's tuning) */
-    uint8_t roll32;                    /* 0: sixteenths (K-B-B-B), 1: 32nds */
+    uint8_t roll;                      /* the bass's step in ticks: 6 sixteenths (K-B-B-B), 4 triplets (K-b-b-b-b-b) */
     float ratio;                       /* the bass's modulator to carrier */
     float index, index_ms;             /* the modulation at the note's start, and how fast it falls (ms to 1/e) */
     float floor;                       /* the modulation it falls to */
     float gate;                        /* the note's length, of its step */
     float drive;
-    float kick_len;                    /* the kick's length, of a sixteenth */
+    float kick_len;                    /* the kick's length, of the bass's step */
 } world_t;
 
 static const world_t W[PS_NWORLD] = {
     /* cold dark psy: hard, short sixteenths, a dry growl */
-    {"COLD SIGNAL", 152.0f, 30, 0, 1.0f, 3.2f, 14.0f, 0.35f, 0.72f, 1.6f, 0.95f},
-    /* bright hi-tech: a clean 32nd roll, a metallic edge */
-    {"GLASS INSECTS", 176.0f, 30, 1, 2.0f, 2.4f, 7.0f, 0.25f, 0.80f, 1.3f, 0.90f},
+    {"COLD SIGNAL", 152.0f, 30, 6, 1.0f, 3.2f, 14.0f, 0.35f, 0.72f, 1.6f, 0.95f},
+    /* bright hi-tech: sixteenths at 176, a metallic edge */
+    {"GLASS INSECTS", 176.0f, 30, 6, 2.0f, 2.4f, 9.0f, 0.25f, 0.76f, 1.3f, 0.92f},
+    /* the same, rolled in triplet sixteenths (a sketch to compare) */
+    {"GLASS INSECTS 3", 176.0f, 30, 4, 2.0f, 2.4f, 8.0f, 0.25f, 0.80f, 1.3f, 0.95f},
 };
 
 const char *ps_world_name(int w) { return W[(unsigned)w % PS_NWORLD].name; }
@@ -34,8 +39,8 @@ static volatile int want_world, want_play;
 static int world, playing;
 
 static struct {
-    float tick_len, next;              /* samples a 32nd, and samples to the next */
-    uint32_t tick;                     /* 32nds since PLAY */
+    float tick_len, next;              /* samples a tick, and samples to the next */
+    uint32_t tick;                     /* ticks since PLAY */
     /* the kick */
     float k_t, k_ph;                   /* seconds since it struck (< 0: silent), its phase (turns) */
     float k_len;
@@ -59,13 +64,13 @@ void ps_init(void)
 void ps_world(int w) { want_world = (int)((unsigned)w % PS_NWORLD); }
 void ps_play(int on) { want_play = on != 0; }
 int ps_playing(void) { return playing; }
-int ps_bar(void) { return (int)(s.tick / 32u); }
+int ps_bar(void) { return (int)(s.tick / TPBAR); }
 
 static float note_hz(int note) { return 440.0f * fm_exp2f((float)(note - 69) / 12.0f); }
 
-static void step(const world_t *w)     /* a 32nd begins: what strikes on it */
+static void step(const world_t *w)     /* a tick begins: what strikes on it */
 {
-    uint32_t t = s.tick % 8u, beat = s.tick / 8u % 4u, bar = s.tick / 32u;
+    uint32_t t = s.tick % TPB, beat = s.tick / TPB % 4u, bar = s.tick / TPBAR;
     int bass_rests = bar % 8u == 7u && beat == 3u;     /* the 8th bar's last beat: the bass stops */
     int kick_rests = bar % 32u == 31u && beat == 3u;   /* the 32nd's: the kick too */
     int bass;
@@ -76,12 +81,12 @@ static void step(const world_t *w)     /* a 32nd begins: what strikes on it */
         }
         return;
     }
-    bass = w->roll32 ? t >= 2u : (t == 2u || t == 4u || t == 6u);
+    bass = t % w->roll == 0u;
     if (!bass || bass_rests)
         return;
     s.b_t = 0.0f;
     s.b_cph = s.b_mph = 0.0f;          /* every note from the same place: the roll is tight */
-    s.b_gate = w->gate * s.tick_len * (w->roll32 ? 1.0f : 2.0f) / PS_SR;
+    s.b_gate = w->gate * s.tick_len * (float)w->roll / PS_SR;
     s.b_inc = note_hz(w->root) / PS_SR;
 }
 
@@ -141,8 +146,8 @@ static float bass(const world_t *w, float dt)
 
 static void tempo(const world_t *w)
 {
-    s.tick_len = PS_SR * 60.0f / w->bpm / 8.0f;
-    s.k_len = w->kick_len * s.tick_len * 2.0f / PS_SR;
+    s.tick_len = PS_SR * 60.0f / w->bpm / (float)TPB;
+    s.k_len = w->kick_len * s.tick_len * (float)w->roll / PS_SR;
 }
 
 void ps_render(float *out, uint32_t n)
@@ -158,13 +163,13 @@ void ps_render(float *out, uint32_t n)
     tempo(w);
     for (i = 0; i < n; i++) {
         if (playing) {
-            if (s.next <= 0.0f) {                  /* a 32nd begins on this sample */
-                if (s.tick % 32u == 0u && want_world != world) {   /* a world changes as a bar begins */
+            if (s.next <= 0.0f) {                  /* a tick begins on this sample */
+                if (s.tick % TPBAR == 0u && want_world != world) {   /* a world changes as a bar begins */
                     world = want_world;
                     w = &W[world];
                     tempo(w);
                 }
-                s.drift = 0.5f - 0.5f * fm_cosf((float)(s.tick % 512u) / 512.0f * 6.2831853f);
+                s.drift = 0.5f - 0.5f * fm_cosf((float)(s.tick % (16u * TPBAR)) / (float)(16u * TPBAR) * 6.2831853f);
                 step(w);
                 s.tick++;
                 s.next += s.tick_len;
