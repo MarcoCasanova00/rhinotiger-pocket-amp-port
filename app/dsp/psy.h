@@ -69,6 +69,13 @@ void ps_key(int k, int down, int value);
 int ps_stat(int which);                /* 0 events begun, 1 thrown and remembered (up to 8), 2 the latest thrown's type */
 const char *ps_event_name(int type);
 
+/* for the screen: the bar now, lane by lane, as it will play (the parts are generated: this is the engine's plan for
+ * the bar, not a record). out[i] for each step: 0 none, else 1..3 its weight (soft, middle, strong); for the line, 1 +
+ * its note over the register + 2 (so a height). Returns the steps: 16 sixteenths, or 24 (the bass in triplets) */
+enum { LANE_KICK, LANE_BASS, LANE_PERC, LANE_LINE, LANE_EVENTS, NLANE };
+int ps_lane(int lane, uint8_t out[24]);
+int ps_line_range(void);               /* the line's highest note over its register (the screen's scale) */
+
 /* for the screen: what struck, counted (the UI sees a count move), and where the music is */
 enum { HIT_KICK, HIT_BASS, HIT_PERC, HIT_EVENT, HIT_THROW, HIT_LINE, NHIT };
 typedef struct {

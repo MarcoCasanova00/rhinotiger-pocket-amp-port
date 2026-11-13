@@ -110,7 +110,6 @@ static int page_par(int p)
                                         P_EV_LEVEL, P_LINE_LEVEL, P_ECHO_LEVEL, -1};
     return FIRST[clamp(p, 0, NPAGE - 1)];
 }
-enum { LANE_KICK, LANE_BASS, LANE_PERC, LANE_LINE, LANE_EVENTS, NLANE };
 static const char *const LANE_NAME[NLANE] = {"KICK", "BASS", "PERC", "LINE", "EVENTS"};
 static int page_lane(int p)              /* the lane a page acts on (the screen brightens it), or -1 */
 {
@@ -125,7 +124,7 @@ static struct {
     uint32_t turned_at[4];               /* each knob's last turn (the strip lights it) */
     uint32_t last_draw;
     uint32_t seen[NHIT];                 /* the engine's counts as last drawn */
-    int32_t mark[NLANE][16];             /* the bar each sixteenth was last struck in, per lane (-9: never) */
+    uint32_t struck_at[NLANE];           /* each lane's last note (the playhead's step flares) */
     uint32_t thrown_at;                  /* a key's event named on the screen since (0: none) */
     uint32_t save_at;                    /* SAVE pressed at (a cue: tapped or held) */
     uint8_t save_held;                   /* SAVE held long enough: the drop cued */
@@ -516,22 +515,20 @@ static void draw_header(uint32_t now)
     cv_blit(0, 0);
 }
 
-/* the lanes: what struck, on the bar's sixteen sixteenths; the page's lane brighter; under them the phrase's eight
- * bars, and a thrown event's name */
+/* what struck: a key's event named at once, a lane's step flaring as it sounds */
 static void marks_update(void)
 {
     static const uint8_t LANE_OF[NHIT] = {LANE_KICK, LANE_BASS, LANE_PERC, LANE_EVENTS, LANE_EVENTS, LANE_LINE};
-    uint32_t tick = ps_ui.tick ? ps_ui.tick - 1u : 0u, h, thrown = ps_ui.hits[HIT_THROW];
-    int32_t bar = (int32_t)(tick / (4u * PS_TPB)), six = (int32_t)(tick / 6u % 16u);
-    if (thrown != ui.seen[HIT_THROW]) {      /* a key's event: named at once */
+    uint32_t h, now = plat_ms();
+    if (ps_ui.hits[HIT_THROW] != ui.seen[HIT_THROW]) {
         ui.thrown_type = ps_ui.thrown_type;
-        ui.thrown_at = plat_ms();
+        ui.thrown_at = now;
     }
     for (h = 0; h < NHIT; h++) {
         uint32_t c = ps_ui.hits[h];
         if (c != ui.seen[h]) {
             ui.seen[h] = c;
-            ui.mark[LANE_OF[h]][six] = bar;
+            ui.struck_at[LANE_OF[h]] = now;
         }
     }
 }
@@ -563,22 +560,39 @@ static void draw_grid(void)
     cv_blit(0, 32);
 }
 
+/* the lanes: the bar now as the engine will play it (ps_lane), a step a cell in fours (the beats): a note a block,
+ * its height its weight (the line: its pitch, a bar of a piano roll), a rest a dot on the line. The step playing is
+ * white, a moment brighter as it sounds; the rest of the bar stays as it is (no trail). The page's lane amber, the
+ * others grey, a muted one dark */
 static void draw_lanes(uint32_t now)
 {
     uint32_t tick = ps_ui.tick ? ps_ui.tick - 1u : 0u;
-    int32_t bar = (int32_t)(tick / (4u * PS_TPB)), six = (int32_t)(tick / 6u % 16u), lane, i;
+    int32_t lane, i, range = ps_line_range();
     int focus = page_lane(ui.page);
+    uint8_t st[24];
     cv_begin(240, 148, C_BLACK);
     for (lane = 0; lane < NLANE; lane++) {
-        int32_t y = 4 + lane * 21;
-        int f = lane == focus;
-        cv_text(8, y + 3, &FONT_XS, LANE_NAME[lane], f ? C_HI : C_GRAY);
-        for (i = 0; i < 16; i++) {
-            int32_t x = 66 + i * 10, mk = ui.mark[lane][i];
-            uint16_t c = mk == bar ? (f ? C_WHITE : C_HI) : mk == bar - 1 ? (f ? C_AMB : C_DIM) : C_LINE;
-            cv_rect(x, y + (i % 4 ? 4 : 2), 7, i % 4 ? 8 : 12, c);
-            if (ps_playing() && i == six)
-                cv_rect(x, y + 16, 7, 2, C_WHITE);
+        int32_t y = 4 + lane * 21, base = y + 15, n = ps_lane((int)lane, st), per = n / 4;
+        int f = lane == focus, muted = ps_ui.muted >> lane & 1u;   /* (the lanes in the parts' order) */
+        int32_t cur = ps_playing() ? (int32_t)(n == 24 ? tick / 4u % 24u : tick / 6u % 16u) : -1;
+        int flare = now - ui.struck_at[lane] < 90u;
+        uint16_t on = muted ? C_LINE : f ? C_HI : C_GRAY;
+        cv_text(8, y + 3, &FONT_XS, LANE_NAME[lane], muted ? C_LINE : f ? C_HI : C_GRAY);
+        for (i = 0; i < n; i++) {
+            int32_t x = 62 + i * (n == 24 ? 20 : 30) / 3 + i / per * 2, w = n == 24 ? 5 : 8;
+            int here = i == cur;
+            uint16_t c = here ? (muted ? C_GRAY : C_WHITE) : on;
+            if (!st[i]) {
+                cv_rect(x, base - 1, w, 1, here ? C_GRAY : C_LINE);
+            } else if (lane == LANE_LINE) {
+                int32_t h = (st[i] - 1) * 11 / (range > 0 ? range : 1);
+                cv_rect(x, base - 3 - (h > 11 ? 11 : h), w, 3, c);
+            } else {
+                int32_t h = st[i] == 1 ? 5 : st[i] == 2 ? 9 : 13;
+                if (here && flare && !muted)
+                    h += 2;
+                cv_rect(x, base - h, w, h, c);
+            }
         }
     }
     {   /* the phrase's eight bars; in a break, its bars (eight shown, then counting on); in a build, its four */
@@ -682,12 +696,8 @@ void app_splash(void) { draw_logo(); }
 
 void app_ui_init(void)
 {
-    int l, i;
     draw_logo();                             /* (the device's splash already; the host's first sight of it) */
     ui.logo_until = plat_ms() + 1200u;
-    for (l = 0; l < NLANE; l++)
-        for (i = 0; i < 16; i++)
-            ui.mark[l][i] = -9;
     ui.thrown_type = -1;
     ui.redraw = 1;
 }

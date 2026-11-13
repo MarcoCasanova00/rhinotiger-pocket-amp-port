@@ -317,6 +317,85 @@ void ps_key(int k, int down, int value)
     cmd_post((uint32_t)(k & 31) | (uint32_t)(down & 3) << 5 | (uint32_t)(value & 127) << 8);
 }
 
+static int fill_now(uint32_t bar, uint32_t beat);
+
+/* the bar now as it will play (psy.h): read by the UI while the render moves on (a frame's glance, no lock) */
+int ps_lane(int lane, uint8_t out[24])
+{
+    const world_t *w = &W[world];
+    uint32_t tick = s.tick ? s.tick - 1u : 0u, bar = tick / TPBAR, rb = bar - s.origin, i;
+    int groove = s.sec == SEC_MAIN, n = 16;
+    for (i = 0; i < 24u; i++)
+        out[i] = 0;
+    if (!playing)
+        return 16;
+    switch (lane) {
+    case LANE_KICK:
+        if (groove)
+            for (i = 0; i < 16u; i += 4u)
+                out[i] = 3;
+        if (groove && par[P_FILLS] && rb % 32u == 31u)
+            out[12] = 0;
+        break;
+    case LANE_BASS:
+        if (!groove)
+            break;
+        if (s.pat == 2u) {             /* triplets: six a beat, the kick on the first */
+            n = 24;
+            for (i = 0; i < 24u; i++)
+                out[i] = i % 6u ? 2 : 0;
+        } else
+            for (i = 0; i < 16u; i++)
+                out[i] = i % 4u == 0u || (s.pat == 1u && i % 4u == 1u) ? 0 : 2;
+        if (fill_now(rb, 3))
+            for (i = (uint32_t)n * 3u / 4u; i < (uint32_t)n; i++)
+                out[i] = 0;
+        break;
+    case LANE_PERC:
+        if (s.sec == SEC_BUILD) {      /* the roll: quarters, eighths, sixteenths; the breath */
+            uint32_t every = s.sec_bar == 0u ? 4u : s.sec_bar == 1u ? 2u : 1u;
+            for (i = 0; i < 16u; i += every)
+                out[i] = (uint8_t)(1u + (s.sec_bar >= 2u) + (s.sec_bar >= 3u));
+            if (s.sec_bar >= 3u)
+                out[12] = out[13] = out[14] = out[15] = 0;
+        } else if (groove) {
+            static const uint8_t HAT[4] = {1, 2, 0, 2};
+            for (i = 0; i < 16u; i++) {
+                uint32_t j = i % 4u;
+                if (j != 2u && s.out != 1u && par[P_HATS] > 0)
+                    out[i] = HAT[j];
+                if (j == 2u && bar >= 8u && s.out != 2u && par[P_HATS] > 0)
+                    out[i] = 3;
+                if ((i == 4u || i == 12u) && bar >= 16u && s.out != 3u)
+                    out[i] = 3;
+            }
+            if (fill_now(rb, 3))
+                for (i = 12; i < 16u; i++)
+                    out[i] = (uint8_t)(1u + (i - 12u) / 2u + (i == 15u));
+        }
+        break;
+    case LANE_LINE:
+        if (ln.playing)
+            for (i = 0; i < 16u; i++) {
+                uint32_t k = (rb % 2u) * 16u + i;
+                if (ln.on[k])
+                    out[i] = (uint8_t)(1 + clampi(ln.note[k] + 2, 0, 30));
+            }
+        (void)w;
+        break;
+    case LANE_EVENTS:
+        if ((bar >= 4u || s.drops) && s.sec != SEC_BUILD)
+            for (i = 0; i < 16u; i++) {
+                uint32_t sl = ev.at[(rb % 4u) * 16u + i];
+                if (sl < ev.density)
+                    out[i] = 2;
+            }
+        break;
+    }
+    return n;
+}
+int ps_line_range(void) { return W[world].line_range + 8; }   /* (+2 below the register, Dark's +6 above) */
+
 void ps_init(void)
 {
     int k;
