@@ -17,7 +17,8 @@
  *   6 ATMOS (LFO again)      K1..K4 Level, Colour, Air, Wash (the send)
  *   7 EVENTS (ARP)           K1..K4 Level, Density, Runs, Echo (the send)
  *   8 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
- *   9 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; SAVE here keeps it all
+ *   9 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); SAVE here
+ *                            keeps it all
  * SEL held: the knobs are MAIN's four on any page. PRESETS: the world, from the next bar. PLAY: play or rest.
  * SAVE (but on GLOBAL), after HYP-1's: tapped, the next section from the next bar (the groove: a break; a break: its
  * build, then the drop); held, the drop at the next bar. Lit in a break, quick in a build.
@@ -210,7 +211,7 @@ static void page_go(int p)
 static const char *knob_name(int page, int k)
 {
     if (page == PG_GLOBAL)
-        return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : "";
+        return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "";
     return ps_param(page_par(page) + k)->name;
 }
 
@@ -247,6 +248,12 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
             str_put(t, 12, PALETTES[set.theme].name);
             *pos = set.theme;
             *span = (int32_t)NPALETTES - 1;
+        } else if (k == 2) {             /* the audio's load, of its budget (read only; the device's) */
+            uint32_t c = plat_cpu_pct();
+            int_text((int32_t)c, t);
+            str_put(t + strlen(t), 4, "%");
+            *pos = (int32_t)(c > 100u ? 100u : c);
+            *span = 100;
         }
         return;
     }

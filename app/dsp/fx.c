@@ -37,6 +37,7 @@ static struct {
     float fl_ph;
     float riser_g, riser_t, rz[2];
     float spin_g, spin_t, spin_ph;
+    float lo_f, hi_f, bp_f, rz_f, spin_rate;   /* worked out as a block begins (fx_block) */
     uint8_t muted;                     /* the parts muted (PART_* bits) */
     uint8_t out;                       /* the parts out while a key is held */
     uint8_t fill_req;                  /* a fill cued for the next beat */
@@ -106,9 +107,9 @@ static int fx_buffer(float tick_len, float *l, float *r)
         if (id == FX_STAIRS) {         /* each time round a whole tone higher, up to an octave and a fifth */
             int k = (int)(fx.el / len);
             rate = fm_exp2f((float)(k > 10 ? 10 : k) * 2.0f / 12.0f);
-            p = (float)fx.p0 + (u * rate - len * fm_floorf(u * rate / len));
+            p = (float)(fx.p0 % CAP_N) + (u * rate - len * fm_floorf(u * rate / len));
         } else {
-            p = (float)fx.p0 + u;
+            p = (float)(fx.p0 % CAP_N) + u;
         }
         w = fm_clampf(fm_minf(u, len - u) / 64.0f, 0.0f, 1.0f);   /* the slice's edges, softened */
         if (fx.el < len)               /* the first time through: the music itself, written */
@@ -117,7 +118,7 @@ static int fx_buffer(float tick_len, float *l, float *r)
     } else if (id == FX_REVERSE) {     /* the last beat backwards, again and again */
         len = tick_len * (float)PS_TPB;
         u = fx.el - len * fm_floorf(fx.el / len);
-        p = (float)fx.p0 + (float)CAP_N - 1.0f - u;
+        p = (float)(fx.p0 % CAP_N) + (float)CAP_N - 1.0f - u;
         w = fm_clampf(fm_minf(u, len - u) / 64.0f, 0.0f, 1.0f);
         fx.cap_hold = 1;
     } else {                           /* TAPE: slowing to a stop over a beat */
@@ -125,13 +126,23 @@ static int fx_buffer(float tick_len, float *l, float *r)
         if (rate < 0.0f)
             rate = 0.0f;
         fx.tape_pos += rate;
-        p = (float)fx.p0 + fx.tape_pos;
+        p = (float)(fx.p0 % CAP_N) + fx.tape_pos;
         w = rate < 0.05f ? rate / 0.05f : 1.0f;
     }
     fx.el += 1.0f;
     *l = cap_read(0, p) * w;
     *r = cap_read(1, p) * w;
     return 1;
+}
+
+static void fx_block(float tick_len)   /* as a block begins: the filters' coefficients, the sweeps' rates */
+{
+    float two = tick_len * (float)(8u * PS_TPB);   /* two bars, in frames */
+    fx.lo_f = 2.0f * fm_sinf(3.14159265f * 250.0f * fm_exp2f(5.0f * (1.0f - fx.lo_g)) / PS_SR);   /* 8 kHz down */
+    fx.hi_f = 2.0f * fm_sinf(3.14159265f * 1600.0f * fm_exp2f(-5.0f * (1.0f - fx.hi_g)) / PS_SR);  /* 50 Hz up */
+    fx.bp_f = 2.0f * fm_sinf(3.14159265f * 1300.0f / PS_SR);
+    fx.rz_f = 2.0f * fm_sinf(3.14159265f * 250.0f * fm_exp2f(4.7f * fm_clampf(fx.riser_t / two, 0.0f, 1.0f)) / PS_SR);
+    fx.spin_rate = fm_exp2f(3.0f * fm_clampf(fx.spin_t / two, 0.0f, 1.0f)) / (tick_len * (float)PS_TPB);
 }
 
 static void svf(float st[2], float x, float f, float q)   /* Chamberlin: st[0] low, st[1] band */
@@ -168,7 +179,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     fx.band_g += ((fx.held >> FX_BAND & 1u ? 1.0f : 0.0f) - fx.band_g) * 0.002f;
     fx.fl_g += ((fx.held >> FX_FLANGE & 1u ? 1.0f : 0.0f) - fx.fl_g) * 0.002f;
     if (fx.lo_g > 0.001f) {
-        float f = 2.0f * fm_sinf(3.14159265f * 250.0f * fm_exp2f(5.0f * (1.0f - fx.lo_g)) / PS_SR);   /* 8 kHz down */
+        float f = fx.lo_f;
         svf(fx.svf_lo[0], dl, f, 0.6f);
         svf(fx.svf_lo[1], dr, f, 0.6f);
         g = fx.lo_g > 0.05f ? 1.0f : fx.lo_g / 0.05f;
@@ -176,7 +187,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         dr += (fx.svf_lo[1][0] - dr) * g;
     }
     if (fx.hi_g > 0.001f) {
-        float f = 2.0f * fm_sinf(3.14159265f * 1600.0f * fm_exp2f(-5.0f * (1.0f - fx.hi_g)) / PS_SR);   /* 50 Hz up */
+        float f = fx.hi_f;
         svf(fx.svf_hi[0], dl, f, 0.6f);
         svf(fx.svf_hi[1], dr, f, 0.6f);
         g = fx.hi_g > 0.05f ? 1.0f : fx.hi_g / 0.05f;
@@ -184,7 +195,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         dr -= fx.svf_hi[1][0] * g;
     }
     if (fx.band_g > 0.001f) {
-        float f = 2.0f * fm_sinf(3.14159265f * 1300.0f / PS_SR);
+        float f = fx.bp_f;
         svf(fx.svf_bp[0], dl, f, 0.5f);
         svf(fx.svf_bp[1], dr, f, 0.5f);
         dl += (fm_tanhf(1.6f * fx.svf_bp[0][1]) - dl) * fx.band_g;
@@ -195,8 +206,8 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         if ((fx.fl_ph += 0.4f / PS_SR) >= 1.0f)
             fx.fl_ph -= 1.0f;
         d = 26.0f + 190.0f * (0.5f + 0.5f * fm_sin_turns(fx.fl_ph));
-        dl += 0.7f * fx.fl_g * cap_read(0, (float)fx.cap_w + (float)CAP_N - 1.0f - d);
-        dr += 0.7f * fx.fl_g * cap_read(1, (float)fx.cap_w + (float)CAP_N - 1.0f - d * 1.07f);
+        dl += 0.7f * fx.fl_g * cap_read(0, (float)(fx.cap_w % CAP_N) + (float)CAP_N - 1.0f - d);
+        dr += 0.7f * fx.fl_g * cap_read(1, (float)(fx.cap_w % CAP_N) + (float)CAP_N - 1.0f - d * 1.07f);
         dl *= 1.0f - 0.3f * fx.fl_g;
         dr *= 1.0f - 0.3f * fx.fl_g;
     }
@@ -210,7 +221,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     if (fx.riser_g > 0.0005f) {
         float p = fm_clampf(fx.riser_t / (tick_len * (float)(8u * PS_TPB)), 0.0f, 1.0f), f, x;
         fx.riser_t += 1.0f;
-        f = 2.0f * fm_sinf(3.14159265f * 250.0f * fm_exp2f(4.7f * p) / PS_SR);
+        f = fx.rz_f;
         svf(fx.rz, n, f, 0.35f);
         x = fx.rz[1] * fx.riser_g * (0.08f + 0.3f * p * p);
         dl += x;
@@ -222,7 +233,8 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     if (fx.spin_g > 0.0005f) {
         float p = fm_clampf(fx.spin_t / (tick_len * (float)(8u * PS_TPB)), 0.0f, 1.0f), rate, c;
         fx.spin_t += 1.0f;
-        rate = fm_exp2f(3.0f * p) / (tick_len * (float)PS_TPB);   /* turns a frame: a beat's turn, then 8 a beat */
+        rate = fx.spin_rate;           /* turns a frame: a beat's turn, then 8 a beat */
+        (void)p;
         if ((fx.spin_ph += rate) >= 1.0f)
             fx.spin_ph -= 1.0f;
         c = fm_sin_turns(fx.spin_ph) * fx.spin_g;

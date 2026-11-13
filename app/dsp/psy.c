@@ -28,7 +28,10 @@
  *
  * The atmos: a held chord of three notes over the root (fifths and the octave; at high Dark a second and a tritone),
  * each a little apart left and right and lightly frequency-modulated, and a band of noise wandering (Air). Quiet under
- * the groove as the world has it, up in a break, back down after the drop. */
+ * the groove as the world has it, up in a break, back down after the drop.
+ *
+ * Memory (the device's pool, 336 KB): the template's 68 KB, the echo's 64 KB, the effects' buffer 128 KB (fx.c): about
+ * 76 KB left. What changes slowly is worked out as a block begins (coefs()), not every sample. */
 #define TPB PS_TPB                     /* ticks a beat */
 #define TPBAR (4u * TPB)
 #include "psy.h"
@@ -143,6 +146,13 @@ static struct {
     int root;
     float bpm;
 } m;
+
+/* what changes slowly, worked out as a block begins (coefs()) rather than every sample */
+static struct {
+    float kick_f0;                     /* the kick's resting pitch, Hz */
+    float clap_f, z_f, air_f;          /* the clap's, the riser's and the atmos's air's band-passes */
+    float a_inc[3];                    /* the atmos's notes, turns a sample */
+} cf;
 
 #define ECHO_N 16384u                  /* (a dotted eighth at 125 bpm, the slowest a world can be moved to: 15876) */
 static PLAT_POOL int16_t echo_buf[2][ECHO_N];
@@ -454,7 +464,7 @@ static float kick(float dt)
         s.k_t = -1.0f;
         return 0.0f;
     }
-    f0 = note_hz(m.root + par[P_KICK_TUNE]);        /* tuned to the key */
+    f0 = cf.kick_f0;                                /* tuned to the key */
     f = f0 + f0 * (4.0f + 5.0f * punch) * fm_expf(-t / 0.011f);   /* the pitch falls: Punch, from how high */
     s.k_ph += f * dt;
     if (s.k_ph >= 1.0f)
@@ -529,7 +539,8 @@ static void perc(const world_t *w, float dt, float *l, float *r)
     }
     /* the clap: a band of noise, three quick bursts, then its tail */
     if (s.c_t >= 0.0f) {
-        float t = s.c_t, f = 2.0f * fm_sinf(3.14159265f * w->clap_hz / PS_SR), hi, env;
+        float t = s.c_t, f = cf.clap_f, hi, env;
+        (void)w;
         hi = n - s.c_low - 0.9f * s.c_band;
         s.c_band += f * hi;
         s.c_low += f * s.c_band;
@@ -573,18 +584,20 @@ static void perc(const world_t *w, float dt, float *l, float *r)
 }
 
 /* the build's riser: a band of noise rising over its four bars, gone for the breath; returns what goes to the echo */
+static float build_progress(void)      /* 0..1 through a build's four bars */
+{
+    return s.sec == SEC_BUILD ? ((float)s.sec_bar + (float)(s.tick % TPBAR) / (float)TPBAR) / 4.0f : 0.0f;
+}
+
 static float riser(float n, float *l, float *r)
 {
-    float p = 0.0f, target = 0.0f, f, x;
-    if (s.sec == SEC_BUILD) {
-        p = ((float)s.sec_bar + (float)(s.tick % TPBAR) / (float)TPBAR) / 4.0f;
-        if (!(s.sec_bar >= 3u && s.tick % TPBAR >= 3u * TPB))
-            target = p * p;
-    }
+    float p = build_progress(), target = 0.0f, f, x;
+    if (s.sec == SEC_BUILD && !(s.sec_bar >= 3u && s.tick % TPBAR >= 3u * TPB))
+        target = p * p;
     s.z_g += (target - s.z_g) * (target > s.z_g ? 0.0005f : 0.004f);
     if (s.z_g < 0.0003f)
         return 0.0f;
-    f = 2.0f * fm_sinf(3.14159265f * 300.0f * fm_exp2f(4.5f * p) / PS_SR);   /* 300 Hz to 6.8 kHz */
+    f = cf.z_f;
     s.z_band += f * (n - s.z_low - 0.5f * s.z_band);
     s.z_low += f * s.z_band;
     x = s.z_band * s.z_g * 0.35f;
@@ -596,20 +609,18 @@ static float riser(float n, float *l, float *r)
 /* the atmos, a sample: l and r added to; returns what goes to the echo (Wash) */
 static float atmos(const world_t *w, float n, float *l, float *r)
 {
-    static const int8_t IV[2][3] = {{24, 31, 36}, {24, 30, 25}};   /* over the root: fifths; dark, a tritone and a second */
     float lvl = (float)par[P_ATMOS_LEVEL] / 70.0f, target = (s.sec == SEC_MAIN ? w->atmos : 1.0f) * lvl;
     float colour = (float)par[P_ATMOS_COLOUR] / 100.0f, air = (float)par[P_ATMOS_AIR] / 100.0f, wob, al = 0.0f, ar = 0.0f, k, x;
     int i;
     s.a_lvl += (target - s.a_lvl) * (target > s.a_lvl ? 1.0f / (2.5f * PS_SR) : 1.0f / (1.5f * PS_SR));
     if (s.a_lvl < 0.0005f)
         return 0.0f;
-    if (s.sec == SEC_BUILD)            /* it opens as the build rises */
-        colour += 0.4f * ((float)s.sec_bar + (float)(s.tick % TPBAR) / (float)TPBAR) / 4.0f;
+    colour += 0.4f * build_progress(); /* it opens as the build rises */
     if ((s.a_lfo += 0.05f / PS_SR) >= 1.0f)
         s.a_lfo -= 1.0f;
     wob = fm_sin_turns(s.a_lfo);
     for (i = 0; i < 3; i++) {          /* the chord: each note a little apart left and right, its modulator shared */
-        float inc = note_hz(m.root + IV[m.dark > 0.3f][i]) / PS_SR, idx = (0.15f + 1.2f * colour) * (0.75f + 0.25f * wob), mo;
+        float inc = cf.a_inc[i], idx = (0.15f + 1.2f * colour) * (0.75f + 0.25f * wob), mo;
         mo = fm_sin_turns(s.a_mph[i]) * idx * 0.159155f;
         al += fm_sin_turns(s.a_ph[i][0] + mo);
         ar += fm_sin_turns(s.a_ph[i][1] + mo);
@@ -624,7 +635,7 @@ static float atmos(const world_t *w, float n, float *l, float *r)
     s.a_lp[0] += (al - s.a_lp[0]) * k;
     s.a_lp[1] += (ar - s.a_lp[1]) * k;
     {   /* the air: a band of noise, wandering, swaying left and right */
-        float f = 2.0f * fm_sinf(3.14159265f * (1200.0f + 900.0f * wob + 1500.0f * colour) / PS_SR);
+        float f = cf.air_f;
         s.a_band += f * (n - s.a_low - 0.7f * s.a_band);
         s.a_low += f * s.a_band;
         x = s.a_band * air * 0.5f;
@@ -636,6 +647,20 @@ static float atmos(const world_t *w, float n, float *l, float *r)
     return (al + ar) * s.a_lvl * (float)par[P_ATMOS_WASH] / 100.0f;
 }
 
+static void coefs(const world_t *w)    /* as a block begins: what changes slowly */
+{
+    static const int8_t IV[2][3] = {{24, 31, 36}, {24, 30, 25}};   /* the atmos over the root: fifths; dark, a tritone and a second */
+    float colour = (float)par[P_ATMOS_COLOUR] / 100.0f + 0.4f * build_progress();
+    int i;
+    cf.kick_f0 = note_hz(m.root + par[P_KICK_TUNE]);
+    cf.clap_f = 2.0f * fm_sinf(3.14159265f * w->clap_hz / PS_SR);
+    cf.z_f = 2.0f * fm_sinf(3.14159265f * 300.0f * fm_exp2f(4.5f * build_progress()) / PS_SR);   /* 300 Hz to 6.8 kHz */
+    cf.air_f = 2.0f * fm_sinf(3.14159265f * (1200.0f + 900.0f * fm_sin_turns(s.a_lfo) + 1500.0f * colour) / PS_SR);
+    for (i = 0; i < 3; i++)
+        cf.a_inc[i] = note_hz(m.root + IV[m.dark > 0.3f][i]) / PS_SR;
+    fx_block(s.tick_len);
+}
+
 static void tempo(const world_t *w)
 {
     mods(w);
@@ -643,6 +668,7 @@ static void tempo(const world_t *w)
     s.k_len = w->kick_len * (0.7f + 0.6f * (float)par[P_KICK_LEN] / 100.0f) * s.tick_len * (float)w->roll / PS_SR;
     if (s.k_len > 0.98f * s.tick_len * (float)w->roll / PS_SR)   /* never into the bass's first note */
         s.k_len = 0.98f * s.tick_len * (float)w->roll / PS_SR;
+    coefs(w);
 }
 
 void ps_render(float *outl, float *outr, uint32_t n)
