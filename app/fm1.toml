@@ -1,0 +1,23 @@
+# RhinoTiger's build settings (fm1-base's tools/build.py: ./build.sh)
+name = "RHINOTIGER"            # the build's files: rhinotiger.fwsc, rhinotiger-X.Y.fwsc
+id_prefix = "FM-1_1613"        # package identity (each firmware its own): dev FM-1_161300, releases FM-1_1613XXYYZZ
+usb_manufacturer = "RhinoTiger"
+usb_product = "RhinoTiger FM-1"
+o2 = []                        # the engine at -O2, once there is one
+words = "words.tsv"
+ble = false                    # no radio
+usb_audio_in = true            # the music recordable over USB
+usb_audio_out = false
+# the site
+tagline = "Generative dark psytrance and hi-tech for the FM-1"
+repo = "https://github.com/hacha/rhinotiger"
+licence = "GPL-3.0-only"
+credits = "Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments). Started from fm1-base's template by Charles Vestal."
+
+# firmware.json, for firmware hubs (fm1-base docs/FIRMWARE-JSON.md)
+author = "hacha"
+description = "RhinoTiger is a generative psytrance firmware for the M-VAVE FM-1, from dark psy to hi-tech. It plays by itself; you steer it."
+tags = ["generative", "fm"]
+install = ""
+site = ""
+screenshot = "app/docs/img/screen-playing.png"
