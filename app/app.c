@@ -637,7 +637,12 @@ enum { HUE_MAGENTA = 1365, HUE_VIOLET = 1173, HUE_BLUE = 981, HUE_CYAN = 789, HU
 static const int16_t LANE_HUE[NLANE] = {HUE_MAGENTA, HUE_VIOLET, HUE_CYAN, HUE_ACID, HUE_GOLD};
 static const int16_t PART_HUE[NPART] = {HUE_MAGENTA, HUE_VIOLET, HUE_CYAN, HUE_ACID, HUE_GOLD, HUE_BLUE};
 
-static uint16_t hsv(int32_t h, int32_t sat, int32_t v)   /* sat, v 0..255 */
+static uint16_t hsv_lift(int32_t h, int32_t sat, int32_t v, int32_t lo);
+static uint16_t hsv(int32_t h, int32_t sat, int32_t v) { return hsv_lift(h, sat, v, 0); }
+
+/* hsv, and if the colour is darker than lo (luma 0..255: blue and violet are, at full value) mixed toward white until
+ * it is not: text in any hue stays legible on black */
+static uint16_t hsv_lift(int32_t h, int32_t sat, int32_t v, int32_t lo)
 {
     int32_t f, p, q, t, r, g, b;
     h %= HUE_FULL;
@@ -654,6 +659,15 @@ static uint16_t hsv(int32_t h, int32_t sat, int32_t v)   /* sat, v 0..255 */
     case 3: r = p, g = q, b = v; break;
     case 4: r = t, g = p, b = v; break;
     default: r = v, g = p, b = q; break;
+    }
+    {
+        int32_t y = (54 * r + 183 * g + 19 * b) >> 8;   /* Rec. 709 luma */
+        if (y < lo) {                    /* c + (255 - c) * k, k = (lo - y) / (255 - y) */
+            int32_t k = (lo - y) * 256 / (255 - y);
+            r += (255 - r) * k >> 8;
+            g += (255 - g) * k >> 8;
+            b += (255 - b) * k >> 8;
+        }
     }
     return RGB(r, g, b);
 }
@@ -686,6 +700,10 @@ static void hue_update(void)             /* once a frame: the sway, the section'
 }
 
 static uint16_t part_col(int32_t base, int32_t v) { return hsv(base + hue.shift, hue.sat, v); }
+static uint16_t part_txt(int32_t base, int32_t v)   /* a label in its part's colour, lifted to read on black */
+{
+    return hsv_lift(base + hue.shift, hue.sat, v, v * 120 / 255);
+}
 
 /* a text, each character its own hue, from h on by dh */
 static int32_t text_rainbow(int32_t x, int32_t y, const felucca_font_t *f, const char *t, int32_t h, int32_t dh, int32_t sat,
@@ -694,7 +712,7 @@ static int32_t text_rainbow(int32_t x, int32_t y, const felucca_font_t *f, const
     char c[2] = {0, 0};
     for (; *t; t++) {
         c[0] = *t;
-        x = cv_text(x, y, f, c, hsv(h, sat, v));
+        x = cv_text(x, y, f, c, hsv_lift(h, sat, v, v * 110 / 255));
         h += dh;
     }
     return x;
@@ -751,7 +769,7 @@ static void draw_grid(void)
     cv_begin(240, 148, C_BLACK);
     for (r = 0; r < 4; r++) {
         int32_t y = 6 + r * 24;
-        cv_text(8, y + 4, &FONT_XS, FX_ROW[r], part_col(LANE_HUE[r], 220));
+        cv_text(8, y + 4, &FONT_XS, FX_ROW[r], part_txt(LANE_HUE[r], 220));
         for (c = 0; c < 4; c++) {
             int id = (int)(r * 4 + c), on = pf.fx_held >> id & 1u;
             int32_t x = 56 + c * 46, tw = text_w(&FONT_XS, ps_fx_name(id));
@@ -762,7 +780,7 @@ static void draw_grid(void)
     for (i = 0, c = 8; i < NPART; i++) {     /* the parts, in the black keys' order (c: x) */
         int mu = ps_ui.muted >> i & 1u;
         int32_t tw = text_w(&FONT_XS, PART_NAME[i]);
-        cv_text(c, 106, &FONT_XS, PART_NAME[i], mu ? C_LINE : part_col(PART_HUE[i], 240));
+        cv_text(c, 106, &FONT_XS, PART_NAME[i], mu ? C_LINE : part_txt(PART_HUE[i], 240));
         if (mu)
             cv_rect(c, 110, tw, 1, C_GRAY);
         c += tw + 10;
@@ -788,7 +806,7 @@ static void draw_lanes(uint32_t now)
         int32_t cur = ps_playing() ? (int32_t)(n == 24 ? tick / 4u % 24u : tick / 6u % 16u) : -1;
         int flare = now - ui.struck_at[lane] < 90u;
         int32_t v = f ? 255 : 210;           /* the page's lane brightest */
-        cv_text(8, y + 3, &FONT_XS, LANE_NAME[lane], muted ? C_LINE : part_col(LANE_HUE[lane], f ? 255 : 210));
+        cv_text(8, y + 3, &FONT_XS, LANE_NAME[lane], muted ? C_LINE : part_txt(LANE_HUE[lane], f ? 255 : 210));
         for (i = 0; i < n; i++) {
             int32_t x = 62 + i * (n == 24 ? 20 : 30) / 3 + i / per * 2, w = n == 24 ? 5 : 8;
             int here = i == cur;
