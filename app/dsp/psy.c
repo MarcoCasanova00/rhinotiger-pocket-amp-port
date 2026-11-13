@@ -648,8 +648,11 @@ static float kick(float dt)
         s.k_ph -= 1.0f;
     env = fm_expf(-t / (s.k_len * 0.45f));
     env *= 1.0f - t / s.k_len;                      /* to nothing by its end: the bass's place stays clear */
+    if (t < 0.0002f)                                /* its first 0.2 ms a slope, not a step (the click too) */
+        env *= t / 0.0002f;
     x = fm_sin_turns(s.k_ph) * env;
-    x += (t < 0.002f ? 0.35f * punch * (1.0f - t / 0.002f) : 0.0f) * fm_sin_turns(s.k_ph * 7.0f);   /* the click */
+    x += (t < 0.002f ? 0.35f * punch * (1.0f - t / 0.002f) : 0.0f) * fm_sin_turns(s.k_ph * 7.0f) *   /* the click */
+         (t < 0.0002f ? t / 0.0002f : 1.0f);
     s.k_t = t + dt;
     return fm_tanhf(x * 1.8f);
 }
@@ -711,14 +714,14 @@ static void perc(const world_t *w, float dt, float *l, float *r)
     s.h_x2 = s.h_hp1;
     hp = s.h_hp2;
     if (s.h_t >= 0.0f) {
-        x = hp * s.h_v * fm_expf(-s.h_t * 1000.0f / w->hat_ms) * 0.20f;
+        x = hp * s.h_v * fm_expf(-s.h_t * 1000.0f / w->hat_ms) * 0.20f * (s.h_t < 0.0001f ? s.h_t / 0.0001f : 1.0f);
         *l += 0.8f * x;
         *r += 1.1f * x;
         if ((s.h_t += dt) > w->hat_ms * 0.008f)
             s.h_t = -1.0f;
     }
     if (s.o_t >= 0.0f) {
-        x = hp * s.o_v * fm_expf(-s.o_t * 1000.0f / w->open_ms) * 0.22f;
+        x = hp * s.o_v * fm_expf(-s.o_t * 1000.0f / w->open_ms) * 0.22f * (s.o_t < 0.0001f ? s.o_t / 0.0001f : 1.0f);
         *l += 1.05f * x;
         *r += 0.85f * x;
         if ((s.o_t += dt) > w->open_ms * 0.008f)
@@ -733,11 +736,11 @@ static void perc(const world_t *w, float dt, float *l, float *r)
         s.c_low += f * s.c_band;
         if (t < 0.024f) {
             float u = t - 0.008f * fm_floorf(t / 0.008f);
-            env = fm_expf(-u / 0.0025f);
+            env = fm_expf(-u / 0.0025f) * (u < 0.0001f ? u / 0.0001f : 1.0f);   /* (each burst from a slope) */
         } else {
             env = 0.8f * fm_expf(-(t - 0.024f) / 0.045f);
         }
-        x = s.c_band * env * s.c_v * 1.4f;
+        x = s.c_band * env * s.c_v * 1.4f * (t < 0.0001f ? t / 0.0001f : 1.0f);   /* (its first 0.1 ms a slope) */
         *l += x;
         *r += x;
         if ((s.c_t += dt) > 0.3f)

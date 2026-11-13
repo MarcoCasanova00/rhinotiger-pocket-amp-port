@@ -11,8 +11,9 @@
  *            sixteenth again and again, a whole tone higher each time), SPIN (left and right, quicker and quicker)
  *
  * The buffer's effects (the repeats, REVERSE, TAPE, STAIRS) take turns: the last pressed plays, from the next
- * sixteenth. The rest add up. Each fades in and out in a few milliseconds. The buffer: the last 0.74 s of the mix, in
- * the pool; while a buffer's effect replays what it took, the buffer keeps it (no more is written). */
+ * sixteenth (the one before fading out over 3 ms beneath it). The rest add up. Each fades in and out in a few
+ * milliseconds. The buffer: the last 0.74 s of the mix, in the pool; while a buffer's effect replays what it took, the
+ * buffer keeps it (no more is written, and its count stands: what is behind it stays the music as it went). */
 
 enum { FX_R8, FX_R16, FX_R32, FX_R16T, FX_LOW, FX_HIGH, FX_FLANGE, FX_BAND,
        FX_THROW, FX_WASH, FX_FREEZE, FX_REVERSE, FX_TAPE, FX_RISER, FX_STAIRS, FX_SPIN, FX_N };
@@ -22,15 +23,21 @@ static const char *const FX_NAME[FX_N] = {"1/8", "1/16", "1/32", "1/16T", "LOW",
 #define CAP_N 32768u                   /* frames: 0.74 s (a beat at 125 bpm is 21168) */
 static PLAT_POOL int16_t cap_buf[2][CAP_N];
 
-static struct {
-    uint16_t held;                     /* the grid's keys held (FX_* bits) */
-    int8_t buf_fx, buf_want;           /* the buffer's effect playing, and the one pressed (-1 none) */
-    uint8_t buf_on;                    /* it is held (0: fading out) */
-    uint8_t cap_hold;                  /* the buffer keeps what it has: a buffer's effect replays it */
-    uint32_t cap_w;                    /* frames written */
-    uint32_t p0;                       /* where the buffer's effect began (a frame count) */
+typedef struct {                       /* a buffer's effect playing */
+    int8_t id;                         /* FX_* (-1 none) */
+    uint32_t p0;                       /* where it began (a frame count) */
     float el;                          /* frames since it began */
     float tape_pos;                    /* TAPE: frames read since it began */
+} bufv_t;
+
+static struct {
+    uint16_t held;                     /* the grid's keys held (FX_* bits) */
+    int8_t buf_want;                   /* the buffer's effect pressed (-1 none) */
+    uint8_t buf_on;                    /* the one playing is held (0: fading out) */
+    uint8_t cap_hold;                  /* the buffer keeps what it has: a buffer's effect replays it */
+    bufv_t cur, old;                   /* the buffer's effect playing, and the one it took over from (fading) */
+    float xf;                          /* the old one's share (1 to 0 over ~3 ms) */
+    uint32_t cap_w;                    /* frames written */
     float wet;                         /* the buffer's effect's share (glides) */
     float lo_g, hi_g, band_g, fl_g;    /* the filters' depths (glide, 0..1) */
     float svf_lo[2][2], svf_hi[2][2], svf_bp[2][2];   /* low, band per channel */
@@ -41,7 +48,7 @@ static struct {
     uint8_t muted;                     /* the parts muted (PART_* bits) */
     uint8_t out;                       /* the parts out while a key is held */
     uint8_t fill_req;                  /* a fill cued for the next beat */
-} fx = {.buf_fx = -1, .buf_want = -1};
+} fx = {.buf_want = -1, .cur = {.id = -1}, .old = {.id = -1}};
 
 /* the read: frame position p (a count, fractional), channel ch, between two samples */
 static float cap_read(int ch, float p)
@@ -67,7 +74,7 @@ static void fx_cmd(int id, int on)     /* (render: from the command queue) */
         fx.held &= (uint16_t)~(1u << id);
         if (fx.buf_want == id)
             fx.buf_want = -1;
-        if (fx.buf_fx == id)           /* let go: back to the music (a buffer's effect still held takes over) */
+        if (fx.cur.id == id)           /* let go: back to the music (a buffer's effect still held takes over) */
             fx.buf_on = 0;
         if (fx.buf_want < 0) {
             int k;
@@ -82,57 +89,61 @@ static void fx_cmd(int id, int on)     /* (render: from the command queue) */
 
 static void fx_sixteenth(void)         /* a sixteenth begins: a pressed buffer's effect starts here */
 {
-    if (fx.buf_want >= 0 && (fx.buf_want != fx.buf_fx || !fx.buf_on)) {
-        fx.buf_fx = fx.buf_want;
+    if (fx.buf_want >= 0 && (fx.buf_want != fx.cur.id || !fx.buf_on)) {
+        if (fx.cur.id >= 0) {          /* another playing: it fades out beneath the new one */
+            fx.old = fx.cur;
+            fx.xf = 1.0f;
+        }
+        fx.cur.id = fx.buf_want;
+        fx.cur.p0 = fx.cap_w;
+        fx.cur.el = 0.0f;
+        fx.cur.tape_pos = 0.0f;
         fx.buf_on = 1;
-        fx.p0 = fx.cap_w;
-        fx.el = 0.0f;
-        fx.tape_pos = 0.0f;
+        fx.cap_hold = 0;               /* the new one's first time through is written as it plays */
     }
 }
 
-/* the buffer's effect, a frame: returns 0 when it has nothing (the music as it is) */
-static int fx_buffer(float tick_len, float *l, float *r)
+/* a buffer's effect, a frame: its read into l and r; *hold set when it replays what the buffer took */
+static void fx_buffer(bufv_t *v, float tick_len, float *l, float *r, int *hold)
 {
     static const float SLICE[4] = {12.0f, 6.0f, 3.0f, 4.0f};   /* ticks: 1/8, 1/16, 1/32, a sixteenth triplet */
-    int id = fx.buf_fx;
-    float len, u, p, w = 1.0f;
-    fx.cap_hold = 0;
-    if (id < 0)
-        return 0;
+    int id = v->id;
+    float len, u, p, w = 1.0f, base = (float)(v->p0 % CAP_N);
+    *hold = 0;
     if (id <= FX_R16T || id == FX_STAIRS) {
-        float rate = 1.0f;
         len = tick_len * (id == FX_STAIRS ? 6.0f : SLICE[id]);
-        u = fx.el - len * fm_floorf(fx.el / len);
+        u = v->el - len * fm_floorf(v->el / len);
+        w = fm_minf(u, len - u);       /* the slice's edges, softened */
         if (id == FX_STAIRS) {         /* each time round a whole tone higher, up to an octave and a fifth */
-            int k = (int)(fx.el / len);
-            rate = fm_exp2f((float)(k > 10 ? 10 : k) * 2.0f / 12.0f);
-            p = (float)(fx.p0 % CAP_N) + (u * rate - len * fm_floorf(u * rate / len));
+            int k = (int)(v->el / len);
+            float q = u * fm_exp2f((float)(k > 10 ? 10 : k) * 2.0f / 12.0f);
+            q -= len * fm_floorf(q / len);
+            w = fm_minf(w, fm_minf(q, len - q));   /* (its read wrapping inside the slice: softened too) */
+            p = base + q;
         } else {
-            p = (float)(fx.p0 % CAP_N) + u;
+            p = base + u;
         }
-        w = fm_clampf(fm_minf(u, len - u) / 64.0f, 0.0f, 1.0f);   /* the slice's edges, softened */
-        if (fx.el < len)               /* the first time through: the music itself, written */
+        w = fm_clampf(w / 64.0f, 0.0f, 1.0f);
+        if (v->el < len)               /* the first time through: the music itself, written */
             w = 1.0f;
-        fx.cap_hold = fx.el + 1.0f >= len;
+        *hold = v->el + 1.0f >= len;
     } else if (id == FX_REVERSE) {     /* the last beat backwards, again and again */
         len = tick_len * (float)PS_TPB;
-        u = fx.el - len * fm_floorf(fx.el / len);
-        p = (float)(fx.p0 % CAP_N) + (float)CAP_N - 1.0f - u;
+        u = v->el - len * fm_floorf(v->el / len);
+        p = base + (float)CAP_N - 1.0f - u;
         w = fm_clampf(fm_minf(u, len - u) / 64.0f, 0.0f, 1.0f);
-        fx.cap_hold = 1;
+        *hold = 1;
     } else {                           /* TAPE: slowing to a stop over a beat */
-        float rate = 1.0f - fx.el / (tick_len * (float)PS_TPB);
+        float rate = 1.0f - v->el / (tick_len * (float)PS_TPB);
         if (rate < 0.0f)
             rate = 0.0f;
-        fx.tape_pos += rate;
-        p = (float)(fx.p0 % CAP_N) + fx.tape_pos;
+        v->tape_pos += rate;
+        p = base + v->tape_pos;
         w = rate < 0.05f ? rate / 0.05f : 1.0f;
     }
-    fx.el += 1.0f;
+    v->el += 1.0f;
     *l = cap_read(0, p) * w;
     *r = cap_read(1, p) * w;
-    return 1;
 }
 
 static void fx_block(float tick_len)   /* as a block begins: the filters' coefficients, the sweeps' rates */
@@ -156,22 +167,36 @@ static void svf(float st[2], float x, float f, float q)   /* Chamberlin: st[0] l
 static float fx_render(float tick_len, float *l, float *r, float upper_l, float upper_r, float n)
 {
     float dl = *l, dr = *r, bl = 0.0f, br = 0.0f, send = 0.0f, g;
-    int have;
     /* the buffer keeps the mix, unless a buffer's effect is replaying it */
     if (!fx.cap_hold) {
         cap_buf[0][fx.cap_w % CAP_N] = (int16_t)(fm_clampf(dl * 0.5f, -1.0f, 1.0f) * 32767.0f);
         cap_buf[1][fx.cap_w % CAP_N] = (int16_t)(fm_clampf(dr * 0.5f, -1.0f, 1.0f) * 32767.0f);
     }
-    have = fx_buffer(tick_len, &bl, &br);
-    fx.cap_w++;
-    fx.wet += ((have && fx.buf_on ? 1.0f : 0.0f) - fx.wet) * 0.01f;
-    if (have && !fx.buf_on && fx.wet < 0.0005f) {   /* faded out */
-        fx.buf_fx = -1;
-        fx.cap_hold = 0;
-    }
-    if (have) {
+    if (fx.cur.id >= 0) {
+        int hold, h2;
+        fx_buffer(&fx.cur, tick_len, &bl, &br, &hold);
+        if (fx.old.id >= 0) {          /* the one taken over from, fading out beneath */
+            float ol, orr;
+            fx_buffer(&fx.old, tick_len, &ol, &orr, &h2);
+            bl += (ol - bl) * fx.xf;
+            br += (orr - br) * fx.xf;
+            if ((fx.xf -= 0.008f) <= 0.0f)
+                fx.old.id = -1;
+        }
+        if (!fx.cap_hold)
+            fx.cap_w++;
+        fx.cap_hold = (uint8_t)hold;
+        fx.wet += ((fx.buf_on ? 1.0f : 0.0f) - fx.wet) * 0.01f;
         dl += (bl - dl) * fx.wet;
         dr += (br - dr) * fx.wet;
+        if (!fx.buf_on && fx.wet < 0.0005f) {   /* faded out: the music again, written again */
+            fx.cur.id = fx.old.id = -1;
+            fx.cap_hold = 0;
+        }
+    } else {
+        if (!fx.cap_hold)
+            fx.cap_w++;
+        fx.wet = 0.0f;
     }
     /* the filters: LOW down to 250 Hz, HIGH up to 1.6 kHz, BAND a telephone, FLANGE */
     fx.lo_g += ((fx.held >> FX_LOW & 1u ? 1.0f : 0.0f) - fx.lo_g) * (fx.held >> FX_LOW & 1u ? 0.00006f : 0.0003f);

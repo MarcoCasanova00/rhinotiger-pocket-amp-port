@@ -1,0 +1,51 @@
+tap FX
+wait 30000
+tapkey b0
+tapkey b2
+wait 300
+wav clk-fx.wav
+key w0 down 90
+wait 900
+key w1 down 90
+wait 900
+key w0 up
+wait 900
+key w11 down 90
+wait 700
+key w1 up
+wait 900
+key w11 up
+wait 600
+key w12 down 90
+wait 900
+key w14 down 90
+wait 900
+key w12 up
+wait 900
+key w14 up
+wait 500
+key w4 down 90
+key w6 down 90
+wait 1500
+key w4 up
+key w5 down 90
+wait 1200
+key w5 up
+key w6 up
+key w7 down 90
+wait 800
+key w7 up
+key w10 down 90
+wait 1500
+key w10 up
+key w15 down 90
+wait 1500
+key w15 up
+key w2 down 90
+wait 100
+key w2 up
+key w3 down 90
+wait 50
+key w3 up
+wait 1000
+wavstop

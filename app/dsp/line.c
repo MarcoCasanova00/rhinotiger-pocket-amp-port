@@ -18,8 +18,10 @@ static struct {
     uint8_t playing;                   /* this phrase it plays */
     /* the voice */
     float t, gate;                     /* seconds since the note (< 0: silent), its length */
+    float amp;                         /* the level, following the envelope (a new note over an old: no step) */
     float cph, mph, inc, inc_to;       /* carrier and modulator phase (turns), the step, gliding to */
     float idx, idx_k, idx_floor;       /* the modulation now, its fall a sample, its floor */
+    float idx_s;                       /* the modulation heard: following idx (a new note's height, no step) */
     float wah_ph;
     float lp;
     float pan;
@@ -87,11 +89,12 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
         return;
     {
         float f = note_hz(m.root + w->line_oct + ln.note[i]) / PS_SR;
-        int glide = ln.slide[(i + LN_STEPS - 1u) % LN_STEPS] && ln.t >= 0.0f;
+        int sounding = ln.t >= 0.0f, glide = ln.slide[(i + LN_STEPS - 1u) % LN_STEPS] && sounding;
         ln.inc_to = f;
         if (!glide) {
             ln.inc = f;
-            ln.cph = ln.mph = 0.0f;
+            if (!sounding)             /* from silence: from the same place; over a sounding note: on from where it is */
+                ln.cph = ln.mph = 0.0f;
         }
         ln.t = 0.0f;
         ln.gate = step_s * (ln.slide[i] ? 1.05f : w->line_gate * (0.4f + 1.2f * (float)par[P_LINE_LEN] / 100.0f));
@@ -109,17 +112,23 @@ static float ln_render(const world_t *w, float dt, float *l, float *r)   /* retu
     if (ln.t < 0.0f)
         return 0.0f;
     if (ln.t < ln.gate)
-        env = ln.t < 0.002f ? ln.t / 0.002f : 1.0f;
+        env = 1.0f;
     else {
         env = 1.0f - (ln.t - ln.gate) / 0.006f;
-        if (env <= 0.0f) {
+        if (env <= 0.0f && ln.amp < 0.001f) {
             ln.t = -1.0f;
+            ln.amp = 0.0f;
             return 0.0f;
         }
+        if (env < 0.0f)
+            env = 0.0f;
     }
+    ln.amp += (env - ln.amp) * 0.03f;  /* ~0.75 ms: the attack, and a retrigger's dip, as slopes */
+    env = ln.amp;
     ln.inc += (ln.inc_to - ln.inc) * 0.004f;   /* a slide: ~5 ms */
     ln.idx = ln.idx_floor + (ln.idx - ln.idx_floor) * ln.idx_k;
-    idx = ln.idx;
+    ln.idx_s += (ln.idx - ln.idx_s) * 0.05f;   /* ~0.45 ms */
+    idx = ln.idx_s;
     if (w->line_wah > 0.0f) {          /* the wah: the modulation swinging with the note */
         if ((ln.wah_ph += 7.0f * dt) >= 1.0f)
             ln.wah_ph -= 1.0f;
