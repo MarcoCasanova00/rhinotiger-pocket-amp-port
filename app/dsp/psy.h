@@ -19,6 +19,8 @@ const char *ps_world_name(int w);
 void ps_init(void);
 void ps_world(int w);                  /* from the next bar */
 void ps_play(int on);
+void ps_restart(void);                 /* from the top now (a MIDI start while playing) */
+void ps_ext_bpm(float bpm);            /* a MIDI clock's tempo over the world's (0: none) */
 int ps_playing(void);
 int ps_bar(void);                      /* bars since PLAY (the screen, the host's checks) */
 void ps_render(float *l, float *r, uint32_t n);   /* stereo, about -1..1 */

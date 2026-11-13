@@ -9,6 +9,7 @@ words = "words.tsv"
 ble = false                    # no radio
 usb_audio_in = true            # the music recordable over USB
 usb_audio_out = false
+midi_stamp = true              # MIDI in stamped as it lands: an optional clock followed evenly
 # the site
 tagline = "Generative dark psytrance and hi-tech for the FM-1"
 repo = "https://github.com/hacha/rhinotiger"

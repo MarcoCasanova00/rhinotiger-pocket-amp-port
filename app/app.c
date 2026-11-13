@@ -18,8 +18,8 @@
  *   7 EVENTS (ARP)           K1..K4 Level, Density, Runs, Echo (the send)
  *   8 LINE (ARP again)       K1..K4 Level, Density, Length, Mutate
  *   9 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
- *  10 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); SAVE here
- *                            keeps it all
+ *  10 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
+ *                            (off by default); SAVE here keeps it all
  * SEL held: the knobs are MAIN's four on any page. PRESETS: the world, from the next bar. PLAY: play or rest.
  * ALGORITHM: the bass's colour (one of four; a drop chooses another on its own). EDIT: the line drawn anew from the
  * next bar. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). ENV: breaks on their
@@ -47,6 +47,8 @@ typedef struct {
 } settings_t;
 static settings_t set;
 #define SET_NOAUTO 1u
+#define SET_MIDI 2u                      /* MIDI in: notes throw events, start / stop / clock followed */
+static void midi_off(void);
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
 
@@ -97,7 +99,7 @@ void app_init(void)
     ps_init();
     ok = plat_store_load(OBJ_SETTINGS, &set, sizeof set) == (int)sizeof set && set.magic == SET_MAGIC &&
          set.world < PS_NWORLD && set.lights <= 2u && set.theme < NPALETTES &&
-         set.flags <= SET_NOAUTO;
+         set.flags <= (SET_NOAUTO | SET_MIDI);
     for (p = 0; ok && p < P_NPARAMS; p++)
         ok = set.par[p] >= ps_param(p)->lo && set.par[p] <= ps_param(p)->hi;
     if (!ok)
@@ -223,7 +225,7 @@ static void page_go(int p)
 static const char *knob_name(int page, int k)
 {
     if (page == PG_GLOBAL)
-        return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "";
+        return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "MIDI IN";
     return ps_param(page_par(page) + k)->name;
 }
 
@@ -269,6 +271,10 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
             str_put(t + k, 4, "%");
             *pos = (int32_t)(c > 100u ? 100u : c);
             *span = 100;
+        } else {
+            str_put(t, 12, set.flags & SET_MIDI ? "ON" : "OFF");
+            *pos = (set.flags & SET_MIDI) != 0;
+            *span = 1;
         }
         return;
     }
@@ -294,6 +300,10 @@ static void knob_turn(int k, int32_t d)
         else if (k == 1) {
             set.theme = (uint8_t)clamp(set.theme + d, 0, (int32_t)NPALETTES - 1);
             palette_set(set.theme);
+        } else if (k == 3) {
+            set.flags = (uint8_t)(d > 0 ? set.flags | SET_MIDI : set.flags & ~SET_MIDI);
+            if (!(set.flags & SET_MIDI))
+                midi_off();
         } else
             return;
     } else {
@@ -405,12 +415,94 @@ static void key_up(int k)
     }
 }
 
+/* ------------------------------------------------------------------- midi --- */
+/* MIDI in (optional: GLOBAL's MIDI IN, off by default), from USB and the TRS jack: a note throws an event as its key
+ * would (folded by octaves into the keys' F3..G5); start, continue and stop play and rest (start from the top); a
+ * clock's tempo is followed (its beats' length, smoothed) until the clock stops for half a second */
+static struct {
+    uint32_t down;                       /* the keys a note holds */
+    uint32_t last_t24, beat_t24;         /* the last clock's time; a beat's length (t24 ticks, smoothed) */
+    uint32_t last_ms;
+    uint8_t clocks;
+} md;
+
+static void midi_off(void)
+{
+    uint32_t k;
+    for (k = 0; k < NKEYS; k++)
+        if (md.down >> k & 1u && !(ui.keys >> k & 1u))
+            ps_key((int)k, 0, 0);
+    md.down = 0;
+    md.clocks = 0;
+    md.beat_t24 = 0;
+    ps_ext_bpm(0.0f);
+}
+
+static void midi_poll(void)
+{
+    uint32_t pkt;
+    int port;
+    while (plat_midi_in(&pkt, &port)) {
+        uint32_t st = pkt >> 8 & 0xFFu, d1 = pkt >> 16 & 0x7Fu, d2 = pkt >> 24 & 0x7Fu;
+        if (!(set.flags & SET_MIDI))
+            continue;
+        if (st == 0xF8u) {               /* a clock: 24 a beat */
+#ifdef PLAT_HOST
+            uint32_t t = plat_ms() * 1000u * PLAT_TICKS_PER_US;   /* (the host's t24 is its real clock, not the script's) */
+#else
+            uint32_t t = plat_midi_in_t24();   /* as it landed (fm1.toml midi_stamp) */
+#endif
+            if (md.clocks && t - md.last_t24 < PLAT_TICKS_PER_US * 100000u) {   /* (a tenth of a second apart: anew) */
+                uint32_t beat = (t - md.last_t24) * 24u;
+                md.beat_t24 = md.beat_t24 ? (uint32_t)((int32_t)md.beat_t24 + ((int32_t)(beat - md.beat_t24) >> 4)) : beat;
+                if (md.clocks >= 24u) {
+                    float bpm = 60.0f * 1e6f * (float)PLAT_TICKS_PER_US / (float)md.beat_t24;
+                    ps_ext_bpm(bpm < 60.0f ? 60.0f : bpm > 240.0f ? 240.0f : bpm);
+                }
+            } else
+                md.clocks = 0;
+            if (md.clocks < 255u)
+                md.clocks++;
+            md.last_t24 = t;
+            md.last_ms = plat_ms();
+        } else if (st == 0xFAu) {        /* start: from the top */
+            if (ps_playing())
+                ps_restart();
+            ps_play(1);
+        } else if (st == 0xFBu) {        /* continue */
+            ps_play(1);
+        } else if (st == 0xFCu) {        /* stop */
+            ps_play(0);
+        } else if ((st & 0xE0u) == 0x80u) {   /* a note on or off, any channel */
+            int k = (int)d1 - 53;
+            while (k < 0)
+                k += 12;
+            while (k >= (int)NKEYS)
+                k -= 12;
+            if ((st & 0xF0u) == 0x90u && d2) {
+                md.down |= 1u << k;
+                ps_key(k, 1, (int)d2);
+            } else if (md.down >> k & 1u) {
+                md.down &= ~(1u << k);
+                if (!(ui.keys >> k & 1u))
+                    ps_key(k, 0, 0);
+            }
+        }
+    }
+    if (md.clocks && plat_ms() - md.last_ms > 500u) {   /* the clock stopped: the world's tempo again */
+        md.clocks = 0;
+        md.beat_t24 = 0;
+        ps_ext_bpm(0.0f);
+    }
+}
+
 /* ------------------------------------------------------------------ input --- */
 static void input(void)
 {
     uint32_t keys, btn = plat_buttons(), k, down, up;
     int32_t e;
     touch_poll();                            /* the sensed keys' presses, velocities and pressure */
+    midi_poll();
     keys = touch_keys();
     down = btn & ~ui.btn;
     up = ui.btn & ~btn;

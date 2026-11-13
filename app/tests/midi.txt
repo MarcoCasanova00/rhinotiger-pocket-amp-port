@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# MIDI in, optional (GLOBAL's MIDI IN, off by default): notes throw events, start / stop, a clock's tempo followed.
+wait 1500
+# off: a note does nothing
+midi 90 3C 64
+wait 300
+expect thrown 0
+# on
+tap GLO
+turn K4 1
+wait 30
+expect dirty 1
+midi 90 3C 64
+wait 300
+midi 80 3C 00
+expect thrown 1
+# a note out of the keys' range, folded in
+midi 90 18 64
+wait 300
+midi 80 18 00
+expect thrown 2
+# a clock at 21 ms: 119 bpm
+clock 96 21
+wait 30
+expect bpm >117
+expect bpm <121
+# stop, start
+midi FC
+wait 50
+expect playing 0
+midi FA
+wait 50
+expect playing 1
+# the clock gone: the world's tempo again
+wait 1000
+expect bpm 152

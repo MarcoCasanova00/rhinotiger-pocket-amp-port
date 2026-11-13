@@ -165,6 +165,9 @@ const char *ps_echo_time_name(int v) { return ECHO_TIME_NAME[(unsigned)v % 4u]; 
 ps_ui_t ps_ui;
 
 static volatile int want_world, want_play;
+static volatile uint32_t restart_n;    /* restarts asked for, counted */
+static uint32_t restart_seen;
+static volatile float ext_bpm;         /* a MIDI clock's tempo (0: the world's) */
 static int world, playing;
 
 static struct {
@@ -428,9 +431,11 @@ void ps_init(void)
 
 void ps_world(int w) { want_world = (int)((unsigned)w % PS_NWORLD); }
 void ps_play(int on) { want_play = on != 0; }
+void ps_restart(void) { restart_n++; }
+void ps_ext_bpm(float bpm) { ext_bpm = bpm; }
 int ps_playing(void) { return playing; }
 int ps_bar(void) { return (int)(s.tick / TPBAR); }
-int ps_bpm(void) { return (int)(W[want_world].bpm + (float)par[P_TEMPO]); }
+int ps_bpm(void) { return ext_bpm > 0.0f ? (int)(ext_bpm + 0.5f) : (int)(W[want_world].bpm + (float)par[P_TEMPO]); }
 int ps_root(void) { return W[want_world].root + par[P_ROOT]; }
 void ps_cue(int how)
 {
@@ -450,7 +455,7 @@ static void mods(const world_t *w)     /* the macros and the moved tempo and roo
     m.dark = (float)(par[P_DARK] - 50) / 50.0f;
     m.drift = (float)par[P_DRIFT] / 100.0f;
     m.root = w->root + par[P_ROOT];
-    m.bpm = w->bpm + (float)par[P_TEMPO];
+    m.bpm = ext_bpm > 0.0f ? ext_bpm : w->bpm + (float)par[P_TEMPO];
 }
 
 /* the build's roll: quarters, eighths, then sixteenths, louder bar by bar; its last beat silent */
@@ -853,7 +858,8 @@ void ps_render(float *outl, float *outr, uint32_t n)
     float fb = (float)par[P_ECHO_FB] / 100.0f, tone = 0.12f + 0.46f * (float)par[P_ECHO_TONE] / 100.0f;
     uint32_t i;
     static float fx_send;              /* what the effects sent to the echo (the next frame takes it) */
-    if (want_play != playing) {
+    if (want_play != playing || restart_n != restart_seen) {
+        restart_seen = restart_n;
         playing = want_play;
         s.tick = 0;
         s.next = 0.0f;
