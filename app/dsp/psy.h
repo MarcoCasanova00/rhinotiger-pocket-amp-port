@@ -52,6 +52,17 @@ enum { SEC_MAIN, SEC_BREAK, SEC_BUILD };
 void ps_cue(int how);
 int ps_section(void);
 
+/* the performance (fx.c): the white keys' grid of sixteen effects, each while held (from the next sixteenth where it
+ * takes the music's time), and the parts: muted (a black key tapped, again: back), out while a black key is held, and
+ * a fill on the next beat */
+#define PS_NFX 16
+void ps_fx(int id, int on);
+const char *ps_fx_name(int id);
+enum { PART_KICK, PART_BASS, PART_PERC, PART_LINE, PART_EVENTS, PART_ATMOS, NPART };
+void ps_mute(int part);                /* muted, or back */
+void ps_out(int part, int on);         /* out while held */
+void ps_fill(void);
+
 /* the keys throw events (events.c): key 0..26 (F3..G5), down 1 (value: velocity), 0 up, 2 pressure (value 0..127) */
 void ps_key(int k, int down, int value);
 int ps_stat(int which);                /* 0 events begun, 1 thrown and remembered (up to 8), 2 the latest thrown's type */
@@ -68,6 +79,7 @@ typedef struct {
     volatile int8_t cued;              /* a cue waiting for the next bar: 0 none, 1 next, 2 drop */
     volatile uint8_t sec_bar;          /* bars into the section (the groove: into its phrase, 0..7) */
     volatile uint8_t drops;            /* drops so far (wraps) */
+    volatile uint8_t muted;            /* the parts muted (1 << PART_*) */
 } ps_ui_t;
 extern ps_ui_t ps_ui;
 #define PS_TPB 24u

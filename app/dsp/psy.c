@@ -33,6 +33,7 @@
 #define TPBAR (4u * TPB)
 #include "psy.h"
 #include "fastmath.h"
+#include "plat.h"                     /* PLAT_POOL: the big buffers in the pool on the device */
 
 typedef struct {
     const char *name;
@@ -123,6 +124,8 @@ static struct {
     uint32_t last_drop;
     uint32_t sec_bar, sec_len;         /* bars into the section; a break's length (0: until cued) */
     uint32_t cue_seen, drop_seen;
+    uint8_t fill_beat;                 /* this beat a fill (cued by a black key) */
+    float part_g[NPART];               /* the parts' gains, gliding to their mutes */
     float x_t;                         /* the crash's age (s, < 0 silent) */
     float z_g, z_low, z_band;          /* the riser: its level (glides), its band-pass */
     /* the atmos */
@@ -142,7 +145,7 @@ static struct {
 } m;
 
 #define ECHO_N 16384u                  /* (a dotted eighth at 125 bpm, the slowest a world can be moved to: 15876) */
-static int16_t echo_buf[2][ECHO_N];
+static PLAT_POOL int16_t echo_buf[2][ECHO_N];
 static uint32_t echo_w;
 
 /* commands from the UI: keys (the render drains them as a block begins) */
@@ -189,6 +192,38 @@ static int ev_changes(void)            /* recipes changed as a phrase begins: 0.
 static float ev_dark(void) { return m.dark; }
 
 #include "events.c"
+#include "fx.c"
+
+/* the queue's commands: bits 16.. the kind (0 a key, 1 an effect, 2 a mute, 3 out, 4 a fill) */
+enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL };
+void ps_fx(int id, int on) { cmd_post((uint32_t)CMD_FX << 16 | (uint32_t)(id & 31) | (uint32_t)(on != 0) << 5); }
+const char *ps_fx_name(int id) { return FX_NAME[(unsigned)id % FX_N]; }
+void ps_mute(int part) { cmd_post((uint32_t)CMD_MUTE << 16 | (uint32_t)(part & 7)); }
+void ps_out(int part, int on) { cmd_post((uint32_t)CMD_OUT << 16 | (uint32_t)(part & 7) | (uint32_t)(on != 0) << 5); }
+void ps_fill(void) { cmd_post((uint32_t)CMD_FILL << 16); }
+
+static void cmd_do(uint32_t c)         /* (render, as a block begins) */
+{
+    uint32_t a = c & 31u, b = c >> 5 & 1u;
+    switch (c >> 16) {
+    case CMD_KEY:
+        ev_key((int)(c & 31u), (int)(c >> 5 & 3u), (int)(c >> 8 & 127u));
+        break;
+    case CMD_FX:
+        fx_cmd((int)a, (int)b);
+        break;
+    case CMD_MUTE:
+        fx.muted ^= (uint8_t)(1u << a);
+        ps_ui.muted = fx.muted;
+        break;
+    case CMD_OUT:
+        fx.out = (uint8_t)(b ? fx.out | 1u << a : fx.out & ~(1u << a));
+        break;
+    case CMD_FILL:
+        fx.fill_req = 1;
+        break;
+    }
+}
 
 void ps_key(int k, int down, int value)
 {
@@ -374,9 +409,15 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     int groove, bass_rests, kick_rests, bass;
     if (s.tick % TPBAR == 0u)
         section_bar(w, bar);
+    if (t % 6u == 0u)
+        fx_sixteenth();
+    if (t == 0u) {                     /* a fill cued (a black key): this beat */
+        s.fill_beat = fx.fill_req;
+        fx.fill_req = 0;
+    }
     rb = bar - s.origin;
     groove = s.sec == SEC_MAIN;
-    bass_rests = !groove || fill_now(rb, beat);
+    bass_rests = !groove || fill_now(rb, beat) || s.fill_beat;
     kick_rests = !groove || (par[P_FILLS] && rb % 32u == 31u && beat == 3u);   /* every 32nd bar's: the kick too */
     perc_step(w, t, beat, bar, rb, groove && bass_rests);
     ev_step(w, t, rb, (uint32_t)((s.tick - s.origin * TPBAR) / 6u), (bar < 4u && !s.drops) || s.sec == SEC_BUILD);
@@ -613,6 +654,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
     float send_g = (float)par[P_EV_ECHO] / 50.0f, ret_g = 0.7f * (float)par[P_ECHO_LEVEL] / 50.0f;
     float fb = (float)par[P_ECHO_FB] / 100.0f, tone = 0.12f + 0.46f * (float)par[P_ECHO_TONE] / 100.0f;
     uint32_t i;
+    static float fx_send;              /* what the effects sent to the echo (the next frame takes it) */
     if (want_play != playing) {
         playing = want_play;
         s.tick = 0;
@@ -622,12 +664,21 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.cue_seen = cue_n;
         s.drop_seen = drop_n;
     }
-    while (cmd_r != cmd_w) {           /* the keys */
+    while (cmd_r != cmd_w) {           /* the keys, the effects, the parts */
         uint32_t c = cmd_q[cmd_r % CMD_N];
         cmd_r++;
-        ev_key((int)(c & 31u), (int)(c >> 5 & 3u), (int)(c >> 8 & 127u));
+        cmd_do(c);
     }
     tempo(w);
+    if (fx.held >> FX_WASH & 1u) {     /* WASH: the echo longer and darker; FREEZE: it keeps what it holds */
+        fb = 0.86f;
+        tone = 0.14f;
+    }
+    if (fx.held >> FX_FREEZE & 1u) {
+        fb = 1.0f;
+        tone = 1.0f;
+        send_g = 0.0f;
+    }
     for (i = 0; i < n; i++) {
         if (playing) {
             if (s.next <= 0.0f) {                  /* a tick begins on this sample */
@@ -645,22 +696,40 @@ void ps_render(float *outl, float *outr, uint32_t n)
             s.next -= 1.0f;
         }
         {
-            float c = kick_g * kick(dt) + bass_g * bass(w, dt), l = 0.0f, r = 0.0f, el = 0.0f, er = 0.0f, send, xl, xr;
-            float al = 0.0f, ar = 0.0f, n = noise();
+            float s_kick = kick(dt), s_bass = bass(w, dt), c, l = 0.0f, r = 0.0f, el = 0.0f, er = 0.0f, send, xl, xr;
+            float al = 0.0f, ar = 0.0f, n = noise(), *pg = s.part_g, ml, mr;
             uint32_t d = (uint32_t)(s.tick_len * (float)ECHO_TICKS[par[P_ECHO_TIME] & 3]);
+            int k;
+            for (k = 0; k < NPART; k++)        /* the parts' gains glide to their mutes (~3 ms) */
+                pg[k] += (((fx.muted | fx.out) >> k & 1u ? 0.0f : 1.0f) - pg[k]) * 0.008f;
+            c = kick_g * pg[PART_KICK] * s_kick + bass_g * pg[PART_BASS] * s_bass;
             perc(w, dt, &l, &r);
-            send = ev_render(dt, &el, &er) * ev_g * send_g + perc_g * riser(n, &l, &r) * 0.5f + atmos(w, n, &al, &ar);
+            l *= pg[PART_PERC];
+            r *= pg[PART_PERC];
+            send = ev_render(dt, &el, &er) * ev_g * send_g * pg[PART_EVENTS];
+            el *= pg[PART_EVENTS];
+            er *= pg[PART_EVENTS];
+            send += perc_g * riser(n, &l, &r) * 0.5f + atmos(w, n, &al, &ar) * pg[PART_ATMOS];
+            al *= pg[PART_ATMOS];
+            ar *= pg[PART_ATMOS];
             if (d >= ECHO_N)
                 d = ECHO_N - 1u;
             xl = (float)echo_buf[0][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
             xr = (float)echo_buf[1][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
+            if (fb < 1.0f)
+                send += fx_send;
+            else
+                send = 0.0f;
             s.e_lp[0] += (xr * fb + send * 0.5f - s.e_lp[0]) * tone;   /* into the left: the right's, and the send */
             s.e_lp[1] += (xl * fb - s.e_lp[1]) * tone;                  /* into the right: the left's */
             echo_buf[0][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[0], -0.99f, 0.99f) * 32767.0f);
             echo_buf[1][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[1], -0.99f, 0.99f) * 32767.0f);
             echo_w++;
-            outl[i] = c + perc_g * l + ev_g * el + al + ret_g * xl;
-            outr[i] = c + perc_g * r + ev_g * er + ar + ret_g * xr;
+            ml = perc_g * l + ev_g * el + al;          /* above the kick and the bass: THROW and WASH take it */
+            mr = perc_g * r + ev_g * er + ar;
+            outl[i] = c + ml + ret_g * xl;
+            outr[i] = c + mr + ret_g * xr;
+            fx_send = fx_render(s.tick_len, &outl[i], &outr[i], ml, mr, n);
         }
     }
 }

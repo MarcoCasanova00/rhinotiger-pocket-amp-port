@@ -22,7 +22,11 @@
  * SAVE (but on GLOBAL), after HYP-1's: tapped, the next section from the next bar (the groove: a break; a break: its
  * build, then the drop); held, the drop at the next bar. Lit in a break, quick in a build.
  * The keys play no notes: each throws an event into the music on the next sixteenth (dsp/events.c); the screen
- * names it at once. */
+ * names it at once. On ECHO (FX), or while REC is held, they are the performance instead (dsp/fx.c), and the screen
+ * shows them: the white keys a grid of sixteen effects, four rows of four (REPEAT, FILTER, SPACE, MOTION; each row's
+ * first key glows), each while held; the black keys the parts, F#3 G#3 A#3 C#4 D#4 F#4 muted (tapped, again: back:
+ * KICK, BASS, PERC, LINE, EVENTS, ATMOS), G#4 a fill on the next beat, A#4 and C#5 the kick and the bass out while
+ * held, F#5 every part back. A key does what it did when pressed until let go. */
 #include "fastmath.h"
 #include "psy.h"
 
@@ -124,7 +128,9 @@ static struct {
     uint8_t page;
     uint8_t redraw;
     uint8_t shift;                       /* SEL held: the knobs are MAIN's */
+    uint8_t rec;                         /* REC held: the keys are the performance */
 } ui;
+static int grid_mode(void) { return ui.page == PG_ECHO || ui.rec; }
 
 /* s copied into d (cap bytes with the terminator); returns the length written */
 static uint32_t str_put(char *d, uint32_t cap, const char *s)
@@ -301,6 +307,84 @@ static void save(void)
     }
 }
 
+/* ------------------------------------------------------------ performance --- */
+/* the keys as the performance: key k (0: F3) white (0..15 its place in the grid) or black (0..10) */
+static int key_black(int k) { int pc = (k + 5) % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
+static int key_place(int k)              /* its place among the white keys, or among the black */
+{
+    int i, n = 0;
+    for (i = 0; i < k; i++)
+        n += key_black(i) == key_black(k);
+    return n;
+}
+enum { BK_MUTE0 = 0, BK_FILL = 6, BK_NOKICK, BK_NOBASS, BK_NONE, BK_ALL, NBK };
+static const char *const PART_NAME[NPART] = {"KICK", "BASS", "PERC", "LINE", "EVENTS", "ATMOS"};
+static const char *const FX_ROW[4] = {"REPEAT", "FILTER", "SPACE", "MOTION"};
+
+enum { ROLE_EVENT, ROLE_FX, ROLE_BLACK };
+static struct {
+    uint8_t role[NKEYS];                 /* what a key does, as it was pressed */
+    uint16_t fx_held;
+    uint8_t muted;                       /* as the UI asked (the engine's is ps_ui.muted) */
+} pf;
+
+static int grid_mode(void);
+
+static void key_down(int k, int vel)
+{
+    if (!grid_mode()) {
+        pf.role[k] = ROLE_EVENT;
+        ps_key(k, 1, vel);
+        return;
+    }
+    if (!key_black(k)) {
+        int id = key_place(k);
+        pf.role[k] = ROLE_FX;
+        pf.fx_held |= (uint16_t)(1u << id);
+        ps_fx(id, 1);
+        app_say(FX_ROW[id / 4], ps_fx_name(id));
+        return;
+    }
+    pf.role[k] = ROLE_BLACK;
+    {
+        int b = key_place(k), p;
+        if (b < BK_FILL) {
+            if (b == PART_LINE)          /* (no line yet) */
+                return;
+            ps_mute(b);
+            pf.muted ^= (uint8_t)(1u << b);
+            app_say(PART_NAME[b], pf.muted >> b & 1u ? "MUTED" : "BACK");
+        } else if (b == BK_FILL) {
+            ps_fill();
+            app_say("FILL", "NEXT BEAT");
+        } else if (b == BK_NOKICK || b == BK_NOBASS) {
+            ps_out(b == BK_NOKICK ? PART_KICK : PART_BASS, 1);
+            app_say(b == BK_NOKICK ? "KICK" : "BASS", "OUT");
+        } else if (b == BK_ALL) {
+            for (p = 0; p < NPART; p++)
+                if (pf.muted >> p & 1u)
+                    ps_mute(p);
+            pf.muted = 0;
+            app_say("ALL", "BACK");
+        }
+    }
+}
+
+static void key_up(int k)
+{
+    if (pf.role[k] == ROLE_EVENT)
+        ps_key(k, 0, 0);
+    else if (pf.role[k] == ROLE_FX) {
+        int id = key_place(k);
+        pf.fx_held &= (uint16_t)~(1u << id);
+        ps_fx(id, 0);
+    } else {
+        int b = key_place(k);
+        if (b == BK_NOKICK || b == BK_NOBASS)
+            ps_out(b == BK_NOKICK ? PART_KICK : PART_BASS, 0);
+    }
+}
+
 /* ------------------------------------------------------------------ input --- */
 static void input(void)
 {
@@ -310,13 +394,16 @@ static void input(void)
     keys = touch_keys();
     down = btn & ~ui.btn;
     up = ui.btn & ~btn;
-    for (k = 0; k < NKEYS; k++) {            /* the keys throw events (key 0 is F3) */
+    ui.rec = (uint8_t)((btn >> B_REC) & 1u);
+    if ((down | up) & 1u << B_REC)
+        ui.redraw = 1;
+    for (k = 0; k < NKEYS; k++) {            /* the keys throw events, or play the performance (key 0 is F3) */
         uint32_t bit = 1u << k;
         if ((keys & bit) && !(ui.keys & bit))
-            ps_key((int)k, 1, touch_vel(k));
+            key_down((int)k, touch_vel(k));
         else if (!(keys & bit) && (ui.keys & bit))
-            ps_key((int)k, 0, 0);
-        else if (keys & bit)
+            key_up((int)k);
+        else if ((keys & bit) && pf.role[k] == ROLE_EVENT)
             ps_key((int)k, 2, touch_pressure(k));
     }
     if (down & 1u << B_PLAY) {
@@ -378,8 +465,16 @@ static void input(void)
                        : sec == SEC_BUILD ? tick % PS_TPB < PS_TPB / 2u : 0;   /* a build: on the beats */
         uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (save_lit ? 1u << B_SAVE : 0u) | (ps_playing() ? 1u << B_PLAY : 0u);
         uint32_t dim = 1u << B_HOME | 1u << B_SEQ | 1u << B_LFO | 1u << B_ARP | 1u << B_FX | 1u << B_GLO | 1u << B_SAVE |
-                       1u << B_PLAY | 1u << B_SEL;
-        plat_lights(lit, keys, dim, 0, set.lights);
+                       1u << B_PLAY | 1u << B_SEL | 1u << B_REC, klit = keys, kdim = 0;
+        if (grid_mode())                     /* the grid: each row's first key glows, a muted part's key is lit */
+            for (k = 0; k < NKEYS; k++) {
+                int pl = key_place((int)k);
+                if (!key_black((int)k) && pl % 4 == 0)
+                    kdim |= 1u << k;
+                if (key_black((int)k) && pl < NPART && (ps_ui.muted >> pl & 1u))
+                    klit |= 1u << k;
+            }
+        plat_lights(lit, klit, dim, kdim, set.lights);
     }
 }
 
@@ -428,6 +523,36 @@ static void marks_update(void)
     }
 }
 
+/* the performance: the grid's sixteen (held: lit) and the parts (muted: dark) */
+static void draw_grid(void)
+{
+    int32_t r, c, i;
+    cv_begin(240, 148, C_BLACK);
+    for (r = 0; r < 4; r++) {
+        int32_t y = 6 + r * 24;
+        cv_text(8, y + 4, &FONT_XS, FX_ROW[r], C_GRAY);
+        for (c = 0; c < 4; c++) {
+            int id = (int)(r * 4 + c), on = pf.fx_held >> id & 1u;
+            int32_t x = 56 + c * 46, tw = text_w(&FONT_XS, ps_fx_name(id));
+            cv_rect(x, y, 44, 18, on ? C_HI : c == 0 ? C_DIM : C_LINE);
+            cv_text(x + (44 - tw) / 2, y + 4, &FONT_XS, ps_fx_name(id), on ? C_BLACK : C_WHITE);
+        }
+    }
+    cv_text(8, 106, &FONT_XS, "PARTS", C_GRAY);
+    for (i = 0, c = 56; i < NPART; i++) {    /* (c: x) */
+        int mu = ps_ui.muted >> i & 1u;
+        int32_t tw = text_w(&FONT_XS, PART_NAME[i]);
+        if (i == PART_LINE)
+            continue;
+        cv_text(c, 106, &FONT_XS, PART_NAME[i], mu ? C_LINE : C_HI);
+        if (mu)
+            cv_rect(c, 110, tw, 1, C_GRAY);
+        c += tw + 8;
+    }
+    cv_text(8, 126, &FONT_XS, "BLACK: MUTE  FILL  OUT  ALL", C_DIM);
+    cv_blit(0, 32);
+}
+
 static void draw_lanes(uint32_t now)
 {
     uint32_t tick = ps_ui.tick ? ps_ui.tick - 1u : 0u;
@@ -474,6 +599,8 @@ static void draw_rule(void)
     int32_t xd = 231 - NPAGE * 5, xt = xd - 6 - text_w(&FONT_XS, name), xs = 0, i;
     if (ui.shift)
         ctx = "SEL: MAIN";
+    else if (ui.rec)
+        ctx = "REC: KEYS PLAY FX";
     else if (ui.page == PG_GLOBAL && set_dirty)
         ctx = "SAVE: KEEP IT";
     if (ctx)
@@ -514,7 +641,10 @@ static void draw(void)
 {
     uint32_t now = plat_ms();
     draw_header(now);
-    draw_lanes(now);
+    if (grid_mode())
+        draw_grid();
+    else
+        draw_lanes(now);
     draw_knobs(now);
 }
 
@@ -563,6 +693,10 @@ int app_expect(const char *what, int *got)
         *got = ps_section();
     else if (!strcmp(what, "drops"))
         *got = ps_ui.drops;
+    else if (!strcmp(what, "muted"))         /* the parts muted, 1 << PART_* (the engine's) */
+        *got = ps_ui.muted;
+    else if (!strcmp(what, "fx"))            /* the grid's effects held, 1 << id */
+        *got = pf.fx_held;
     else if (!strcmp(what, "lights"))
         *got = set.lights;
     else if (!strcmp(what, "bpm"))
