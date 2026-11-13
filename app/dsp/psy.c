@@ -16,7 +16,19 @@
  *   Detail   the events' runs (how often, how long, sixteenths or 32nds), the hats' 32nd flams
  *   Dark     the events' families (low and middle against high) and notes (seconds and tritones against fifths
  *            and octaves), the bass's brightness
- *   Drift    how much of the events' loop changes as a phrase begins, how far the bass slowly opens and closes */
+ *   Drift    how much of the events' loop changes as a phrase begins, how far the bass slowly opens and closes, how
+ *            often a break comes on its own
+ *
+ * The sections (psy.h): the groove; a break, the kick, the bass and the percussion out, the atmos up and the events
+ * fewer; its build, four bars of a clap roll quickening (quarters, eighths, sixteenths, and the last beat silent: a
+ * breath) under a noise rising; the drop, on a bar's first beat: a crash, the phrases counted from it, the events'
+ * loop drawn anew, and the bass a shade other (another of four colours: its ratio and its bite). A cue (SAVE) acts as
+ * the next bar begins; a break on its own comes as a 32-bar block begins, 64 bars after the last drop at least, and
+ * lasts as the world has it (then builds and drops on its own); a cued one waits for the next cue.
+ *
+ * The atmos: a held chord of three notes over the root (fifths and the octave; at high Dark a second and a tritone),
+ * each a little apart left and right and lightly frequency-modulated, and a band of noise wandering (Air). Quiet under
+ * the groove as the world has it, up in a break, back down after the drop. */
 #define TPB PS_TPB                     /* ticks a beat */
 #define TPBAR (4u * TPB)
 #include "psy.h"
@@ -43,13 +55,16 @@ typedef struct {
     uint8_t ev_density;                /* recipes in the 4-bar loop */
     uint8_t ev_low, ev_mid;            /* % of them low (dive, growl) and middle (zap, gurgle); the rest high */
     uint8_t ev_runs;                   /* % of them runs */
+    /* the atmos and the sections */
+    float atmos;                       /* the atmos under the groove, of its level in a break */
+    uint8_t brk;                       /* a break's bars when it comes on its own */
 } world_t;
 
 static const world_t W[PS_NWORLD] = {
     /* cold dark psy: hard, short sixteenths, a dry growl */
-    {"COLD SIGNAL", 152.0f, 30, 6, 1.0f, 3.2f, 14.0f, 0.35f, 0.72f, 1.6f, 0.95f, 14.0f, 55.0f, 0.80f, 1100.0f, 0, 5, 30, 55, 15},
+    {"COLD SIGNAL", 152.0f, 30, 6, 1.0f, 3.2f, 14.0f, 0.35f, 0.72f, 1.6f, 0.95f, 14.0f, 55.0f, 0.80f, 1100.0f, 0, 5, 30, 55, 15, 0.30f, 16},
     /* bright hi-tech: sixteenths at 176, a metallic edge */
-    {"GLASS INSECTS", 176.0f, 30, 6, 2.0f, 2.4f, 9.0f, 0.25f, 0.76f, 1.3f, 0.92f, 10.0f, 40.0f, 0.88f, 1500.0f, 1, 9, 10, 40, 35},
+    {"GLASS INSECTS", 176.0f, 30, 6, 2.0f, 2.4f, 9.0f, 0.25f, 0.76f, 1.3f, 0.92f, 10.0f, 40.0f, 0.88f, 1500.0f, 1, 9, 10, 40, 35, 0.05f, 8},
 };
 
 const char *ps_world_name(int w) { return W[(unsigned)w % PS_NWORLD].name; }
@@ -63,6 +78,7 @@ static const ps_param_t PAR[P_NPARAMS] = {
     {"LEVEL", 0, 100, 80}, {"HATS", 0, 100, 50}, {"TONE", 0, 100, 50}, {"CLAP", 0, 100, 50},
     {"LEVEL", 0, 100, 80}, {"DENSITY", 0, 100, 50}, {"RUNS", 0, 100, 50}, {"ECHO", 0, 100, 50},
     {"LEVEL", 0, 100, 50}, {"FEEDBACK", 0, 90, 42}, {"TONE", 0, 100, 50}, {"TIME", 0, 3, 0},
+    {"LEVEL", 0, 100, 70}, {"COLOUR", 0, 100, 50}, {"AIR", 0, 100, 50}, {"WASH", 0, 100, 50},
 };
 static volatile int16_t par[P_NPARAMS];
 const ps_param_t *ps_param(int p) { return &PAR[(unsigned)p % P_NPARAMS]; }
@@ -101,7 +117,21 @@ static struct {
     uint8_t out;                       /* the part sitting out this phrase: 0 none, 1 hats, 2 open, 3 clap, 4 ride */
     /* the echo: ping-pong */
     float e_lp[2];
+    /* the sections */
+    uint8_t sec, colour, drops;
+    uint32_t origin;                   /* the bar the phrases count from: the last drop's */
+    uint32_t last_drop;
+    uint32_t sec_bar, sec_len;         /* bars into the section; a break's length (0: until cued) */
+    uint32_t cue_seen, drop_seen;
+    float x_t;                         /* the crash's age (s, < 0 silent) */
+    float z_g, z_low, z_band;          /* the riser: its level (glides), its band-pass */
+    /* the atmos */
+    float a_lvl;                       /* its level now (glides between the sections) */
+    float a_ph[3][2], a_mph[3];        /* the chord's notes, left and right; each note's modulator */
+    float a_lfo, a_lp[2];              /* the slow wander; the chord's low-pass */
+    float a_low, a_band;               /* the air's band-pass */
 } s;
+static volatile uint32_t cue_n, drop_n;   /* the UI's cues, counted: the render acts on a change */
 
 /* the macros, -1..1 from their middle (Drift 0..1), and what the parameters make of the world: set as a block
  * begins (mods()) */
@@ -140,7 +170,7 @@ static int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v;
 /* what events.c asks of the world, as the macros and the EVENTS page lean it */
 static int ev_density_now(const world_t *w)
 {
-    float k = (float)par[P_EV_DENSITY] / 50.0f * (1.0f + 0.6f * m.energy);
+    float k = (float)par[P_EV_DENSITY] / 50.0f * (1.0f + 0.6f * m.energy) * (s.sec == SEC_BREAK ? 0.5f : 1.0f);
     return clampi((int)((float)w->ev_density * k + 0.5f), 0, 24);
 }
 static int ev_runs_now(const world_t *w)
@@ -197,6 +227,14 @@ int ps_playing(void) { return playing; }
 int ps_bar(void) { return (int)(s.tick / TPBAR); }
 int ps_bpm(void) { return (int)(W[want_world].bpm + (float)par[P_TEMPO]); }
 int ps_root(void) { return W[want_world].root + par[P_ROOT]; }
+void ps_cue(int how)
+{
+    if (how == 2)
+        drop_n++;
+    else
+        cue_n++;
+}
+int ps_section(void) { return s.sec; }
 int ps_stat(int which) { return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : ev.last_type; }
 const char *ps_event_name(int type) { return EV_NAME[(unsigned)type % EV_NTYPE]; }
 
@@ -210,11 +248,29 @@ static void mods(const world_t *w)     /* the macros and the moved tempo and roo
     m.bpm = w->bpm + (float)par[P_TEMPO];
 }
 
-static void perc_step(const world_t *w, uint32_t t, uint32_t beat, uint32_t bar, int fill)
+/* the build's roll: quarters, eighths, then sixteenths, louder bar by bar; its last beat silent */
+static void build_step(uint32_t t, uint32_t beat)
+{
+    uint32_t b = s.sec_bar, every = b == 0u ? 24u : b == 1u ? 12u : 6u;
+    if ((b >= 3u && beat == 3u) || t % every)
+        return;
+    s.c_t = 0.0f;
+    s.c_v = 0.35f + 0.65f * (float)(b * 4u + beat) / 15.0f;
+    ps_ui.hits[HIT_PERC]++;
+}
+
+/* bar: since PLAY (the parts come in over the first bars); rb: since the last drop (the phrases) */
+static void perc_step(const world_t *w, uint32_t t, uint32_t beat, uint32_t bar, uint32_t rb, int fill)
 {
     uint32_t six = t / 6u;             /* the sixteenth in the beat */
     static const float HAT_V[4] = {0.55f, 0.80f, 0.0f, 1.0f};
     float hats = (float)par[P_HATS] / 50.0f;
+    if (s.sec == SEC_BUILD) {
+        build_step(t, beat);
+        return;
+    }
+    if (s.sec == SEC_BREAK)
+        return;
     if (t % 6u) {                      /* between sixteenths: at high Detail, a 32nd flam on the hats now and then */
         if (t % 3u == 0u && six != 2u && m.detail > 0.3f && s.out != 1u && !fill &&
             (float)(rnd() % 100u) < 60.0f * (m.detail - 0.3f)) {
@@ -224,10 +280,10 @@ static void perc_step(const world_t *w, uint32_t t, uint32_t beat, uint32_t bar,
         }
         return;
     }
-    if (t == 0u && beat == 0u && bar % 8u == 0u) {   /* a phrase begins: who sits it out */
+    if (t == 0u && beat == 0u && rb % 8u == 0u) {    /* a phrase begins: who sits it out */
         float p = (float)par[P_SITOUT] * (1.0f - 0.7f * m.energy);
         s.out = 0;
-        if (bar >= 32u && (float)(rnd() % 100u) < p)
+        if (bar >= 32u && rb > 0u && (float)(rnd() % 100u) < p)   /* (not on a drop's first phrase) */
             s.out = (uint8_t)(1u + rnd() % (w->ride ? 4u : 3u));
         ps_ui.sitting_out = (int8_t)s.out;
     }
@@ -268,14 +324,66 @@ static int fill_now(uint32_t bar, uint32_t beat)   /* this beat a fill's (the ba
     return e && bar % e == e - 1u && beat == 3u;
 }
 
+static void enter(int sec, uint32_t len)
+{
+    s.sec = (uint8_t)sec;
+    s.sec_bar = 0;
+    s.sec_len = len;
+}
+
+static void drop(uint32_t bar)         /* on this bar's first tick: the groove again, a shade other */
+{
+    enter(SEC_MAIN, 0);
+    s.origin = s.last_drop = bar;
+    s.drops++;
+    s.colour = (uint8_t)((s.colour + 1u + rnd() % 3u) % 4u);   /* another of the bass's four colours */
+    s.out = 0;
+    ps_ui.sitting_out = 0;
+    s.x_t = 0.0f;                      /* the crash */
+    ps_ui.hits[HIT_PERC]++;
+}
+
+static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the cues, and what comes on its own */
+{
+    uint32_t cue = cue_n, dn = drop_n;
+    int next = cue != s.cue_seen, now = dn != s.drop_seen;
+    s.cue_seen = cue;
+    s.drop_seen = dn;
+    s.sec_bar++;
+    if (now) {
+        drop(bar);
+        return;
+    }
+    if (s.sec == SEC_MAIN) {
+        uint32_t rb = bar - s.origin;
+        if (next)
+            enter(SEC_BREAK, 0);
+        else if (rb && rb % 32u == 0u && bar - s.last_drop >= 64u && (float)(rnd() % 100u) < 70.0f * m.drift)
+            enter(SEC_BREAK, w->brk);
+    } else if (s.sec == SEC_BREAK) {
+        if (next || (s.sec_len && s.sec_bar >= s.sec_len))
+            enter(SEC_BUILD, 4);
+    } else if (s.sec_bar >= 4u) {
+        drop(bar);
+    }
+}
+
 static void step(const world_t *w)     /* a tick begins: what strikes on it */
 {
-    uint32_t t = s.tick % TPB, beat = s.tick / TPB % 4u, bar = s.tick / TPBAR;
-    int bass_rests = fill_now(bar, beat);
-    int kick_rests = par[P_FILLS] && bar % 32u == 31u && beat == 3u;   /* every 32nd bar's: the kick too */
-    int bass;
-    perc_step(w, t, beat, bar, bass_rests);
-    ev_step(w, t, bar, (uint32_t)(s.tick / 6u), 0);
+    uint32_t t = s.tick % TPB, beat = s.tick / TPB % 4u, bar = s.tick / TPBAR, rb;
+    int groove, bass_rests, kick_rests, bass;
+    if (s.tick % TPBAR == 0u)
+        section_bar(w, bar);
+    rb = bar - s.origin;
+    groove = s.sec == SEC_MAIN;
+    bass_rests = !groove || fill_now(rb, beat);
+    kick_rests = !groove || (par[P_FILLS] && rb % 32u == 31u && beat == 3u);   /* every 32nd bar's: the kick too */
+    perc_step(w, t, beat, bar, rb, groove && bass_rests);
+    ev_step(w, t, rb, (uint32_t)((s.tick - s.origin * TPBAR) / 6u), (bar < 4u && !s.drops) || s.sec == SEC_BUILD);
+    ps_ui.section = (int8_t)s.sec;
+    ps_ui.sec_bar = (uint8_t)(groove ? rb % 8u : s.sec_bar);
+    ps_ui.drops = s.drops;
+    ps_ui.cued = (int8_t)(drop_n != s.drop_seen ? 2 : cue_n != s.cue_seen ? 1 : 0);
     if (t == 0u) {
         if (!kick_rests) {
             s.k_t = 0.0f;
@@ -318,9 +426,11 @@ static float kick(float dt)
     return fm_tanhf(x * 1.8f);
 }
 
+static const float COLOUR[4][2] = {{1.0f, 1.0f}, {1.0f, 1.35f}, {1.5f, 0.8f}, {0.5f, 1.25f}};   /* ratio, bite */
+
 static float bass(const world_t *w, float dt)
 {
-    float t = s.b_t, idx, env, x, mo, bite = (float)par[P_BASS_BITE] / 50.0f;
+    float t = s.b_t, idx, env, x, mo, bite = (float)par[P_BASS_BITE] / 50.0f * COLOUR[s.colour][1];
     float depth = 0.5f * m.drift * 2.0f;           /* the slow movement's depth: Drift (50: as the world has it) */
     if (t < 0.0f)
         return s.lp *= 0.99f;
@@ -340,7 +450,7 @@ static float bass(const world_t *w, float dt)
     s.b_cph += s.b_inc;
     if (s.b_cph >= 1.0f)
         s.b_cph -= 1.0f;
-    s.b_mph += s.b_inc * w->ratio;
+    s.b_mph += s.b_inc * w->ratio * COLOUR[s.colour][0];
     if (s.b_mph >= 1.0f)
         s.b_mph -= 1.0f;
     if (s.b_t >= 0.0f)
@@ -411,6 +521,78 @@ static void perc(const world_t *w, float dt, float *l, float *r)
         if ((s.r_t += dt) > 0.9f)
             s.r_t = -1.0f;
     }
+    /* the drop's crash: the hats' noise, long */
+    if (s.x_t >= 0.0f) {
+        x = hp * fm_expf(-s.x_t / 0.6f) * 0.30f;
+        *l += 0.9f * x;
+        *r += 1.1f * x;
+        if ((s.x_t += dt) > 3.0f)
+            s.x_t = -1.0f;
+    }
+}
+
+/* the build's riser: a band of noise rising over its four bars, gone for the breath; returns what goes to the echo */
+static float riser(float n, float *l, float *r)
+{
+    float p = 0.0f, target = 0.0f, f, x;
+    if (s.sec == SEC_BUILD) {
+        p = ((float)s.sec_bar + (float)(s.tick % TPBAR) / (float)TPBAR) / 4.0f;
+        if (!(s.sec_bar >= 3u && s.tick % TPBAR >= 3u * TPB))
+            target = p * p;
+    }
+    s.z_g += (target - s.z_g) * (target > s.z_g ? 0.0005f : 0.004f);
+    if (s.z_g < 0.0003f)
+        return 0.0f;
+    f = 2.0f * fm_sinf(3.14159265f * 300.0f * fm_exp2f(4.5f * p) / PS_SR);   /* 300 Hz to 6.8 kHz */
+    s.z_band += f * (n - s.z_low - 0.5f * s.z_band);
+    s.z_low += f * s.z_band;
+    x = s.z_band * s.z_g * 0.35f;
+    *l += x;
+    *r += x;
+    return x;
+}
+
+/* the atmos, a sample: l and r added to; returns what goes to the echo (Wash) */
+static float atmos(const world_t *w, float n, float *l, float *r)
+{
+    static const int8_t IV[2][3] = {{24, 31, 36}, {24, 30, 25}};   /* over the root: fifths; dark, a tritone and a second */
+    float lvl = (float)par[P_ATMOS_LEVEL] / 70.0f, target = (s.sec == SEC_MAIN ? w->atmos : 1.0f) * lvl;
+    float colour = (float)par[P_ATMOS_COLOUR] / 100.0f, air = (float)par[P_ATMOS_AIR] / 100.0f, wob, al = 0.0f, ar = 0.0f, k, x;
+    int i;
+    s.a_lvl += (target - s.a_lvl) * (target > s.a_lvl ? 1.0f / (2.5f * PS_SR) : 1.0f / (1.5f * PS_SR));
+    if (s.a_lvl < 0.0005f)
+        return 0.0f;
+    if (s.sec == SEC_BUILD)            /* it opens as the build rises */
+        colour += 0.4f * ((float)s.sec_bar + (float)(s.tick % TPBAR) / (float)TPBAR) / 4.0f;
+    if ((s.a_lfo += 0.05f / PS_SR) >= 1.0f)
+        s.a_lfo -= 1.0f;
+    wob = fm_sin_turns(s.a_lfo);
+    for (i = 0; i < 3; i++) {          /* the chord: each note a little apart left and right, its modulator shared */
+        float inc = note_hz(m.root + IV[m.dark > 0.3f][i]) / PS_SR, idx = (0.15f + 1.2f * colour) * (0.75f + 0.25f * wob), mo;
+        mo = fm_sin_turns(s.a_mph[i]) * idx * 0.159155f;
+        al += fm_sin_turns(s.a_ph[i][0] + mo);
+        ar += fm_sin_turns(s.a_ph[i][1] + mo);
+        if ((s.a_mph[i] += 2.0f * inc) >= 1.0f)
+            s.a_mph[i] -= 1.0f;
+        if ((s.a_ph[i][0] += inc * (1.0f - 0.0016f * (float)(i + 1))) >= 1.0f)
+            s.a_ph[i][0] -= 1.0f;
+        if ((s.a_ph[i][1] += inc * (1.0f + 0.0016f * (float)(i + 1))) >= 1.0f)
+            s.a_ph[i][1] -= 1.0f;
+    }
+    k = fm_clampf(0.03f + 0.35f * colour, 0.02f, 0.6f);
+    s.a_lp[0] += (al - s.a_lp[0]) * k;
+    s.a_lp[1] += (ar - s.a_lp[1]) * k;
+    {   /* the air: a band of noise, wandering, swaying left and right */
+        float f = 2.0f * fm_sinf(3.14159265f * (1200.0f + 900.0f * wob + 1500.0f * colour) / PS_SR);
+        s.a_band += f * (n - s.a_low - 0.7f * s.a_band);
+        s.a_low += f * s.a_band;
+        x = s.a_band * air * 0.5f;
+    }
+    al = s.a_lp[0] * 0.10f + x * (0.6f + 0.35f * wob);
+    ar = s.a_lp[1] * 0.10f + x * (0.6f - 0.35f * wob);
+    *l += al * s.a_lvl;
+    *r += ar * s.a_lvl;
+    return (al + ar) * s.a_lvl * (float)par[P_ATMOS_WASH] / 100.0f;
 }
 
 static void tempo(const world_t *w)
@@ -435,6 +617,10 @@ void ps_render(float *outl, float *outr, uint32_t n)
         playing = want_play;
         s.tick = 0;
         s.next = 0.0f;
+        enter(SEC_MAIN, 0);            /* from the top: the groove, the phrases from bar 0, the cues forgotten */
+        s.origin = s.last_drop = 0;
+        s.cue_seen = cue_n;
+        s.drop_seen = drop_n;
     }
     while (cmd_r != cmd_w) {           /* the keys */
         uint32_t c = cmd_q[cmd_r % CMD_N];
@@ -460,9 +646,10 @@ void ps_render(float *outl, float *outr, uint32_t n)
         }
         {
             float c = kick_g * kick(dt) + bass_g * bass(w, dt), l = 0.0f, r = 0.0f, el = 0.0f, er = 0.0f, send, xl, xr;
+            float al = 0.0f, ar = 0.0f, n = noise();
             uint32_t d = (uint32_t)(s.tick_len * (float)ECHO_TICKS[par[P_ECHO_TIME] & 3]);
             perc(w, dt, &l, &r);
-            send = ev_render(dt, &el, &er) * ev_g * send_g;
+            send = ev_render(dt, &el, &er) * ev_g * send_g + perc_g * riser(n, &l, &r) * 0.5f + atmos(w, n, &al, &ar);
             if (d >= ECHO_N)
                 d = ECHO_N - 1u;
             xl = (float)echo_buf[0][(echo_w - d) % ECHO_N] * (1.0f / 32768.0f);
@@ -472,8 +659,8 @@ void ps_render(float *outl, float *outr, uint32_t n)
             echo_buf[0][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[0], -0.99f, 0.99f) * 32767.0f);
             echo_buf[1][echo_w % ECHO_N] = (int16_t)(fm_clampf(s.e_lp[1], -0.99f, 0.99f) * 32767.0f);
             echo_w++;
-            outl[i] = c + perc_g * l + ev_g * el + ret_g * xl;
-            outr[i] = c + perc_g * r + ev_g * er + ret_g * xr;
+            outl[i] = c + perc_g * l + ev_g * el + al + ret_g * xl;
+            outr[i] = c + perc_g * r + ev_g * er + ar + ret_g * xr;
         }
     }
 }

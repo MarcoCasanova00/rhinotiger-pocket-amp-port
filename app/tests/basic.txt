@@ -12,12 +12,12 @@ shot main.png
 turn SELECT 1
 wait 30
 expect page 1
-turn SELECT 6
+turn SELECT 7
 wait 30
-expect page 7
+expect page 8
 turn SELECT 3
 wait 30
-expect page 7
+expect page 8
 tap HOME
 wait 30
 expect page 0
@@ -33,15 +33,18 @@ expect page 3
 tap LFO
 wait 30
 expect page 4
-tap ARP
+tap LFO
 wait 30
 expect page 5
-tap FX
+tap ARP
 wait 30
 expect page 6
-tap GLO
+tap FX
 wait 30
 expect page 7
+tap GLO
+wait 30
+expect page 8
 # the macros on MAIN, reaching the engine
 tap HOME
 wait 30
@@ -73,7 +76,7 @@ wait 1800
 expect world 1
 expect bpm 180
 shot world.png
-# SAVE keeps it all, on GLOBAL only
+# SAVE keeps it all, on GLOBAL only (elsewhere it cues a break)
 tap SAVE
 wait 30
 expect dirty 1

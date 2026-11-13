@@ -2,8 +2,9 @@
  * Copyright (C) 2026 hacha */
 /* RhinoTiger's engine: the kick and the rolling FM bass sharing the grid, the percussion over them, and the events.
  *
- * STATUS: a sketch. Two worlds; the kick, the bass (a sixteenth roll, K-B-B-B), the percussion and the events, with
- * the parameters the pages turn (four to a page) and the main page's four macros.
+ * STATUS: a sketch. Two worlds; the kick, the bass (a sixteenth roll, K-B-B-B), the percussion, the events and the
+ * atmos, with the parameters the pages turn (four to a page) and the main page's four macros; the sections (a break,
+ * its build, the drop), cued or on their own.
  *
  * Threads: ps_render() runs in the audio interrupt. The UI writes the parameters (single halfwords) and posts the
  * keys to a queue the render drains as a block begins; what the render counts for the screen (ps_ui) only the UI
@@ -30,6 +31,7 @@ enum { P_ENERGY, P_DETAIL, P_DARK, P_DRIFT,                  /* MAIN: the macros
        P_PERC_LEVEL, P_HATS, P_HAT_TONE, P_CLAP,             /* PERC */
        P_EV_LEVEL, P_EV_DENSITY, P_EV_RUNS, P_EV_ECHO,       /* EVENTS */
        P_ECHO_LEVEL, P_ECHO_FB, P_ECHO_TONE, P_ECHO_TIME,    /* ECHO */
+       P_ATMOS_LEVEL, P_ATMOS_COLOUR, P_ATMOS_AIR, P_ATMOS_WASH,   /* ATMOS */
        P_NPARAMS };
 typedef struct {
     const char *name;
@@ -41,6 +43,14 @@ int ps_get(int p);
 int ps_bpm(void);                      /* the tempo now (the world's, moved) */
 int ps_root(void);                     /* the root now, MIDI note of the bass */
 const char *ps_echo_time_name(int v);  /* P_ECHO_TIME's values */
+
+/* the sections: the groove (MAIN), a break (the kick and the bass out, the atmos up), its build (4 bars: a roll and a
+ * rising noise), then the drop: everything back on a bar's first beat, a crash, and the bass a shade other than before.
+ * A cue acts as the next bar begins: 1 (SAVE tapped) the next section (the groove: a break; a break: its build),
+ * 2 (SAVE held) the drop now. On their own, now and then (Drift), a break comes as a 32-bar block begins. */
+enum { SEC_MAIN, SEC_BREAK, SEC_BUILD };
+void ps_cue(int how);
+int ps_section(void);
 
 /* the keys throw events (events.c): key 0..26 (F3..G5), down 1 (value: velocity), 0 up, 2 pressure (value 0..127) */
 void ps_key(int k, int down, int value);
@@ -54,6 +64,10 @@ typedef struct {
     volatile uint32_t tick;            /* ticks since PLAY (24 a beat) */
     volatile int8_t thrown_type;       /* the latest thrown event's type (-1 none) */
     volatile int8_t sitting_out;       /* the part sitting out this phrase: 0 none, 1 hats, 2 open hat, 3 clap, 4 ride */
+    volatile int8_t section;           /* SEC_* */
+    volatile int8_t cued;              /* a cue waiting for the next bar: 0 none, 1 next, 2 drop */
+    volatile uint8_t sec_bar;          /* bars into the section (the groove: into its phrase, 0..7) */
+    volatile uint8_t drops;            /* drops so far (wraps) */
 } ps_ui_t;
 extern ps_ui_t ps_ui;
 #define PS_TPB 24u

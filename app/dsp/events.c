@@ -259,7 +259,7 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
         return;
     {
         uint32_t i = ev.at[pos16 % EV_LOOP];
-        if (bar >= 4u && !quiet && i < ev.density) {   /* a slot here, ranked within the density */
+        if (!quiet && i < ev.density) {   /* a slot here, ranked within the density (quiet: the first bars, a build) */
             recipe_t r = ev_resolve(w, i);
             ev_start(&r, 0.0f, 0.7f);
             ps_ui.hits[HIT_EVENT]++;

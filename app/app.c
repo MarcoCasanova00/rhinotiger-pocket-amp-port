@@ -14,16 +14,19 @@
  *   3 KICK (SEQ)             K1..K4 Level, Tune, Length, Punch
  *   4 PERC (SEQ again)       K1..K4 Level, Hats, Tone, Clap
  *   5 BASS (LFO)             K1..K4 Level, Bite, Length, Drive
- *   6 EVENTS (ARP)           K1..K4 Level, Density, Runs, Echo (the send)
- *   7 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
- *   8 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; SAVE here keeps it all
+ *   6 ATMOS (LFO again)      K1..K4 Level, Colour, Air, Wash (the send)
+ *   7 EVENTS (ARP)           K1..K4 Level, Density, Runs, Echo (the send)
+ *   8 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
+ *   9 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; SAVE here keeps it all
  * SEL held: the knobs are MAIN's four on any page. PRESETS: the world, from the next bar. PLAY: play or rest.
+ * SAVE (but on GLOBAL), after HYP-1's: tapped, the next section from the next bar (the groove: a break; a break: its
+ * build, then the drop); held, the drop at the next bar. Lit in a break, quick in a build.
  * The keys play no notes: each throws an event into the music on the next sixteenth (dsp/events.c); the screen
  * names it at once. */
 #include "fastmath.h"
 #include "psy.h"
 
-#define SET_MAGIC 0x31544852u            /* "RHT1": the settings record */
+#define SET_MAGIC 0x32544852u            /* "RHT2": the settings record (2: the atmos's four) */
 typedef struct {
     uint32_t magic;
     uint8_t world;
@@ -89,14 +92,14 @@ void app_init(void)
 }
 
 /* ------------------------------------------------------------------ pages --- */
-enum { PG_MAIN, PG_GROOVE, PG_KICK, PG_PERC, PG_BASS, PG_EVENTS, PG_ECHO, PG_GLOBAL, NPAGE };
-static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "KICK", "PERC", "BASS", "EVENTS", "ECHO", "GLOBAL"};
-static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEQ, B_LFO, B_ARP, B_FX, B_GLO};
+enum { PG_MAIN, PG_GROOVE, PG_KICK, PG_PERC, PG_BASS, PG_ATMOS, PG_EVENTS, PG_ECHO, PG_GLOBAL, NPAGE };
+static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "KICK", "PERC", "BASS", "ATMOS", "EVENTS", "ECHO", "GLOBAL"};
+static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEQ, B_LFO, B_LFO, B_ARP, B_FX, B_GLO};
 /* a page's first parameter (P_*), or -1 */
 static int page_par(int p)
 {
-    static const int8_t FIRST[NPAGE] = {P_ENERGY, P_TEMPO, P_KICK_LEVEL, P_PERC_LEVEL, P_BASS_LEVEL, P_EV_LEVEL,
-                                        P_ECHO_LEVEL, -1};
+    static const int8_t FIRST[NPAGE] = {P_ENERGY, P_TEMPO, P_KICK_LEVEL, P_PERC_LEVEL, P_BASS_LEVEL, P_ATMOS_LEVEL,
+                                        P_EV_LEVEL, P_ECHO_LEVEL, -1};
     return FIRST[clamp(p, 0, NPAGE - 1)];
 }
 enum { LANE_KICK, LANE_BASS, LANE_PERC, LANE_EVENTS, NLANE };
@@ -115,6 +118,8 @@ static struct {
     uint32_t seen[NHIT];                 /* the engine's counts as last drawn */
     int32_t mark[NLANE][16];             /* the bar each sixteenth was last struck in, per lane (-9: never) */
     uint32_t thrown_at;                  /* a key's event named on the screen since (0: none) */
+    uint32_t save_at;                    /* SAVE pressed at (a cue: tapped or held) */
+    uint8_t save_held;                   /* SAVE held long enough: the drop cued */
     int8_t thrown_type;
     uint8_t page;
     uint8_t redraw;
@@ -319,17 +324,32 @@ static void input(void)
         app_say(ps_playing() ? "RESTING" : "PLAYING", "");   /* (it changes as the next block starts) */
     }
     if (down & 1u << B_SAVE) {
+        ui.save_at = plat_ms();
+        ui.save_held = 0;
         if (ui.page == PG_GLOBAL)
             save();
-        else
-            app_say("SAVE", "ON GLOBAL");
+    }
+    if (ui.page != PG_GLOBAL && ps_playing()) {   /* SAVE elsewhere: the sections (after HYP-1's) */
+        if ((btn & 1u << B_SAVE) && !ui.save_held && plat_ms() - ui.save_at >= 500u) {
+            ui.save_held = 1;
+            ps_cue(2);
+            app_say("DROP", "NEXT BAR");
+        } else if ((up & 1u << B_SAVE) && !ui.save_held) {
+            int sec = ps_section();
+            if (sec == SEC_BUILD)
+                app_say("BUILDING", "HOLD: DROP");
+            else {
+                ps_cue(1);
+                app_say(sec == SEC_MAIN ? "BREAK" : "BUILD", "NEXT BAR");
+            }
+        }
     }
     if (down & 1u << B_HOME)
         page_go(ui.page == PG_MAIN ? PG_GROOVE : PG_MAIN);
     if (down & 1u << B_SEQ)
         page_go(ui.page == PG_KICK ? PG_PERC : PG_KICK);
     if (down & 1u << B_LFO)
-        page_go(PG_BASS);
+        page_go(ui.page == PG_BASS ? PG_ATMOS : PG_BASS);
     if (down & 1u << B_ARP)
         page_go(PG_EVENTS);
     if (down & 1u << B_FX)
@@ -352,7 +372,11 @@ static void input(void)
     ui.keys = keys;
     ui.btn = btn;
     {   /* lit: the page's button, PLAY playing, SAVE unsaved; dim: the buttons that have a page or a use */
-        uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (set_dirty ? 1u << B_SAVE : 0u) | (ps_playing() ? 1u << B_PLAY : 0u);
+        uint32_t tick = ps_ui.tick, sec = (uint32_t)ps_ui.section;
+        int save_lit = ui.page == PG_GLOBAL ? set_dirty
+                       : sec == SEC_BREAK || ps_ui.cued ? 1
+                       : sec == SEC_BUILD ? tick % PS_TPB < PS_TPB / 2u : 0;   /* a build: on the beats */
+        uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (save_lit ? 1u << B_SAVE : 0u) | (ps_playing() ? 1u << B_PLAY : 0u);
         uint32_t dim = 1u << B_HOME | 1u << B_SEQ | 1u << B_LFO | 1u << B_ARP | 1u << B_FX | 1u << B_GLO | 1u << B_SAVE |
                        1u << B_PLAY | 1u << B_SEL;
         plat_lights(lit, keys, dim, 0, set.lights);
@@ -422,11 +446,15 @@ static void draw_lanes(uint32_t now)
                 cv_rect(x, y + 18, 7, 2, C_WHITE);
         }
     }
-    {   /* the phrase: eight bars */
-        int32_t inph = bar % 8;
-        cv_text(8, 112, &FONT_XS, "PHRASE", C_GRAY);
-        for (i = 0; i < 8; i++)
-            cv_rect(66 + i * 20, 116, 16, 4, i == inph && ps_playing() ? C_HI : i < inph ? C_DIM : C_LINE);
+    {   /* the phrase's eight bars; in a break, its bars (eight shown, then counting on); in a build, its four */
+        int sec = ps_ui.section, sb = ps_ui.sec_bar, nb = sec == SEC_BUILD ? 4 : 8, inph = sec == SEC_BREAK ? sb % 8 : sb;
+        static const char *const SEC_NAME[3] = {"PHRASE", "BREAK", "BUILD"};
+        cv_text(8, 112, &FONT_XS, SEC_NAME[clamp(sec, 0, 2)], sec == SEC_MAIN ? C_GRAY : C_AMB);
+        for (i = 0; i < nb; i++)
+            cv_rect(66 + i * (160 / nb), 116, 160 / nb - 4, 4,
+                    i == inph && ps_playing() ? (sec == SEC_MAIN ? C_HI : C_WHITE) : i < inph ? C_DIM : C_LINE);
+        if (ps_ui.cued)                      /* a cue waiting for the next bar */
+            cv_text(8, 126, &FONT_XS, ps_ui.cued == 2 ? "DROP >" : sec == SEC_MAIN ? "BREAK >" : "BUILD >", C_WHITE);
     }
     if (ui.thrown_at && now - ui.thrown_at < 900u && ui.thrown_type >= 0) {   /* a key's event, named */
         const char *n = ps_event_name(ui.thrown_type);
@@ -523,7 +551,7 @@ int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "world"))
         *got = set.world;
-    else if (!strcmp(what, "page"))          /* 0 MAIN .. 7 GLOBAL */
+    else if (!strcmp(what, "page"))          /* 0 MAIN .. 8 GLOBAL */
         *got = ui.page;
     else if (!strcmp(what, "bar"))           /* bars since PLAY */
         *got = ps_bar();
@@ -531,6 +559,10 @@ int app_expect(const char *what, int *got)
         *got = ps_playing();
     else if (!strcmp(what, "dirty"))
         *got = set_dirty;
+    else if (!strcmp(what, "section"))       /* 0 the groove, 1 a break, 2 a build */
+        *got = ps_section();
+    else if (!strcmp(what, "drops"))
+        *got = ps_ui.drops;
     else if (!strcmp(what, "lights"))
         *got = set.lights;
     else if (!strcmp(what, "bpm"))

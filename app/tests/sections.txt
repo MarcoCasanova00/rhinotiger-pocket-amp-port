@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The sections: SAVE tapped, a break from the next bar; again, its build (4 bars); then the drop. SAVE held: the drop
+# at the next bar. Recorded (build/host/sections.wav) to listen to. COLD SIGNAL, 152: a bar is about 1.58 s.
+jack in
+wait 600
+expect section 0
+wav sections.wav
+# 12 bars of the groove
+wait 19000
+tap SAVE
+wait 1700
+expect section 1
+shot break.png
+# 6 bars of the break, then its build
+wait 9500
+tap SAVE
+wait 1700
+expect section 2
+shot build.png
+# the build's 4 bars, then the drop
+wait 6400
+expect section 0
+expect drops 1
+# 8 bars after the drop, the drop again, held
+wait 12600
+press SAVE
+wait 700
+release SAVE
+wait 1700
+expect drops 2
+expect section 0
+wait 6000
+wavstop
