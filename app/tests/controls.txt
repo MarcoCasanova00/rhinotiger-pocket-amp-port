@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The buttons beyond the pages: ALGORITHM the bass's colour, EDIT the line anew, OCT the keys' octave, ENV the breaks
+# on their own or only when cued (kept by SAVE on GLOBAL).
+listen
+wait 1500
+expect colour 0
+turn ALGO 2
+wait 100
+expect colour 2
+said BASS
+turn ALGO -3
+wait 100
+expect colour 3
+tap EDIT
+wait 30
+said LINE
+tap OCT+
+wait 30
+said OCTAVE
+tap OCT+
+tap OCT+
+tap OCT+
+wait 30
+# an octave up and more: the events still thrown
+tapkey w7
+wait 400
+expect thrown 1
+tap OCT-
+tap OCT-
+tap OCT-
+tap OCT-
+wait 30
+said OCTAVE
+expect auto 1
+tap ENV
+wait 30
+expect auto 0
+expect dirty 1
+tap GLO
+tap SAVE
+wait 30
+reboot
+listen
+wait 1500
+expect auto 0
+tap ENV
+wait 30
+expect auto 1

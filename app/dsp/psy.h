@@ -52,6 +52,14 @@ const char *ps_echo_time_name(int v);  /* P_ECHO_TIME's values */
 enum { SEC_MAIN, SEC_BREAK, SEC_BUILD };
 void ps_cue(int how);
 int ps_section(void);
+void ps_auto(int on);                  /* breaks on their own (1, the default) or only when cued (0) */
+
+/* the bass's colour (one of four: its ratio and bite), chosen now (each drop chooses another on its own) */
+#define PS_NCOLOUR 4
+void ps_colour(int c);
+int ps_colour_now(void);
+void ps_line_new(void);                /* the line's phrase drawn anew as the next bar begins */
+void ps_octave(int o);                 /* the keys' events an octave or two up or down (-1..2) */
 
 /* the performance (fx.c): the white keys' grid of sixteen effects, each while held (from the next sixteenth where it
  * takes the music's time), and the parts: muted (a black key tapped, again: back), out while a black key is held, and

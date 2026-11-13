@@ -70,7 +70,7 @@ static recipe_t key_recipe(int k)      /* key 0 is F3 (MIDI 53) */
 {
     recipe_t r;
     int fam = k < 9 ? 0 : k < 18 ? 1 : 2;
-    r.note = (int8_t)(53 + k);
+    r.note = (int8_t)(53 + k + 12 * key_oct);   /* (OCT- / OCT+) */
     r.type = (uint8_t)(fam * 2 + ((k / 2) & 1));   /* neighbouring keys alternate the family's two */
     r.run = key_black(k) ? (fam == 0 ? RUN_ROLL : RUN_STAIRS) : RUN_ONE;
     r.var = (uint8_t)(k * 37);

@@ -68,8 +68,10 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
     if (t % 6u)
         return;
     if (pos16 % 16u == 0u && t == 0u) {
-        if (rb == 0u && (pos16 == 0u))
-            ln_draw(w);                /* the start, a drop: anew */
+        if ((rb == 0u && pos16 == 0u) || line_new) {
+            ln_draw(w);                /* the start, a drop, EDIT: anew */
+            line_new = 0;
+        }
         else if (rb % 4u == 0u) {      /* every 4 bars: Mutate rewrites a few */
             int k, n = (int)((float)par[P_LINE_MUTATE] / 100.0f * 6.0f * (0.5f + m.drift) + (float)(rnd() % 100u) / 100.0f);
             for (k = 0; k < n; k++)

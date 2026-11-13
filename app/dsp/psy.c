@@ -205,6 +205,9 @@ static struct {
     float a_low, a_band;               /* the air's band-pass */
 } s;
 static volatile uint32_t cue_n, drop_n;   /* the UI's cues, counted: the render acts on a change */
+static volatile int auto_on = 1;       /* breaks on their own */
+static volatile int key_oct;           /* the keys' events: octaves up or down */
+static volatile uint8_t line_new;      /* the line drawn anew at the next bar */
 
 /* the macros, -1..1 from their middle (Drift 0..1), and what the parameters make of the world: set as a block
  * begins (mods()) */
@@ -274,7 +277,12 @@ static float ev_dark(void) { return m.dark; }
 #include "line.c"
 
 /* the queue's commands: bits 16.. the kind (0 a key, 1 an effect, 2 a mute, 3 out, 4 a fill) */
-enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL };
+enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_COLOUR };
+void ps_colour(int c) { cmd_post((uint32_t)CMD_COLOUR << 16 | (uint32_t)(c & 3)); }
+int ps_colour_now(void) { return s.colour; }
+void ps_line_new(void) { line_new = 1; }
+void ps_octave(int o) { key_oct = o < -1 ? -1 : o > 2 ? 2 : o; }
+void ps_auto(int on) { auto_on = on != 0; }
 void ps_fx(int id, int on) { cmd_post((uint32_t)CMD_FX << 16 | (uint32_t)(id & 31) | (uint32_t)(on != 0) << 5); }
 const char *ps_fx_name(int id) { return FX_NAME[(unsigned)id % FX_N]; }
 void ps_mute(int part) { cmd_post((uint32_t)CMD_MUTE << 16 | (uint32_t)(part & 7)); }
@@ -300,6 +308,9 @@ static void cmd_do(uint32_t c)         /* (render, as a block begins) */
         break;
     case CMD_FILL:
         fx.fill_req = 1;
+        break;
+    case CMD_COLOUR:
+        s.colour = (uint8_t)a;
         break;
     }
 }
@@ -552,7 +563,7 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
         uint32_t rb = bar - s.origin;
         if (next)
             enter(SEC_BREAK, 0);
-        else if (rb && rb % 32u == 0u && bar - s.last_drop >= 64u && (float)(rnd() % 100u) < 70.0f * m.drift)
+        else if (auto_on && rb && rb % 32u == 0u && bar - s.last_drop >= 64u && (float)(rnd() % 100u) < 70.0f * m.drift)
             enter(SEC_BREAK, w->brk);
     } else if (s.sec == SEC_BREAK) {
         if (next || (s.sec_len && s.sec_bar >= s.sec_len))

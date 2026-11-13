@@ -21,6 +21,9 @@
  *  10 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); SAVE here
  *                            keeps it all
  * SEL held: the knobs are MAIN's four on any page. PRESETS: the world, from the next bar. PLAY: play or rest.
+ * ALGORITHM: the bass's colour (one of four; a drop chooses another on its own). EDIT: the line drawn anew from the
+ * next bar. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). ENV: breaks on their
+ * own, or only when cued (lit: on their own; kept by SAVE on GLOBAL).
  * SAVE (but on GLOBAL), after HYP-1's: tapped, the next section from the next bar (the groove: a break; a break: its
  * build, then the drop); held, the drop at the next bar. Lit in a break, quick in a build.
  * The keys play no notes: each throws an event into the music on the next sixteenth (dsp/events.c); the screen
@@ -39,10 +42,11 @@ typedef struct {
     uint8_t world;
     uint8_t lights;                      /* the buttons' glow: 0 off, 1 low, 2 high */
     uint8_t theme;                       /* gfx.c PALETTES */
-    uint8_t rsv;
+    uint8_t flags;                       /* SET_NOAUTO: breaks only when cued */
     int16_t par[P_NPARAMS];
 } settings_t;
 static settings_t set;
+#define SET_NOAUTO 1u
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
 
@@ -71,6 +75,7 @@ static void settings_defaults(void)
     set.magic = SET_MAGIC;
     set.world = 2;                       /* COLD SIGNAL */
     set.lights = 1;
+    set.flags = 0;
     set.theme = APP_PALETTE;
     for (p = 0; p < P_NPARAMS; p++)
         set.par[p] = ps_param(p)->def;
@@ -82,6 +87,7 @@ static void settings_apply(void)
     for (p = 0; p < P_NPARAMS; p++)
         ps_set(p, set.par[p]);
     ps_world(set.world);
+    ps_auto(!(set.flags & SET_NOAUTO));
     palette_set(set.theme);
 }
 
@@ -90,7 +96,8 @@ void app_init(void)
     int p, ok;
     ps_init();
     ok = plat_store_load(OBJ_SETTINGS, &set, sizeof set) == (int)sizeof set && set.magic == SET_MAGIC &&
-         set.world < PS_NWORLD && set.lights <= 2u && set.theme < NPALETTES;
+         set.world < PS_NWORLD && set.lights <= 2u && set.theme < NPALETTES &&
+         set.flags <= SET_NOAUTO;
     for (p = 0; ok && p < P_NPARAMS; p++)
         ok = set.par[p] >= ps_param(p)->lo && set.par[p] <= ps_param(p)->hi;
     if (!ok)
@@ -133,6 +140,7 @@ static struct {
     uint8_t redraw;
     uint8_t shift;                       /* SEL held: the knobs are MAIN's */
     uint8_t rec;                         /* REC held: the keys are the performance */
+    int8_t oct;                          /* the keys' events' octave (OCT- / OCT+) */
     uint32_t logo_until;                 /* the logo stays until (the keys and knobs already work) */
 } ui;
 static int grid_mode(void) { return ui.page == PG_ECHO || ui.rec; }
@@ -462,7 +470,31 @@ static void input(void)
         page_go((int)ui.page + (int)e);
     if ((e = plat_enc(EN_PRESET)) != 0)
         world_step(e);
-    (void)plat_enc(EN_ALGO);                 /* (not yet: the voices' sounds) */
+    if ((e = plat_enc(EN_ALGO)) != 0) {     /* the bass's colour */
+        static const char *const COL[PS_NCOLOUR] = {"ROUND", "BITTEN", "METAL", "HOLLOW"};
+        int c = (ps_colour_now() + (int)e % PS_NCOLOUR + PS_NCOLOUR) % PS_NCOLOUR;
+        ps_colour(c);
+        app_say("BASS", COL[c]);
+    }
+    if (down & 1u << B_EDIT) {
+        ps_line_new();
+        app_say("LINE", "NEW");
+    }
+    if (down & (1u << B_OCTDN | 1u << B_OCTUP)) {
+        char t[4];
+        ui.oct = (int8_t)clamp(ui.oct + (down & 1u << B_OCTUP ? 1 : 0) - (down & 1u << B_OCTDN ? 1 : 0), -1, 2);
+        ps_octave(ui.oct);
+        t[0] = ui.oct < 0 ? '-' : '+';
+        t[1] = (char)('0' + (ui.oct < 0 ? -ui.oct : ui.oct));
+        t[2] = 0;
+        app_say("OCTAVE", ui.oct ? t : "0");
+    }
+    if (down & 1u << B_ENV) {
+        set.flags ^= SET_NOAUTO;
+        set_dirty = 1;
+        ps_auto(!(set.flags & SET_NOAUTO));
+        app_say("BREAKS", set.flags & SET_NOAUTO ? "WHEN CUED" : "ON THEIR OWN");
+    }
     for (k = 0; k < 4; k++)
         if ((e = plat_enc((int)(EN_K1 + k))) != 0)
             knob_turn((int)k, e);
@@ -475,9 +507,12 @@ static void input(void)
         int save_lit = ui.page == PG_GLOBAL ? set_dirty
                        : sec == SEC_BREAK || ps_ui.cued ? 1
                        : sec == SEC_BUILD ? tick % PS_TPB < PS_TPB / 2u : 0;   /* a build: on the beats */
-        uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (save_lit ? 1u << B_SAVE : 0u) | (ps_playing() ? 1u << B_PLAY : 0u);
+        uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (save_lit ? 1u << B_SAVE : 0u) | (ps_playing() ? 1u << B_PLAY : 0u) |
+                       (set.flags & SET_NOAUTO ? 0u : 1u << B_ENV) | (ui.oct < 0 ? 1u << B_OCTDN : 0u) |
+                       (ui.oct > 0 ? 1u << B_OCTUP : 0u);
         uint32_t dim = 1u << B_HOME | 1u << B_SEQ | 1u << B_LFO | 1u << B_ARP | 1u << B_FX | 1u << B_GLO | 1u << B_SAVE |
-                       1u << B_PLAY | 1u << B_SEL | 1u << B_REC, klit = keys, kdim = 0;
+                       1u << B_PLAY | 1u << B_SEL | 1u << B_REC | 1u << B_ENV | 1u << B_EDIT | 1u << B_OCTDN |
+                       1u << B_OCTUP, klit = keys, kdim = 0;
         if (grid_mode())                     /* the grid: each row's first key glows, a muted part's key is lit */
             for (k = 0; k < NKEYS; k++) {
                 int pl = key_place((int)k);
@@ -827,6 +862,10 @@ int app_expect(const char *what, int *got)
         *got = ps_section();
     else if (!strcmp(what, "drops"))
         *got = ps_ui.drops;
+    else if (!strcmp(what, "colour"))        /* the bass's colour, 0..3 */
+        *got = ps_colour_now();
+    else if (!strcmp(what, "auto"))          /* breaks on their own */
+        *got = !(set.flags & SET_NOAUTO);
     else if (!strcmp(what, "lines"))         /* the line's notes so far */
         *got = (int)ps_ui.hits[HIT_LINE];
     else if (!strcmp(what, "muted"))         /* the parts muted, 1 << PART_* (the engine's) */
