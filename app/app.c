@@ -153,6 +153,18 @@ static struct {
     int8_t oct;                          /* the keys' events' octave (OCT- / OCT+) */
     uint32_t logo_until;                 /* the logo stays until (the keys and knobs already work) */
 } ui;
+static int algo_part(void)               /* ALGORITHM's part: the page's (MAIN, GROOVE, ECHO, GLOBAL: the bass, for now) */
+{
+    switch (ui.page) {
+    case PG_KICK: return PART_KICK;
+    case PG_PERC: return PART_PERC;
+    case PG_LINE: return PART_LINE;
+    case PG_EVENTS: return PART_EVENTS;
+    case PG_ATMOS: return PART_ATMOS;
+    default: return PART_BASS;
+    }
+}
+
 static int grid_mode(void) { return ui.page == PG_ECHO || ui.rec; }
 
 /* s copied into d (cap bytes with the terminator); returns the length written */
@@ -571,11 +583,15 @@ static void input(void)
         page_go((int)ui.page + (int)e);
     if ((e = plat_enc(EN_PRESET)) != 0)
         world_step(e);
-    if ((e = plat_enc(EN_ALGO)) != 0) {     /* the bass's colour */
-        static const char *const COL[PS_NCOLOUR] = {"ROUND", "BITTEN", "METAL", "HOLLOW"};
-        int c = (ps_colour_now() + (int)e % PS_NCOLOUR + PS_NCOLOUR) % PS_NCOLOUR;
-        ps_colour(c);
-        app_say("BASS", COL[c]);
+    if ((e = plat_enc(EN_ALGO)) != 0) {     /* the type of the page's part (elsewhere, for now: the bass's colour) */
+        static const char *const PNAME[NPART] = {"KICK", "BASS", "PERC", "LINE", "EVENTS", "ATMOS"};
+        int part = algo_part(), n = ps_ntypes(part);
+        if (n > 1) {
+            int c = (ps_type_now(part) + (int)e % n + n) % n;
+            ps_type(part, c);
+            app_say(PNAME[part], ps_type_name(part, c));
+        } else
+            app_say(PNAME[part], "ONE TYPE");
     }
     if (down & 1u << B_EDIT) {
         ps_line_new();
@@ -987,6 +1003,8 @@ int app_expect(const char *what, int *got)
         *got = ps_ui.drops;
     else if (!strcmp(what, "colour"))        /* the bass's colour, 0..3 */
         *got = ps_colour_now();
+    else if (!strcmp(what, "line_type"))     /* the line's type, 0..3 */
+        *got = ps_type_now(PART_LINE);
     else if (!strcmp(what, "auto"))          /* breaks on their own */
         *got = !(set.flags & SET_NOAUTO);
     else if (!strcmp(what, "lines"))         /* the line's notes so far */

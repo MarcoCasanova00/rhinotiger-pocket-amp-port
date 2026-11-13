@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The buttons beyond the pages: ALGORITHM the bass's colour, EDIT the line anew, OCT the keys' octave, ENV the breaks
+# The buttons beyond the pages: ALGORITHM the type of the page's part (MAIN: the bass's colour), EDIT the line anew, OCT the keys' octave, ENV the breaks
 # on their own or only when cued (kept by SAVE on GLOBAL).
 listen
 wait 1500
@@ -12,6 +12,21 @@ said BASS
 turn ALGO -3
 wait 100
 expect colour 3
+# on the LINE page: the line's type (the bass's colour stays)
+tap ARP
+tap ARP
+wait 30
+expect line_type 0
+turn ALGO 1
+wait 100
+expect line_type 1
+said LINE
+turn ALGO -2
+wait 100
+expect line_type 3
+expect colour 3
+tap HOME
+wait 30
 tap EDIT
 wait 30
 said LINE

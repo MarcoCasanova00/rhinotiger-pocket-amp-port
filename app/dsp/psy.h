@@ -63,6 +63,13 @@ int ps_shedding(void);                  /* breaks on their own (1, the default) 
 #define PS_NCOLOUR 4
 void ps_colour(int c);
 int ps_colour_now(void);
+/* each part's type (ALGORITHM on its page): four sounds of it, 0 the world's own. A type takes from a part's next
+ * note. The bass's are its colours. A part without types yet has one (ps_ntypes 1). */
+#define PS_NTYPE 4
+void ps_type(int part, int t);
+int ps_type_now(int part);
+int ps_ntypes(int part);
+const char *ps_type_name(int part, int t);
 void ps_line_new(void);                /* the line's phrase drawn anew as the next bar begins */
 void ps_octave(int o);                 /* the keys' events an octave or two up or down (-1..2) */
 

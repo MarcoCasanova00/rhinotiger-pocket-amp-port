@@ -196,7 +196,8 @@ static struct {
     float g[NG];                       /* the levels, gliding: kick, bass, perc, events, line, the events' send, the echo */
     float echo_d;                      /* the echo's delay in frames, gliding (a tempo moved, a time changed) */
     /* the sections */
-    uint8_t sec, colour, drops;
+    uint8_t sec, drops;
+    uint8_t type[NPART];                 /* each part's type (PART_*: the bass's is its colour) */
     uint32_t origin;                   /* the bar the phrases count from: the last drop's */
     uint32_t last_drop;
     uint32_t sec_bar, sec_len;         /* bars into the section; a break's length (0: until cued) */
@@ -301,9 +302,24 @@ static hp2_t echo_hp;                  /* the echo's input */
 #include "line.c"
 
 /* the queue's commands: bits 16.. the kind (0 a key, 1 an effect, 2 a mute, 3 out, 4 a fill) */
-enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_COLOUR };
-void ps_colour(int c) { cmd_post((uint32_t)CMD_COLOUR << 16 | (uint32_t)(c & 3)); }
-int ps_colour_now(void) { return s.colour; }
+enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE };
+static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; 0: none yet beyond the world's own */
+    [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW"},
+    [PART_LINE] = {"ACID", "GLASS", "GROWL", "REED"},
+};
+int ps_ntypes(int part) { return part >= 0 && part < NPART && TYPE_NAME[part][1] ? PS_NTYPE : 1; }
+const char *ps_type_name(int part, int t)
+{
+    return part >= 0 && part < NPART && TYPE_NAME[part][t & 3] ? TYPE_NAME[part][t & 3] : "WORLD";
+}
+void ps_type(int part, int t)
+{
+    if (part >= 0 && part < NPART && t >= 0 && t < ps_ntypes(part))
+        cmd_post((uint32_t)CMD_TYPE << 16 | (uint32_t)part << 8 | (uint32_t)t);
+}
+int ps_type_now(int part) { return part >= 0 && part < NPART ? s.type[part] : 0; }
+void ps_colour(int c) { ps_type(PART_BASS, c & 3); }
+int ps_colour_now(void) { return s.type[PART_BASS]; }
 void ps_line_new(void) { line_new = 1; }
 void ps_octave(int o) { key_oct = o < -1 ? -1 : o > 2 ? 2 : o; }
 void ps_auto(int on) { auto_on = on != 0; }
@@ -335,8 +351,9 @@ static void cmd_do(uint32_t c)         /* (render, as a block begins) */
     case CMD_FILL:
         fx.fill_req = 1;
         break;
-    case CMD_COLOUR:
-        s.colour = (uint8_t)a;
+    case CMD_TYPE:
+        if ((c >> 8 & 7u) < NPART)
+            s.type[c >> 8 & 7u] = (uint8_t)(c & 3u);
         break;
     }
 }
@@ -571,7 +588,7 @@ static void drop(uint32_t bar)         /* on this bar's first tick: the groove a
     enter(SEC_MAIN, 0);
     s.origin = s.last_drop = bar;
     s.drops++;
-    s.colour = (uint8_t)((s.colour + 1u + rnd() % 3u) % 4u);   /* another of the bass's four colours */
+    s.type[PART_BASS] = (uint8_t)((s.type[PART_BASS] + 1u + rnd() % 3u) % 4u);   /* another of the bass's four colours */
     s.out = 0;
     ps_ui.sitting_out = 0;
     s.x_t = 0.0f;                      /* the crash */
@@ -687,7 +704,7 @@ static const float COLOUR[4][2] = {{1.0f, 1.0f}, {1.0f, 1.35f}, {1.5f, 0.8f}, {0
 
 static float bass(const world_t *w, float dt)
 {
-    float t = s.b_t, idx, env, x, mo, bite = (float)par[P_BASS_BITE] / 50.0f * COLOUR[s.colour][1];
+    float t = s.b_t, idx, env, x, mo, bite = (float)par[P_BASS_BITE] / 50.0f * COLOUR[s.type[PART_BASS]][1];
     float depth = 0.5f * m.drift * 2.0f;           /* the slow movement's depth: Drift (50: as the world has it) */
     if (t < 0.0f)
         return s.lp *= 0.99f;
@@ -707,7 +724,7 @@ static float bass(const world_t *w, float dt)
     s.b_cph += s.b_inc;
     if (s.b_cph >= 1.0f)
         s.b_cph -= 1.0f;
-    s.b_mph += s.b_inc * w->ratio * COLOUR[s.colour][0];
+    s.b_mph += s.b_inc * w->ratio * COLOUR[s.type[PART_BASS]][0];
     if (s.b_mph >= 1.0f)
         s.b_mph -= 1.0f;
     if (s.b_t >= 0.0f)
