@@ -71,6 +71,13 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 
 void app_panic(void) { ps_play(0); }
 
+static volatile uint32_t shed_at;        /* the render last over its time (plat_ms; 0: not lately) */
+void app_overload(void)                  /* the render over 90 % of its time: lighter, for 8 seconds after the last */
+{
+    ps_shed(1);
+    shed_at = plat_ms() | 1u;
+}
+
 /* --------------------------------------------------------------- settings --- */
 static void settings_defaults(void)
 {
@@ -269,7 +276,7 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
             int_text((int32_t)c, t);
             while (t[k])
                 k++;
-            str_put(t + k, 4, "%");
+            str_put(t + k, 4, ps_shedding() ? "%!" : "%");   /* (!: lighter, the render was near its time) */
             *pos = (int32_t)(c > 100u ? 100u : c);
             *span = 100;
         } else {
@@ -924,6 +931,10 @@ void app_frame(void)
     if (ui.msg_until && now >= ui.msg_until) {
         ui.msg_until = 0;
         ui.redraw = 1;
+    }
+    if (shed_at && now - shed_at > 8000u) {   /* lighter no more */
+        shed_at = 0;
+        ps_shed(0);
     }
     if (ui.logo_until) {                     /* the logo, a moment more */
         if ((int32_t)(now - ui.logo_until) < 0)

@@ -213,6 +213,7 @@ static struct {
 } s;
 static volatile uint32_t cue_n, drop_n;   /* the UI's cues, counted: the render acts on a change */
 static volatile int auto_on = 1;       /* breaks on their own */
+static volatile uint8_t shed;          /* lighter: the render near its time (APP_OVERLOAD) */
 static volatile int key_oct;           /* the keys' events: octaves up or down */
 static volatile uint8_t line_new;      /* the line drawn anew at the next bar */
 
@@ -305,6 +306,8 @@ int ps_colour_now(void) { return s.colour; }
 void ps_line_new(void) { line_new = 1; }
 void ps_octave(int o) { key_oct = o < -1 ? -1 : o > 2 ? 2 : o; }
 void ps_auto(int on) { auto_on = on != 0; }
+void ps_shed(int on) { shed = (uint8_t)(on != 0); }
+int ps_shedding(void) { return shed; }
 void ps_fx(int id, int on) { cmd_post((uint32_t)CMD_FX << 16 | (uint32_t)(id & 31) | (uint32_t)(on != 0) << 5); }
 const char *ps_fx_name(int id) { return FX_NAME[(unsigned)id % FX_N]; }
 void ps_mute(int part) { cmd_post((uint32_t)CMD_MUTE << 16 | (uint32_t)(part & 7)); }
@@ -831,7 +834,8 @@ static float atmos(const world_t *w, float n, float *l, float *r)
     if ((s.a_lfo += 0.05f / PS_SR) >= 1.0f)
         s.a_lfo -= 1.0f;
     wob = fm_sin_turns(s.a_lfo);
-    for (i = 0; i < 3; i++) {          /* the chord: each note a little apart left and right, its modulator shared */
+    for (i = 0; i < (shed ? 1 : 3); i++) {   /* the chord: each note a little apart left and right, its modulator shared
+                                              * (lighter: its root alone) */
         float inc = cf.a_inc[i], idx = (0.15f + 1.2f * colour) * (0.75f + 0.25f * wob), mo;
         mo = fm_sin_turns(s.a_mph[i]) * idx * 0.159155f;
         al += fm_sin_turns(s.a_ph[i][0] + mo);

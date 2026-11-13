@@ -85,14 +85,15 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
     evoice_t *v = 0;
     int k;
     float f = note_hz(r->note), a = fvar(r->var, 0), b = fvar(r->var, 1);
-    for (k = 0; k < EV_NVOICE; k++)
+    int nv = shed ? EV_NVOICE / 2 : EV_NVOICE;   /* (lighter: half of them) */
+    for (k = 0; k < nv; k++)
         if (ev.v[k].t < 0.0f) {
             v = &ev.v[k];
             break;
         }
     if (!v) {                          /* all sounding: the oldest gives way */
         v = &ev.v[0];
-        for (k = 1; k < EV_NVOICE; k++)
+        for (k = 1; k < nv; k++)
             if (ev.v[k].t > v->t)
                 v = &ev.v[k];
     }

@@ -54,7 +54,10 @@ const char *ps_echo_time_name(int v);  /* P_ECHO_TIME's values */
 enum { SEC_MAIN, SEC_BREAK, SEC_BUILD };
 void ps_cue(int how);
 int ps_section(void);
-void ps_auto(int on);                  /* breaks on their own (1, the default) or only when cued (0) */
+void ps_auto(int on);
+void ps_shed(int on);                  /* lighter (the render near its time): the atmos one note, the events half their
+                                        * voices, no FLANGE */
+int ps_shedding(void);                  /* breaks on their own (1, the default) or only when cued (0) */
 
 /* the bass's colour (one of four: its ratio and bite), chosen now (each drop chooses another on its own) */
 #define PS_NCOLOUR 4

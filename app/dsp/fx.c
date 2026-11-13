@@ -214,7 +214,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     fx.lo_g += ((fx.held >> FX_LOW & 1u ? 1.0f : 0.0f) - fx.lo_g) * (fx.held >> FX_LOW & 1u ? 0.00006f : 0.0003f);
     fx.hi_g += ((fx.held >> FX_HIGH & 1u ? 1.0f : 0.0f) - fx.hi_g) * (fx.held >> FX_HIGH & 1u ? 0.00006f : 0.0003f);
     fx.band_g += ((fx.held >> FX_BAND & 1u ? 1.0f : 0.0f) - fx.band_g) * 0.002f;
-    fx.fl_g += ((fx.held >> FX_FLANGE & 1u ? 1.0f : 0.0f) - fx.fl_g) * 0.002f;
+    fx.fl_g += ((fx.held >> FX_FLANGE & 1u && !shed ? 1.0f : 0.0f) - fx.fl_g) * 0.002f;   /* (lighter: none) */
     if (fx.lo_g > 0.001f) {
         float f = fx.lo_f;
         svf(fx.svf_lo[0], dl, f, 0.6f);
