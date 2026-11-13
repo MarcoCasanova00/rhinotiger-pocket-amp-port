@@ -7,6 +7,9 @@ expect playing 1
 expect page 0
 expect world 2
 expect bpm 152
+shot logo.png
+# the logo for a moment, then the pages
+wait 700
 shot main.png
 # SELECT turns through every page; the buttons jump (HOME again: GROOVE; SEQ again: PERC)
 turn SELECT 1

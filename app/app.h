@@ -10,6 +10,7 @@
 #define APP_SPLASH_RGB RGB(230, 150, 40)
 #define APP_PALETTE 1u                   /* gfx.c PALETTES: amber */
 #define APP_BLOCK 256u                   /* frames per audio block: 5.8 ms at 44.1 kHz */
+#define APP_SPLASH                       /* app_splash: the logo (犀虎) at boot */
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h): an event's bite */
 
 /* the store: the settings, and the panel calibration (the platform's) */

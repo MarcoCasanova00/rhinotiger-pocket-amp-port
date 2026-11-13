@@ -19,3 +19,6 @@ git submodule update --init --recursive
 
 GPL-3.0-only (see LICENSE). Built on [fm1-base](https://github.com/charlesvestal/fm1-base) (MPL-2.0) and
 felucca-bsp. Files taken from fm1-base's template keep their MPL-2.0 notices.
+
+The boot logo's dots (app/logo.h) were drawn from [Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP)
+Black (SIL Open Font License 1.1).

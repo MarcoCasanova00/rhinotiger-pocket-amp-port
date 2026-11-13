@@ -78,10 +78,10 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
         if (rb % 8u == 0u) {           /* a phrase: plays or rests, by the world's presence (more likely after a rest;
                                         * where it is half or more, surely as the intro ends) */
             float p = w->line + (ln.playing ? 0.0f : 0.3f * w->line);
-            ln.playing = bar >= 16u && (bar < 24u && w->line >= 0.5f || (float)(rnd() % 100u) < 100.0f * p);
+            ln.playing = bar >= 16u && ((bar < 24u && w->line >= 0.5f) || (float)(rnd() % 100u) < 100.0f * p);
         }
     }
-    if (!ln.playing || !ln.on[i] || s.sec == SEC_BUILD && s.sec_bar >= 3u && s.tick / TPB % 4u == 3u)
+    if (!ln.playing || !ln.on[i] || (s.sec == SEC_BUILD && s.sec_bar >= 3u && s.tick / TPB % 4u == 3u))
         return;
     {
         float f = note_hz(m.root + w->line_oct + ln.note[i]) / PS_SR;

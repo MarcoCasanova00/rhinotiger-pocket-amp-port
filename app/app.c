@@ -31,6 +31,7 @@
  * held, F#5 every part back. A key does what it did when pressed until let go. */
 #include "fastmath.h"
 #include "psy.h"
+#include "logo.h"
 
 #define SET_MAGIC 0x33544852u            /* "RHT3": the settings record (2: the atmos's four; 3: the line's, 8 worlds) */
 typedef struct {
@@ -133,6 +134,7 @@ static struct {
     uint8_t redraw;
     uint8_t shift;                       /* SEL held: the knobs are MAIN's */
     uint8_t rec;                         /* REC held: the keys are the performance */
+    uint32_t logo_until;                 /* the logo stays until (the keys and knobs already work) */
 } ui;
 static int grid_mode(void) { return ui.page == PG_ECHO || ui.rec; }
 
@@ -253,8 +255,11 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
             *span = (int32_t)NPALETTES - 1;
         } else if (k == 2) {             /* the audio's load, of its budget (read only; the device's) */
             uint32_t c = plat_cpu_pct();
+            uint32_t k = 0;
             int_text((int32_t)c, t);
-            str_put(t + strlen(t), 4, "%");
+            while (t[k])
+                k++;
+            str_put(t + k, 4, "%");
             *pos = (int32_t)(c > 100u ? 100u : c);
             *span = 100;
         }
@@ -653,10 +658,33 @@ static void draw(void)
     draw_knobs(now);
 }
 
+/* the logo: 犀 over 虎, each dot three pixels square, amber on black, the name small under them */
+static void draw_logo(void)
+{
+    int32_t ch, y, x;
+    lcd_fill(0, 0, 240, 240, RGB(0, 0, 0));
+    for (ch = 0; ch < 2; ch++) {
+        cv_begin(240, 3 * LOGO_N, RGB(0, 0, 0));
+        for (y = 0; y < LOGO_N; y++)
+            for (x = 0; x < LOGO_N; x++)
+                if (LOGO[ch][y] >> (LOGO_N - 1 - x) & 1u)
+                    cv_rect(120 - 3 * LOGO_N / 2 + 3 * x, 3 * y, 3, 3, APP_SPLASH_RGB);
+        cv_blit(0, 22 + ch * (3 * LOGO_N + 6));
+    }
+    cv_begin(240, 16, RGB(0, 0, 0));
+    cv_text((240 - text_w(&FONT_XS, "R H I N O T I G E R")) / 2, 2, &FONT_XS, "R H I N O T I G E R", RGB(150, 100, 40));
+    cv_blit(0, 200);
+}
+
+#ifdef APP_SPLASH
+void app_splash(void) { draw_logo(); }
+#endif
+
 void app_ui_init(void)
 {
     int l, i;
-    lcd_fill(0, 0, 240, 240, C_BLACK);
+    draw_logo();                             /* (the device's splash already; the host's first sight of it) */
+    ui.logo_until = plat_ms() + 1200u;
     for (l = 0; l < NLANE; l++)
         for (i = 0; i < 16; i++)
             ui.mark[l][i] = -9;
@@ -672,6 +700,13 @@ void app_frame(void)
     marks_update();
     if (ui.msg_until && now >= ui.msg_until) {
         ui.msg_until = 0;
+        ui.redraw = 1;
+    }
+    if (ui.logo_until) {                     /* the logo, a moment more */
+        if ((int32_t)(now - ui.logo_until) < 0)
+            return;
+        ui.logo_until = 0;
+        lcd_fill(0, 0, 240, 240, C_BLACK);
         ui.redraw = 1;
     }
     if (ui.redraw || now - ui.last_draw >= 33u) {   /* the lanes move: about 30 frames a second */
