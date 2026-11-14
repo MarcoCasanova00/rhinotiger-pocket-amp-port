@@ -17,9 +17,9 @@ tapkey b0
 wait 12000
 wav fx.wav
 wait 3200
-# REPEAT 1/8 (w0), 1/16 (w1), 1/32 (w2), then STAIRS (w14)
+# REPEAT 1/2 (w0, from the next beat), 1/4 (w1), 1/8T (w2), then STAIRS (w14)
 key w0 down 90
-wait 1600
+wait 3200
 expect fx 1
 key w0 up
 wait 800
@@ -65,7 +65,7 @@ key w11 down 90
 wait 3200
 key w11 up
 wait 1600
-# MOTION: TAPE (w12), RISER (w13), SPIN (w15)
+# MOTION: TAPE (w12), RISER (w13), GATE (w15)
 key w12 down 90
 wait 1600
 key w12 up

@@ -741,7 +741,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     if (s.tick % TPBAR == 0u)
         section_bar(w, bar);
     if (t % 6u == 0u)
-        fx_sixteenth();
+        fx_sixteenth(t == 0u);
     if (t == 0u) {                     /* a fill cued (a black key): this beat */
         s.fill_beat = fx.fill_req;
         fx.fill_req = 0;
@@ -1081,7 +1081,7 @@ static void flush_states(void)         /* as a block begins: what decays towards
     s.c_low = fm_flush(s.c_low), s.c_band = fm_flush(s.c_band);
     ln.lp = fm_flush(ln.lp);
     fx.wet = fm_flush(fx.wet), fx.lo_g = fm_flush(fx.lo_g), fx.hi_g = fm_flush(fx.hi_g);
-    fx.band_g = fm_flush(fx.band_g), fx.fl_g = fm_flush(fx.fl_g), fx.riser_g = fm_flush(fx.riser_g), fx.spin_g = fm_flush(fx.spin_g);
+    fx.band_g = fm_flush(fx.band_g), fx.fl_g = fm_flush(fx.fl_g), fx.riser_g = fm_flush(fx.riser_g), fx.gate_g = fm_flush(fx.gate_g);
 }
 
 static void coefs(const world_t *w)    /* as a block begins: what changes slowly */
