@@ -490,6 +490,10 @@ static void kit_step(void)
     kit.back_seen = kit_back;
     if (s.kit_bars)                    /* a bar of the groove's shape gone */
         s.kit_bars--;
+    if (shape_want != s.shape_was) {   /* GROOVE's ALGORITHM turned: the kit's shape gone (before this kit's) */
+        s.shape_was = (uint8_t)shape_want;
+        s.kit_bars = 0;
+    }
     if (net < 0) {                     /* back: the kits before, as far as they go */
         uint8_t was[NPART];
         for (p = 0; p < NPART; p++)
@@ -1141,11 +1145,6 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
                              : u < (160.0f + half) * f ? KF_HALF : KF_NONE);
             s.kf_bars = (uint8_t)(1u + (rnd() & 1u));
         }
-    }
-    if (t == 0u && beat == 0u && shape_want != s.shape_was) {   /* GROOVE's ALGORITHM turned: the kit's shape gone */
-        s.shape_was = (uint8_t)shape_want;
-        s.kit_bars = 0;
-        ps_ui.kit_shape = PS_SHAPE_AUTO;
     }
     if (t == 0u && beat == 0u && shape_want != PS_SHAPE_AUTO) {   /* a shape held (GROOVE's ALGORITHM): from this bar */
         static const uint8_t PAT[PS_NSHAPE] = {0, 0, 1, 3};
