@@ -29,8 +29,8 @@
  *                            (off by default); SAVE here keeps it all
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
  * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on PHASE the
- * builds' kind, on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN and GLOBAL none (MAIN's: all the parts'
- * types at once, later). OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
+ * builds' kind, on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
+ * those heard another type as the next bar begins, more turns more parts; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
  * the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the loop gone; lit while one
  * plays).
  * SAVE and ARP, side by side, the sections (but on GLOBAL, where SAVE keeps the settings): SAVE down, a break from
@@ -175,6 +175,7 @@ static struct {
     uint8_t arp_held;                    /* ARP held long enough: the drop cued */
     uint32_t lfo_at;                     /* LFO pressed on a LINE page at (tapped: the next page; held: a phrase anew) */
     uint8_t lfo_wait;                    /* LFO down on a LINE page, neither yet */
+    uint8_t kits_seen;                   /* the engine's kits as last said */
     int8_t thrown_type;
     uint8_t page;
     uint8_t redraw;
@@ -668,15 +669,17 @@ static void input(void)
         ps_echo_kind(c);
         app_say("ECHO", ps_echo_kind_name(c));
     } else if (e != 0 && algo_part() >= 0) {      /* a part's page: its type */
-        static const char *const PNAME[NPART] = {"KICK", "BASS", "PERC", "LINE", "EVENTS", "ATMOS"};
         int part = algo_part(), n = ps_ntypes(part);
         if (n > 1) {
             int c = (ps_type_now(part) + (int)e % n + n) % n;
             ps_type(part, c);
-            app_say(PNAME[part], ps_type_name(part, c));
+            app_say(PART_NAME[part], ps_type_name(part, c));
         } else
-            app_say(PNAME[part], "ONE TYPE");
-    } else if (e != 0)                             /* MAIN, GLOBAL: none */
+            app_say(PART_NAME[part], "ONE TYPE");
+    } else if (e != 0 && ui.page == PG_MAIN) {     /* MAIN: the kit (forward: another; back: the one before) */
+        ps_kit((int)e);
+        app_say(e > 0 ? "KIT" : ps_ui.kit_depth ? "KIT BACK" : "KIT", e > 0 || ps_ui.kit_depth ? "NEXT BAR" : "NONE BEFORE");
+    } else if (e != 0)                             /* GLOBAL: none */
         app_say("NO ALGO", "");
     if (down & (1u << B_OCTDN | 1u << B_OCTUP)) {
         char t[4];
@@ -842,6 +845,22 @@ static void marks_update(void)
 {
     static const uint8_t LANE_OF[NHIT] = {LANE_KICK, LANE_BASS, LANE_PERC, LANE_EVENTS, LANE_EVENTS, LANE_LINE};
     uint32_t h, now = plat_ms();
+    if (ps_ui.kits != ui.kits_seen) {       /* a kit taken: the parts it changed, and their types */
+        char t[32];
+        uint32_t k = 0, p, mask = ps_ui.kit_parts;
+        ui.kits_seen = ps_ui.kits;
+        for (p = 0; p < NPART; p++)
+            if (mask >> p & 1u) {
+                if (k && k + 1 < sizeof t)
+                    t[k++] = ' ';
+                k += str_put(t + k, sizeof t - k, PART_NAME[p]);
+                if (k + 1 < sizeof t)
+                    t[k++] = ' ';
+                k += str_put(t + k, sizeof t - k, ps_type_name((int)p, ps_type_now((int)p)));
+            }
+        t[k < sizeof t ? k : sizeof t - 1] = 0;
+        app_say("KIT", t);
+    }
     if (ps_ui.hits[HIT_THROW] != ui.seen[HIT_THROW]) {
         ui.thrown_type = ps_ui.thrown_type;
         ui.thrown_at = now;
@@ -970,6 +989,13 @@ static void draw_rule(void)
         xs = cv_text(xs, 0, &FONT_XS, ps_build_name(k), C_HI) + 6;
         if (k == PS_BUILD_AUTO && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0)
             xs = cv_text(xs - 2, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_GRAY) + 6;
+    } else if (ui.page == PG_MAIN) {   /* the kit: the parts the latest changed, each in its hue */
+        uint32_t p, mask = ps_ui.kit_parts;
+        xs = cv_text(6, 0, &FONT_XS, "ALGO: KIT", C_AMB) + 6;
+        for (p = 0; p < NPART; p++)
+            if (ps_ui.kits && (mask >> p & 1u))
+                xs = cv_text(xs, 0, &FONT_XS, ps_type_name((int)p, ps_type_now((int)p)), part_txt(PART_HUE[p], 255)) + 4;
+        xs += 2;
     } else if (ui.page == PG_GROOVE || ui.page == PG_ECHO) {   /* the bass's shape; the echo's kind */
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
         xs = cv_text(xs, 0, &FONT_XS, ui.page == PG_GROOVE ? ps_bass_shape_name(ps_bass_shape_now())
@@ -1151,6 +1177,17 @@ int app_expect(const char *what, int *got)
         *got = ps_stat(1);
     else if (!strcmp(what, "thrown_type"))
         *got = ps_stat(2);
+    else if (!strcmp(what, "kits"))          /* kits taken (MAIN's ALGORITHM) */
+        *got = ps_ui.kits;
+    else if (!strcmp(what, "kit_parts"))     /* the parts the latest changed, 1 << PART_* */
+        *got = ps_ui.kit_parts;
+    else if (!strcmp(what, "kit_n")) {       /* how many parts the latest changed */
+        uint32_t m = ps_ui.kit_parts;
+        *got = 0;
+        for (; m; m &= m - 1u)
+            ++*got;
+    } else if (!strcmp(what, "bass_type"))     /* the bass's type (its colour), 0..3 */
+        *got = ps_type_now(PART_BASS);
     else if (!strcmp(what, "phrases"))       /* the line's phrases drawn whole */
         *got = ps_stat(3);
     else if (!strcmp(what, "line_on"))       /* the line's steps on now, of 32 */

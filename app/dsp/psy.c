@@ -261,6 +261,8 @@ static volatile uint32_t cue_n, drop_n, build_n;   /* the UI's cues (a break, th
 static volatile uint8_t shed;          /* lighter: the render near its time (APP_OVERLOAD) */
 static volatile int key_oct;           /* the keys' events: octaves up or down */
 static volatile uint8_t line_new;      /* the line drawn anew at the next bar */
+static volatile uint32_t kit_fwd, kit_back;   /* MAIN's ALGORITHM, its turns each way, counted: the render acts on
+                                               * the change as a bar begins */
 
 /* the macros, -1..1 from their middle (Drift 0..1), and what the parameters make of the world: set as a block
  * begins (mods()) */
@@ -438,6 +440,95 @@ int ps_type_now(int part) { return part >= 0 && part < NPART ? s.type[part] : 0;
 void ps_colour(int c) { ps_type(PART_BASS, c & 3); }
 int ps_colour_now(void) { return s.type[PART_BASS]; }
 void ps_line_new(void) { line_new = 1; }
+
+/* the kit (ALGORITHM on MAIN): the turns of a bar taken together as the next bar begins (stopped: at once). Forward,
+ * another type for one part or a few (one turn: one, now and then two; more turns: as many, up to three), chosen
+ * among the parts heard now (not muted or out, the kick and the bass not in a break, the line not resting, the events
+ * not before they come in), not the ones the last kit changed if others are there, each to a type other than its
+ * own; each part takes it at its next note. Back, the kit before (up to eight). */
+#define KIT_HIST 8
+static struct {
+    uint32_t fwd_seen, back_seen;
+    uint8_t hist[KIT_HIST][NPART], depth, top;
+    uint8_t last;                      /* the parts the last kit changed */
+} kit;
+void ps_kit(int turns)
+{
+    if (turns > 0)
+        kit_fwd += (uint32_t)turns;
+    else
+        kit_back += (uint32_t)-turns;
+}
+
+static uint32_t kit_heard(void)        /* the parts heard now, 1 << PART_* */
+{
+    uint32_t m = (1u << NPART) - 1u, bar = s.tick / TPBAR;
+    m &= ~(uint32_t)(fx.muted | fx.out);
+    if (s.sec == SEC_BREAK)
+        m &= ~(1u << PART_KICK | 1u << PART_BASS);
+    if (!ln.playing)
+        m &= ~(1u << PART_LINE);
+    if ((bar < 4u && !s.drops) || s.sec == SEC_BUILD)
+        m &= ~(1u << PART_EVENTS);
+    return m;
+}
+
+static void kit_step(void)
+{
+    int net = (int)(kit_fwd - kit.fwd_seen) - (int)(kit_back - kit.back_seen);
+    uint32_t heard, pick = 0, p;
+    int n;
+    kit.fwd_seen = kit_fwd;
+    kit.back_seen = kit_back;
+    if (net < 0) {                     /* back: the kits before, as far as they go */
+        uint8_t was[NPART];
+        for (p = 0; p < NPART; p++)
+            was[p] = s.type[p];
+        for (; net < 0 && kit.depth; net++) {
+            kit.top = (uint8_t)((kit.top + KIT_HIST - 1u) % KIT_HIST);
+            kit.depth--;
+            for (p = 0; p < NPART; p++)
+                s.type[p] = kit.hist[kit.top][p];
+        }
+        for (p = 0; p < NPART; p++)
+            if (s.type[p] != was[p])
+                pick |= 1u << p;
+        kit.last = (uint8_t)pick;
+    } else if (net > 0) {
+        n = net > 1 ? (net > 3 ? 3 : net) : rnd() % 100u < 30u ? 2 : 1;
+        heard = kit_heard();
+        if (!heard)
+            heard = (1u << NPART) - 1u;
+        for (; n > 0; n--) {           /* one at a time: from the heard not changed last, else the heard */
+            uint32_t from = heard & ~pick & ~(uint32_t)kit.last, c = 0, k;
+            if (!from)
+                from = heard & ~pick;
+            if (!from)
+                break;
+            for (p = 0; p < NPART; p++)
+                c += from >> p & 1u;
+            k = rnd() % c;
+            for (p = 0; p < NPART; p++)
+                if ((from >> p & 1u) && k-- == 0u)
+                    break;
+            pick |= 1u << p;
+        }
+        for (p = 0; p < NPART; p++)    /* the kit as it was, kept for going back */
+            kit.hist[kit.top][p] = s.type[p];
+        kit.top = (uint8_t)((kit.top + 1u) % KIT_HIST);
+        if (kit.depth < KIT_HIST)
+            kit.depth++;
+        for (p = 0; p < NPART; p++)
+            if (pick >> p & 1u)
+                s.type[p] = (uint8_t)((s.type[p] + 1u + rnd() % 3u) % PS_NTYPE);
+        kit.last = (uint8_t)pick;
+    }
+    if (pick) {
+        ps_ui.kit_parts = (uint8_t)pick;
+        ps_ui.kits++;
+    }
+    ps_ui.kit_depth = kit.depth;
+}
 static volatile int build_want;        /* PS_BUILD_* (AUTO: the world leans) */
 static volatile int shape_want;        /* PS_SHAPE_* (AUTO: the world's) */
 static volatile int echo_kind;         /* PS_ECHO_* */
@@ -1451,6 +1542,8 @@ void ps_render(float *outl, float *outr, uint32_t n)
               ? 30.0f * fm_exp2f(4.5f * build_progress()) : 0.0f;
         lp_on = s.sec == SEC_BUILD && s.bk == PS_BUILD_SINK && !build_breath(tk / TPB % 4u);
     }
+    if (!playing)                      /* stopped: the kit at once */
+        kit_step();
     for (i = 0; i < n; i++) {
         {
             int k;
@@ -1465,6 +1558,8 @@ void ps_render(float *outl, float *outr, uint32_t n)
                     w = &W[world];
                     tempo(w);
                 }
+                if (s.tick % TPBAR == 0u)          /* the kit, as a bar begins */
+                    kit_step();
                 s.drift = 0.5f - 0.5f * fm_cosf((float)(s.tick % (16u * TPBAR)) / (float)(16u * TPBAR) * 6.2831853f);
                 step(w);
                 s.tick++;

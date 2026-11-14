@@ -105,6 +105,9 @@ int ps_type_now(int part);
 int ps_ntypes(int part);
 const char *ps_type_name(int part, int t);
 void ps_line_new(void);                /* the line's phrase drawn anew as the next bar begins */
+/* the kit (ALGORITHM on MAIN): turns forward, another type for one part or a few of those heard, as the next bar
+ * begins (the turns of a bar together: more, more parts, up to three); back, the kit before (up to eight) */
+void ps_kit(int turns);
 void ps_octave(int o);                 /* the keys' events an octave or two up or down (-1..2) */
 
 /* the performance (fx.c): the white keys' grid of sixteen effects, each while held (from the next sixteenth where it
@@ -151,6 +154,9 @@ typedef struct {
     volatile int8_t build_kind;        /* the build's kind, the latest's (PS_BUILD_*, 0 none yet) */
     volatile uint8_t drops;            /* drops so far (wraps) */
     volatile uint8_t muted;            /* the parts muted (1 << PART_*) */
+    volatile uint8_t kits;             /* kits taken (wraps; back too) */
+    volatile uint8_t kit_parts;        /* the parts the latest changed (1 << PART_*) */
+    volatile uint8_t kit_depth;        /* kits to go back to */
 } ps_ui_t;
 extern ps_ui_t ps_ui;
 #define PS_TPB 24u

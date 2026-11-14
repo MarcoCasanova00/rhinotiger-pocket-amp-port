@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# ALGORITHM on MAIN: the kit. Forward, one part or a few of those heard another type as the next bar begins (the turns
+# of a bar together: three, three parts); back, the kit before; none before, nothing. Only the parts heard change.
+# COLD SIGNAL, 152: a bar is 1.58 s.
+listen
+wait 600
+expect page 0
+expect kits 0
+turn ALGO 1
+wait 50
+said KIT
+expect kits 0
+wait 1700
+expect kits 1
+expect kit_n >0
+expect kit_n <3
+said KIT
+shot kit.png
+# three turns within a bar: three parts, at the next bar
+turn ALGO 3
+wait 50
+expect kits 1
+wait 1700
+expect kits 2
+expect kit_n 3
+# back twice: the world's own types again
+turn ALGO -2
+wait 50
+said KIT BACK
+wait 1700
+expect kits 3
+expect kick_type 0
+expect bass_type 0
+expect perc_type 0
+expect line_type 0
+expect events_type 0
+expect atmos_type 0
+# back again: none before, nothing changes
+turn ALGO -1
+wait 50
+said NONE BEFORE
+wait 1700
+expect kits 3
+# only the percussion heard (the rest muted on ECHO's black keys): the kit changes it, however many turns
+tap FX
+wait 30
+tapkey b0
+tapkey b1
+tapkey b3
+tapkey b4
+tapkey b5
+wait 30
+expect muted 59
+tap HOME
+wait 30
+expect page 0
+turn ALGO 1
+wait 1700
+expect kits 4
+expect kit_parts 4
+expect perc_type >0
+turn ALGO 3
+wait 1700
+expect kits 5
+expect kit_parts 4
