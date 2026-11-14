@@ -119,19 +119,20 @@ static const key_sound_t KEY_SOUND[16] = {
     {"SPARK", EV_CHIRP, 2.0f, 0.0f, 0.0f, 0.04f, 0.02f, 7.13f, 8.0f, 2.0f, 0.0f, 0.0f, 0.0f, 0, 1.53f},  /* G5 */
 };
 
-/* the black keys' rhythms, F#3 to F#5: the ticks between throws (24 a beat), going round; a pitch step a throw */
-static const struct { uint8_t n; uint8_t iv[13]; int8_t step; } KEY_RHYTHM[11] = {
-    {1, {18}, 0},                                      /* F#3 dotted eighths */
-    {1, {12}, 0},                                      /* G#3 eighths */
-    {1, {8}, 0},                                       /* A#3 eighth triplets */
-    {3, {12, 6, 6}, 0},                                /* C#4 a gallop, x.xx */
-    {2, {3, 9}, 0},                                    /* D#4 pairs of 32nds, an eighth apart */
-    {1, {4}, 0},                                       /* F#4 sixteenth triplets */
-    {3, {18, 18, 12}, 0},                              /* G#4 3-3-2 over two beats */
-    {13, {6, 6, 6, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2}, 0},  /* A#4 faster and faster (two beats) */
-    {13, {2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 6, 6, 6}, 0},  /* C#5 slower and slower */
-    {1, {6}, 3},                                       /* D#5 sixteenths climbing (a minor third each, eight) */
-    {1, {6}, -3},                                      /* F#5 sixteenths falling */
+/* the black keys' rhythms, F#3 to F#5: the ticks between throws (24 a beat), going round, the first where the tick in
+ * the beat modulo grid is phase; a pitch step a throw */
+static const struct { uint8_t n; uint8_t iv[13]; uint8_t grid, phase; int8_t step; } KEY_RHYTHM[11] = {
+    {1, {18}, 6, 0, 0},                                      /* F#3 dotted eighths */
+    {1, {12}, 6, 0, 0},                                      /* G#3 eighths */
+    {1, {8}, 6, 0, 0},                                       /* A#3 eighth triplets */
+    {3, {12, 6, 6}, 6, 0, 0},                                /* C#4 a gallop, x.xx */
+    {1, {24}, 24, 12, 0},                                    /* D#4 the offbeat eighths (once a beat, on its half) */
+    {1, {4}, 6, 0, 0},                                       /* F#4 sixteenth triplets */
+    {3, {18, 18, 12}, 6, 0, 0},                              /* G#4 3-3-2 over two beats */
+    {13, {6, 6, 6, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2}, 6, 0, 0},  /* A#4 faster and faster (two beats) */
+    {13, {2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 6, 6, 6}, 6, 0, 0},  /* C#5 slower and slower */
+    {1, {6}, 6, 0, 3},                                       /* D#5 sixteenths climbing (a minor third each, eight) */
+    {1, {6}, 6, 0, -3},                                      /* F#5 sixteenths falling */
 };
 
 static int key_white(int k)            /* the white keys' index (k white) */
@@ -416,8 +417,8 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
             ev.run[k].wait = ev.run[k].step;
             ev.run[k].left--;
         }
-    if (ev.rk >= 0 && !(ev.rstart && t % 6u) && (ev.rstart || --ev.rwait == 0u)) {   /* a rhythm's beat (its first
-                                                                                   * on a sixteenth) */
+    if (ev.rk >= 0 && !(ev.rstart && t % KEY_RHYTHM[key_blacki(ev.rk)].grid != KEY_RHYTHM[key_blacki(ev.rk)].phase) &&
+        (ev.rstart || --ev.rwait == 0u)) {   /* a rhythm's beat (its first on its grid) */
         int b = key_blacki(ev.rk), stepped = (int)(ev.ri % 8u) * (int)KEY_RHYTHM[b].step;
         uint32_t whites = (ev.down | ev.pending) & ~KEY_BLACKS;   /* (held, or tapped since its last beat) */
         ev.rstart = 0;
