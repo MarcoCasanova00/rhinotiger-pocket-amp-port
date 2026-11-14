@@ -222,6 +222,7 @@ static struct {
     uint8_t pat;                       /* the bass's shape this phrase: 0 K-B-B-B, 1 a gallop (K-.-B-B), 3 an offbeat
                                         * (K-.-B-.); 2 triplets (a bar's: bass_pat()) */
     uint8_t trip_at;                   /* the phrase's bar of triplets (3 or 7; 255: none) */
+    uint8_t kit_pat, kit_bars;         /* the kit's shape over AUTO's (s.pat's values), its bars to go (0: none) */
     uint8_t kf, kf_bars;               /* the phrase's kick twist at its end (KF_*), BARE's bars (1 or 2) */
     /* the echo: ping-pong */
     float e_lp[2];
@@ -440,12 +441,16 @@ int ps_type_now(int part) { return part >= 0 && part < NPART ? s.type[part] : 0;
 void ps_colour(int c) { ps_type(PART_BASS, c & 3); }
 int ps_colour_now(void) { return s.type[PART_BASS]; }
 void ps_line_new(void) { line_new = 1; }
+static volatile int shape_want;        /* PS_SHAPE_* (AUTO: the world's) */
 
 /* the kit (ALGORITHM on MAIN): the turns of a bar taken together as the next bar begins (stopped: at once). Forward,
  * another type for one part or a few (one turn: one, now and then two; more turns: as many, up to three), chosen
  * among the parts heard now (not muted or out, the kick and the bass not in a break, the line not resting, the events
  * not before they come in), not the ones the last kit changed if others are there, each to a type other than its
- * own; each part takes it at its next note. Back, the kit before (up to eight). */
+ * own; each part takes it at its next note. The groove too, where GROOVE's ALGORITHM is AUTO and the bass heard in
+ * the groove: another shape for four bars over AUTO's, then AUTO's again (AUTO stays). Back, the kit before (up to
+ * eight; a shape over AUTO's gone). */
+#define KIT_GROOVE PS_KIT_GROOVE       /* the groove's bit in the kit's parts (after the parts') */
 #define KIT_HIST 8
 static struct {
     uint32_t fwd_seen, back_seen;
@@ -460,9 +465,9 @@ void ps_kit(int turns)
         kit_back += (uint32_t)-turns;
 }
 
-static uint32_t kit_heard(void)        /* the parts heard now, 1 << PART_* */
+static uint32_t kit_heard(void)        /* the parts heard now, 1 << PART_* (and the groove's, where AUTO's) */
 {
-    uint32_t m = (1u << NPART) - 1u, bar = s.tick / TPBAR;
+    uint32_t m = (1u << (NPART + 1)) - 1u, bar = s.tick / TPBAR;
     m &= ~(uint32_t)(fx.muted | fx.out);
     if (s.sec == SEC_BREAK)
         m &= ~(1u << PART_KICK | 1u << PART_BASS);
@@ -470,6 +475,8 @@ static uint32_t kit_heard(void)        /* the parts heard now, 1 << PART_* */
         m &= ~(1u << PART_LINE);
     if ((bar < 4u && !s.drops) || s.sec == SEC_BUILD)
         m &= ~(1u << PART_EVENTS);
+    if (shape_want != PS_SHAPE_AUTO || s.sec != SEC_MAIN || !(m >> PART_BASS & 1u))
+        m &= ~(1u << KIT_GROOVE);
     return m;
 }
 
@@ -480,10 +487,16 @@ static void kit_step(void)
     int n;
     kit.fwd_seen = kit_fwd;
     kit.back_seen = kit_back;
+    if (s.kit_bars)                    /* a bar of the groove's shape gone */
+        s.kit_bars--;
     if (net < 0) {                     /* back: the kits before, as far as they go */
         uint8_t was[NPART];
         for (p = 0; p < NPART; p++)
             was[p] = s.type[p];
+        if (s.kit_bars && kit.depth) {
+            s.kit_bars = 0;
+            pick |= 1u << KIT_GROOVE;
+        }
         for (; net < 0 && kit.depth; net++) {
             kit.top = (uint8_t)((kit.top + KIT_HIST - 1u) % KIT_HIST);
             kit.depth--;
@@ -499,16 +512,18 @@ static void kit_step(void)
         heard = kit_heard();
         if (!heard)
             heard = (1u << NPART) - 1u;
+        if (s.kit_bars)                /* (a shape still over AUTO's: not again) */
+            heard &= ~(1u << KIT_GROOVE);
         for (; n > 0; n--) {           /* one at a time: from the heard not changed last, else the heard */
             uint32_t from = heard & ~pick & ~(uint32_t)kit.last, c = 0, k;
             if (!from)
                 from = heard & ~pick;
             if (!from)
                 break;
-            for (p = 0; p < NPART; p++)
+            for (p = 0; p <= KIT_GROOVE; p++)
                 c += from >> p & 1u;
             k = rnd() % c;
-            for (p = 0; p < NPART; p++)
+            for (p = 0; p <= KIT_GROOVE; p++)
                 if ((from >> p & 1u) && k-- == 0u)
                     break;
             pick |= 1u << p;
@@ -521,6 +536,14 @@ static void kit_step(void)
         for (p = 0; p < NPART; p++)
             if (pick >> p & 1u)
                 s.type[p] = (uint8_t)((s.type[p] + 1u + rnd() % 3u) % PS_NTYPE);
+        if (pick >> KIT_GROOVE & 1u) { /* the groove: another shape than this bar's, four bars */
+            static const uint8_t SHAPE[3] = {0, 1, 3};
+            uint32_t now = (s.tick / TPBAR - s.origin) % 8u == s.trip_at ? 2u : s.pat, j = rnd() % 3u;
+            if (SHAPE[j] == now)
+                j = (j + 1u + rnd() % 2u) % 3u;
+            s.kit_pat = SHAPE[j];
+            s.kit_bars = 4;
+        }
         kit.last = (uint8_t)pick;
     }
     if (pick) {
@@ -528,9 +551,10 @@ static void kit_step(void)
         ps_ui.kits++;
     }
     ps_ui.kit_depth = kit.depth;
+    ps_ui.kit_shape = (int8_t)(s.kit_bars ? (s.kit_pat == 1u ? PS_SHAPE_GALLOP : s.kit_pat == 3u ? PS_SHAPE_OFF
+                                                                                : PS_SHAPE_ROLL) : PS_SHAPE_AUTO);
 }
 static volatile int build_want;        /* PS_BUILD_* (AUTO: the world leans) */
-static volatile int shape_want;        /* PS_SHAPE_* (AUTO: the world's) */
 static volatile int echo_kind;         /* PS_ECHO_* */
 void ps_bass_shape(int k) { shape_want = k >= 0 && k < PS_NSHAPE ? k : PS_SHAPE_AUTO; }
 int ps_bass_shape_now(void) { return shape_want; }
@@ -616,7 +640,10 @@ static uint32_t build_len(void);
 static uint32_t roll_every(uint32_t pb);
 static int build_fake(void);
 static int build_grooves(void);
-static uint32_t bass_pat(uint32_t rb) { return rb % 8u == s.trip_at ? 2u : s.pat; }   /* the shape of bar rb */
+static uint32_t bass_pat(uint32_t rb)  /* the shape of bar rb (the kit's over AUTO's while it lasts) */
+{
+    return s.kit_bars ? s.kit_pat : rb % 8u == s.trip_at ? 2u : s.pat;
+}
 
 /* the kick: four to the bar, and now and then, as a phrase ends (Fills: how often), a twist: DOUBLE (a kick on the
  * bar's last sixteenth too, into the next bar's: K . . K | K), ROLL (the last beat's sixteenths all the kick's, the
@@ -1002,6 +1029,7 @@ static void enter(int sec, uint32_t len)
     s.sec = (uint8_t)sec;
     s.sec_bar = 0;
     s.sec_len = len;
+    s.kit_bars = 0;                    /* (the kit's shape over AUTO's: the groove's only) */
 }
 
 static void enter_build(const world_t *w)   /* a build: BUILD's bars, its kind (AUTO: by the world's leaning, not the
@@ -1117,6 +1145,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         static const uint8_t PAT[PS_NSHAPE] = {0, 0, 1, 3};
         s.pat = PAT[shape_want & 3];
         s.trip_at = 255;
+        s.kit_bars = 0;
     }
     ps_ui.section = (int8_t)s.sec;
     ps_ui.sec_bar = (uint8_t)(groove ? rb % 8u : s.sec_bar);

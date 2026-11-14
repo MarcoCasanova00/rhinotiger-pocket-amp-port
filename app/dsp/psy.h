@@ -106,7 +106,10 @@ int ps_ntypes(int part);
 const char *ps_type_name(int part, int t);
 void ps_line_new(void);                /* the line's phrase drawn anew as the next bar begins */
 /* the kit (ALGORITHM on MAIN): turns forward, another type for one part or a few of those heard, as the next bar
- * begins (the turns of a bar together: more, more parts, up to three); back, the kit before (up to eight) */
+ * begins (the turns of a bar together: more, more parts, up to three); the groove one of them where GROOVE's ALGORITHM
+ * is AUTO (another shape for four bars, AUTO staying); back, the kit before (up to eight). ps_ui.kit_parts: bit
+ * PS_KIT_GROOVE the groove */
+#define PS_KIT_GROOVE 6
 void ps_kit(int turns);
 void ps_octave(int o);                 /* the keys' events an octave or two up or down (-1..2) */
 
@@ -157,6 +160,7 @@ typedef struct {
     volatile uint8_t kits;             /* kits taken (wraps; back too) */
     volatile uint8_t kit_parts;        /* the parts the latest changed (1 << PART_*) */
     volatile uint8_t kit_depth;        /* kits to go back to */
+    volatile int8_t kit_shape;         /* the kit's shape over AUTO's now (PS_SHAPE_*; AUTO: none) */
 } ps_ui_t;
 extern ps_ui_t ps_ui;
 #define PS_TPB 24u

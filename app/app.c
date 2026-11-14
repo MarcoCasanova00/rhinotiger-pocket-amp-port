@@ -30,7 +30,8 @@
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
  * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on PHASE the
  * builds' kind, on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
- * those heard another type as the next bar begins, more turns more parts; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
+ * those heard another type as the next bar begins, more turns more parts, and the groove (GROOVE on AUTO) another
+ * shape for four bars, AUTO staying; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
  * the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the loop gone; lit while one
  * plays).
  * SAVE and ARP, side by side, the sections (but on GLOBAL, where SAVE keeps the settings): SAVE down, a break from
@@ -849,14 +850,15 @@ static void marks_update(void)
         char t[32];
         uint32_t k = 0, p, mask = ps_ui.kit_parts;
         ui.kits_seen = ps_ui.kits;
-        for (p = 0; p < NPART; p++)
+        for (p = 0; p <= PS_KIT_GROOVE; p++)
             if (mask >> p & 1u) {
                 if (k && k + 1 < sizeof t)
                     t[k++] = ' ';
-                k += str_put(t + k, sizeof t - k, PART_NAME[p]);
+                k += str_put(t + k, sizeof t - k, p == PS_KIT_GROOVE ? "GROOVE" : PART_NAME[p]);
                 if (k + 1 < sizeof t)
                     t[k++] = ' ';
-                k += str_put(t + k, sizeof t - k, ps_type_name((int)p, ps_type_now((int)p)));
+                k += str_put(t + k, sizeof t - k, p == PS_KIT_GROOVE ? ps_bass_shape_name(ps_ui.kit_shape)
+                                                                     : ps_type_name((int)p, ps_type_now((int)p)));
             }
         t[k < sizeof t ? k : sizeof t - 1] = 0;
         app_say("KIT", t);
@@ -989,17 +991,22 @@ static void draw_rule(void)
         xs = cv_text(xs, 0, &FONT_XS, ps_build_name(k), C_HI) + 6;
         if (k == PS_BUILD_AUTO && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0)
             xs = cv_text(xs - 2, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_GRAY) + 6;
-    } else if (ui.page == PG_MAIN) {   /* the kit: the parts the latest changed, each in its hue */
+    } else if (ui.page == PG_MAIN) {   /* the kit: the parts the latest changed, each in its hue, as many as fit */
         uint32_t p, mask = ps_ui.kit_parts;
         xs = cv_text(6, 0, &FONT_XS, "ALGO: KIT", C_AMB) + 6;
-        for (p = 0; p < NPART; p++)
-            if (ps_ui.kits && (mask >> p & 1u))
-                xs = cv_text(xs, 0, &FONT_XS, ps_type_name((int)p, ps_type_now((int)p)), part_txt(PART_HUE[p], 255)) + 4;
+        for (p = 0; p <= PS_KIT_GROOVE; p++) {
+            const char *nm = p == PS_KIT_GROOVE ? (ps_ui.kit_shape != PS_SHAPE_AUTO ? ps_bass_shape_name(ps_ui.kit_shape) : 0)
+                           : ps_ui.kits && (mask >> p & 1u) ? ps_type_name((int)p, ps_type_now((int)p)) : 0;
+            if (nm && xs + text_w(&FONT_XS, nm) <= xt - 8)   /* (the groove's: while it lasts) */
+                xs = cv_text(xs, 0, &FONT_XS, nm, part_txt(PART_HUE[p == PS_KIT_GROOVE ? PART_BASS : p], 255)) + 4;
+        }
         xs += 2;
     } else if (ui.page == PG_GROOVE || ui.page == PG_ECHO) {   /* the bass's shape; the echo's kind */
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
         xs = cv_text(xs, 0, &FONT_XS, ui.page == PG_GROOVE ? ps_bass_shape_name(ps_bass_shape_now())
                                                            : ps_echo_kind_name(ps_echo_kind_now()), C_HI) + 6;
+        if (ui.page == PG_GROOVE && ps_ui.kit_shape != PS_SHAPE_AUTO)   /* AUTO, the kit's shape over it a while */
+            xs = cv_text(xs - 2, 0, &FONT_XS, ps_bass_shape_name(ps_ui.kit_shape), C_GRAY) + 6;
     } else if (ui.page >= PG_KICK && ui.page <= PG_ATMOS && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
         int part = algo_part();
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
@@ -1181,6 +1188,8 @@ int app_expect(const char *what, int *got)
         *got = ps_ui.kits;
     else if (!strcmp(what, "kit_parts"))     /* the parts the latest changed, 1 << PART_* */
         *got = ps_ui.kit_parts;
+    else if (!strcmp(what, "kit_shape"))     /* the kit's shape over AUTO's now (0: none) */
+        *got = ps_ui.kit_shape;
     else if (!strcmp(what, "kit_n")) {       /* how many parts the latest changed */
         uint32_t m = ps_ui.kit_parts;
         *got = 0;

@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The kit and the groove: where GROOVE's ALGORITHM is AUTO, the kit may give the bass another shape for four bars,
+# AUTO staying; held, the groove is not the kit's. Everything muted but the bass, so the kit's choice is the bass's
+# type and the groove. COLD SIGNAL, 152: a bar is 1.58 s.
+listen
+wait 600
+tap FX
+wait 30
+tapkey b0
+tapkey b2
+tapkey b3
+tapkey b4
+tapkey b5
+wait 30
+expect muted 61
+tap HOME
+wait 30
+expect page 0
+expect shape 0
+# two turns: the bass's type and the groove, at the next bar
+turn ALGO 2
+wait 1700
+expect kits 1
+expect kit_parts 66
+expect kit_shape >0
+expect shape 0
+said GROOVE
+shot kit-groove.png
+# GROOVE's rule: AUTO, the kit's shape beside it
+tap HOME
+wait 30
+expect page 1
+shot kit-groove-page.png
+# four bars on, AUTO's own again (and AUTO it stayed)
+wait 7000
+expect kit_shape 0
+expect shape 0
+# GROOVE held (GALLOP): the groove is not the kit's, only the bass's type
+turn ALGO 2
+wait 100
+expect shape 2
+tap HOME
+wait 30
+expect page 0
+turn ALGO 2
+wait 1700
+expect kits 2
+expect kit_parts 2
+expect kit_shape 0
