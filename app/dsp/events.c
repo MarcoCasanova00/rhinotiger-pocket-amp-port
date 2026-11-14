@@ -127,7 +127,7 @@ static const struct { uint8_t n; uint8_t iv[13]; int8_t step; } KEY_RHYTHM[11] =
     {3, {12, 6, 6}, 0},                                /* C#4 a gallop, x.xx */
     {2, {3, 9}, 0},                                    /* D#4 pairs of 32nds, an eighth apart */
     {1, {4}, 0},                                       /* F#4 sixteenth triplets */
-    {1, {3}, 0},                                       /* G#4 32nds */
+    {3, {18, 18, 12}, 0},                              /* G#4 3-3-2 over two beats */
     {13, {6, 6, 6, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2}, 0},  /* A#4 faster and faster (two beats) */
     {13, {2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 6, 6, 6}, 0},  /* C#5 slower and slower */
     {1, {6}, 3},                                       /* D#5 sixteenths climbing (a minor third each, eight) */
