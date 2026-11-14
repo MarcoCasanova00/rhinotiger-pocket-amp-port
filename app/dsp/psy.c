@@ -222,6 +222,7 @@ static struct {
     uint8_t pat;                       /* the bass's shape this phrase: 0 K-B-B-B, 1 a gallop (K-.-B-B), 3 an offbeat
                                         * (K-.-B-.); 2 triplets (a bar's: bass_pat()) */
     uint8_t trip_at;                   /* the phrase's bar of triplets (3 or 7; 255: none) */
+    uint8_t kf, kf_bars;               /* the phrase's kick twist at its end (KF_*), BARE's bars (1 or 2) */
     /* the echo: ping-pong */
     float e_lp[2];
     float lim;                         /* the master limiter's gain */
@@ -486,6 +487,29 @@ static int build_fake(void);
 static int build_grooves(void);
 static uint32_t bass_pat(uint32_t rb) { return rb % 8u == s.trip_at ? 2u : s.pat; }   /* the shape of bar rb */
 
+/* the kick: four to the bar, and now and then, as a phrase ends (Fills: how often), a twist: DOUBLE (a kick on the
+ * bar's last sixteenth too, into the next bar's: K . . K | K), ROLL (the last beat's sixteenths all the kick's, the
+ * bass resting), BARE (its last bar or two without the kick, the bass alone), HALF (its last bar the kick on 1 and 3
+ * only). Every 32nd bar, with Fills, its last beat without (as it was). */
+enum { KF_NONE, KF_DOUBLE, KF_ROLL, KF_BARE, KF_HALF, KF_N };
+static uint32_t kick_fill(uint32_t rb)  /* the twist acting in bar rb (KF_NONE: none) */
+{
+    if (s.sec != SEC_MAIN || s.kf == KF_NONE)
+        return KF_NONE;
+    if (s.kf == KF_BARE)
+        return rb % 8u >= 8u - s.kf_bars ? KF_BARE : KF_NONE;
+    return rb % 8u == 7u ? s.kf : KF_NONE;
+}
+static int kick_at(uint32_t rb, uint32_t beat, uint32_t t)   /* the kick strikes at tick t of beat */
+{
+    uint32_t kf = kick_fill(rb);
+    if (beat == 3u && ((kf == KF_DOUBLE && t == 18u) || (kf == KF_ROLL && t % 6u == 0u)))
+        return 1;
+    if (t)
+        return 0;
+    return !(par[P_FILLS] && rb % 32u == 31u && beat == 3u) && kf != KF_BARE && !(kf == KF_HALF && (beat & 1u));
+}
+
 /* a build's roll in a lane: n steps (16, or TRIPLET's 24), its every (roll_every); louder as it goes; the breath
  * empty */
 static int lane_roll(uint8_t out[24], uint32_t lo)
@@ -535,13 +559,11 @@ int ps_lane(int lane, uint8_t out[24])
             break;
         }
         if (groove || gro)
-            for (i = 0; i < 16u; i += 4u)
-                if (!build_breath(i / 4u))
+            for (i = 0; i < 16u; i++)
+                if (kick_at(rb, i / 4u, (i % 4u) * 6u) && !build_breath(i / 4u))
                     out[i] = 3;
         if (fake)
             out[0] = 3;
-        if (groove && par[P_FILLS] && rb % 32u == 31u)
-            out[12] = 0;
         break;
     case LANE_BASS:
         if (!groove && !gro && !fake)
@@ -559,6 +581,10 @@ int ps_lane(int lane, uint8_t out[24])
             if ((fill_now(rb, 3) && b == 3u) || build_breath(b) || !filter_in(PART_BASS, b) || (fake && b))
                 out[i] = 0;           /* (a fill's beat, the breath, not in yet; FAKE's: its first beat only) */
         }
+        if (kick_fill(rb) == KF_ROLL || kick_fill(rb) == KF_DOUBLE)   /* the last beat: the kick's (DOUBLE: K-B-B-K) */
+            for (i = (uint32_t)n * 3u / 4u; i < (uint32_t)n; i++)
+                out[i] = kick_fill(rb) == KF_DOUBLE && !fill_now(rb, 3) && (n == 16 ? i == 13u || i == 14u
+                                                                                    : i == 19u || i == 21u) ? 2 : 0;
         break;
     case LANE_PERC:
         if (fake) {                    /* the false drop: a beat, then the clap's sixteenths */
@@ -906,6 +932,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
 {
     uint32_t t = s.tick % TPB, beat = s.tick / TPB % 4u, bar = s.tick / TPBAR, rb;
     int groove, on, bass_rests, kick_rests, bass;
+    uint32_t kf;
     if (s.tick % TPBAR == 0u)
         section_bar(w, bar);
     {   /* STUTTER: the music repeated, a quarter, then an eighth, a sixteenth, a 32nd of it (the buffer's, fx.c) */
@@ -923,8 +950,11 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     groove = s.sec == SEC_MAIN;
     on = groove || (build_grooves() && !build_breath(beat)) || (build_fake() && beat == 0u);   /* the kick and the bass */
     bass_rests = !on || fill_now(rb, beat) || s.fill_beat || (!groove && !filter_in(PART_BASS, beat));
-    kick_rests = !on || (par[P_FILLS] && rb % 32u == 31u && beat == 3u);   /* every 32nd bar's: the kick too */
-    perc_step(w, t, beat, bar, rb, groove && bass_rests);
+    kick_rests = !on;
+    kf = beat == 3u ? kick_fill(rb) : KF_NONE;   /* a twist on the last beat: DOUBLE, ROLL */
+    perc_step(w, t, beat, bar, rb, groove && bass_rests && kf != KF_ROLL);   /* (ROLL: the kick's the fill) */
+    if (kf == KF_ROLL)
+        bass_rests = 1;
     ev_step(w, t, rb, (uint32_t)((s.tick - s.origin * TPBAR) / 6u), (bar < 4u && !s.drops) || s.sec == SEC_BUILD);
     ln_step(w, t, bar, rb, (uint32_t)((s.tick - s.origin * TPBAR) / 6u));
     if (t == 0u && beat == 0u && rb % 8u == 0u && groove) {   /* a phrase: the bass's shape, now and then another */
@@ -932,6 +962,15 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         s.pat = (uint8_t)(rb == 0u || r >= (uint32_t)(w->gallop + w->off) ? 0 : r < w->gallop ? 1 : 3);
         r = rnd() % 100u;              /* a bar of triplets: the half's end, the 4th bar or the 8th */
         s.trip_at = (uint8_t)(rb != 0u && r < w->trip ? (r & 1u ? 3u : 7u) : 255u);
+        s.kf = KF_NONE;                /* the kick's twist as it ends (not in the intro, nor where the 32nd bar's is) */
+        if (bar >= 16u && rb != 0u && par[P_FILLS] && rb % 32u != 24u) {
+            static const float F[5] = {0.0f, 0.4f, 0.7f, 1.0f, 1.4f};
+            float f = F[clampi(par[P_FILLS], 0, 4)], half = w->bpm >= 168.0f ? 40.0f : 20.0f;
+            float u = (float)(rnd() % 1000u);
+            s.kf = (uint8_t)(u < 80.0f * f ? KF_DOUBLE : u < 130.0f * f ? KF_ROLL : u < 160.0f * f ? KF_BARE
+                             : u < (160.0f + half) * f ? KF_HALF : KF_NONE);
+            s.kf_bars = (uint8_t)(1u + (rnd() & 1u));
+        }
     }
     ps_ui.section = (int8_t)s.sec;
     ps_ui.sec_bar = (uint8_t)(groove ? rb % 8u : s.sec_bar);
@@ -940,8 +979,8 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     ps_ui.cued = (int8_t)(drop_n != s.drop_seen     ? PS_CUE_DROP
                           : build_n != s.build_seen ? PS_CUE_BUILD
                           : cue_n != s.cue_seen && s.sec == SEC_MAIN ? PS_CUE_BREAK : 0);
-    if (t == 0u) {
-        if (!kick_rests) {
+    if (t == 0u || (t % 6u == 0u && kf != KF_NONE && kick_at(rb, beat, t))) {   /* (a twist's: its tick the kick's) */
+        if (!kick_rests && kick_at(rb, beat, t)) {
             s.k_t = 0.0f;
             s.k_ph = 0.0f;
             ps_ui.hits[HIT_KICK]++;
@@ -949,7 +988,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         return;
     }
     {
-        uint32_t pat = bass_pat(rb), roll = pat == 2u ? 4u : 6u;   /* triplets: K-b-b-b-b-b; a gallop: K-.-B-B; an
+        uint32_t pat = kf == KF_DOUBLE ? 0u : bass_pat(rb), roll = pat == 2u ? 4u : 6u;   /* (DOUBLE: K-B-B-K) */   /* triplets: K-b-b-b-b-b; a gallop: K-.-B-B; an
                                                                     * offbeat: K-.-B-. */
         uint32_t span = pat == 3u ? 12u : roll;   /* the room a note has (the offbeat's: to the next kick) */
         bass = t % roll == 0u && !(pat == 1u && t == 6u) && !(pat == 3u && t != 12u);
@@ -1324,6 +1363,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.drops = 0;                   /* (the intro again: the events quiet its first bars) */
         s.out = s.pat = s.fill_beat = 0;
         s.trip_at = 255;
+        s.kf = KF_NONE;
         ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */
         take.n = 0;                    /* (the keys' loop gone) */
     }

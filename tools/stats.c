@@ -2,10 +2,10 @@
  * Copyright (C) 2026 hacha */
 /* The structure, counted: each world played on its own (no hands) for a while, bar by bar: how long the grooves run
  * between breaks, how long the breaks are, how often the bass's phrases gallop or sit on the offbeat (the rest
- * K-B-B-B) or have a bar of triplets, the builds' kinds, how much of the time the line plays, a part sits out, and the
- * events and the line's notes a bar. The engine at its defaults, Drift moved by an argument. Usage: stats [minutes]
- * [drift (-1: its default)] [world (-1: all)]. Built (from the repository's top): cc -O2 -ffp-contract=off
- * -Ibase/include -o build/stats tools/stats.c -lm */
+ * K-B-B-B) or have a bar of triplets, the builds' kinds, the kick's twists, how much of the time the line plays, a
+ * part sits out, and the events and the line's notes a bar. The engine at its defaults, Drift moved by an argument.
+ * Usage: stats [minutes] [drift (-1: its default)] [world (-1: all)]. Built (from the repository's top): cc -O2
+ * -ffp-contract=off -Ibase/include -o build/stats tools/stats.c -lm */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -27,6 +27,7 @@ int main(int argc, char **argv)
                  tri = 0, off = 0, ln_on = 0, sit = 0, ev0, lh0, grv_bars_main = 0, drops = 0;
         uint8_t d_prev;
         uint32_t bk[PS_NBUILD] = {0};      /* the builds, by kind (AUTO's choosing) */
+        uint32_t kfc[KF_N] = {0};          /* the phrases' kick twists */
         uint32_t gmin = 1u << 30, gmax = 0, bmin = 1u << 30, bmax = 0;
         int sec_prev = SEC_MAIN;
         float lim_min = 1.0f;
@@ -70,6 +71,7 @@ int main(int argc, char **argv)
                     gal += s.pat == 1u;
                     tri += s.trip_at != 255u;
                     off += s.pat == 3u;
+                    kfc[s.kf % KF_N]++;
                     ln_on += ln.playing;
                     sit += s.out != 0u;
                 }
@@ -102,6 +104,8 @@ int main(int argc, char **argv)
             for (k = PS_BUILD_ROLL; k < PS_NBUILD; k++)
                 printf(" %s %u", ps_build_name(k), bk[k]);
             printf("\n");
+            printf("%-16s the kick's twists, of %u phrases: DOUBLE %u, ROLL %u, BARE %u, HALF %u\n", "", phr,
+                   kfc[KF_DOUBLE], kfc[KF_ROLL], kfc[KF_BARE], kfc[KF_HALF]);
         }
         printf("%-16s the limiter: over 1 dB %.1f%% of the time, at most %.1f dB\n", "", 100.0 * lim_n * 256.0 / samples,
                -20.0 * log10f(lim_min));
