@@ -96,8 +96,13 @@ int main(int argc, char **argv)
                phr ? 100.0 * ln_on / phr : 0.0,
                phr ? 100.0 * sit / phr : 0.0, (double)(ps_ui.hits[HIT_EVENT] - ev0) / bars,
                (double)(ps_ui.hits[HIT_LINE] - lh0) / bars);
-        printf("%-16s builds: ROLL %u, KICK %u, FILTER %u, TRIPLET %u\n", "", bk[PS_BUILD_ROLL], bk[PS_BUILD_KICK],
-               bk[PS_BUILD_FILTER], bk[PS_BUILD_TRIP]);
+        {
+            int k;
+            printf("%-16s builds:", "");
+            for (k = PS_BUILD_ROLL; k < PS_NBUILD; k++)
+                printf(" %s %u", ps_build_name(k), bk[k]);
+            printf("\n");
+        }
         printf("%-16s the limiter: over 1 dB %.1f%% of the time, at most %.1f dB\n", "", 100.0 * lim_n * 256.0 / samples,
                -20.0 * log10f(lim_min));
         (void)bmin; (void)bmax; (void)grv_bars_main;

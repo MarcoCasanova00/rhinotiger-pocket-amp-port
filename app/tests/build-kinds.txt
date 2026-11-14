@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The builds' kinds: ALGORITHM on the PHASE page (SEQ) chooses ROLL, KICK, FILTER, TRIPLET (or AUTO); ARP from the
-# groove, a build each (4 bars), then the drop. Recorded (build/host/build-kinds.wav) to listen to, a look at each.
-# COLD SIGNAL, 152: a bar is about 1.58 s.
+# The builds' kinds: ALGORITHM on the PHASE page (SEQ) chooses ROLL, KICK, FILTER, TRIPLET, STUTTER, POLY, SINK, FAKE
+# (or AUTO); ARP from the groove, a build each (4 bars; FAKE 5, its false drop's), then the drop. Recorded
+# (build/host/build-kinds.wav) to listen to, a look at each. COLD SIGNAL, 152: a bar is about 1.58 s.
 jack in
 wait 1500
 tap SEQ
@@ -61,13 +61,61 @@ shot build-triplet.png
 wait 3400
 expect section 0
 wait 3200
+turn ALGO 1
+wait 30
+expect buildset 5
+tap ARP
+wait 1700
+expect section 2
+expect build 5
+wait 3200
+shot build-stutter.png
+wait 3400
+expect section 0
+wait 3200
+turn ALGO 1
+wait 30
+expect buildset 6
+tap ARP
+wait 1700
+expect section 2
+expect build 6
+wait 3200
+shot build-poly.png
+wait 3400
+expect section 0
+wait 3200
+turn ALGO 1
+wait 30
+expect buildset 7
+tap ARP
+wait 1700
+expect section 2
+expect build 7
+wait 3200
+shot build-sink.png
+wait 3400
+expect section 0
+wait 3200
+turn ALGO 1
+wait 30
+expect buildset 8
+tap ARP
+wait 1700
+expect section 2
+expect build 8
+wait 3200
+shot build-fake.png
+wait 4900
+expect section 0
+wait 3200
 wavstop
-# back round to AUTO: a build its own (not TRIPLET, the last, again)
+# back round to AUTO: a build its own (not FAKE, the last, again)
 turn ALGO 1
 wait 30
 expect buildset 0
 tap ARP
 wait 1700
 expect section 2
-expect build <4
+expect build <8
 shot build-auto.png

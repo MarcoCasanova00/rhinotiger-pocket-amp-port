@@ -20,7 +20,8 @@
  * buffer keeps it (no more is written, and its count stands: what is behind it stays the music as it went). */
 
 enum { FX_R2, FX_R4, FX_R8T, FX_R8, FX_LOW, FX_HIGH, FX_FLANGE, FX_BAND,
-       FX_THROW, FX_DUB, FX_FREEZE, FX_REVERSE, FX_TAPE, FX_RISER, FX_STAIRS, FX_GATE, FX_N };
+       FX_THROW, FX_DUB, FX_FREEZE, FX_REVERSE, FX_TAPE, FX_RISER, FX_STAIRS, FX_GATE, FX_N,
+       FX_AUTO = FX_N };               /* (the buffer's own: a STUTTER build's repeat, auto_slice; under a key's) */
 static const char *const FX_NAME[FX_N] = {"1/2", "1/4", "1/8T", "1/8", "LOW", "HIGH", "FLANGE", "BAND",
                                           "THROW", "DUB", "FREEZE", "REVERSE", "TAPE", "RISER", "STAIRS", "GATE"};
 
@@ -41,6 +42,7 @@ typedef struct {                       /* a buffer's effect playing */
     uint32_t p0;                       /* where it began (a frame count) */
     float el;                          /* frames since it began */
     float tape_pos;                    /* TAPE: frames read since it began */
+    float slice;                       /* FX_AUTO: its slice (ticks) */
 } bufv_t;
 
 static struct {
@@ -61,6 +63,7 @@ static struct {
     uint8_t muted;                     /* the parts muted (PART_* bits) */
     uint8_t out;                       /* the parts out while a key is held */
     uint8_t fill_req;                  /* a fill cued for the next beat */
+    uint8_t auto_slice;                /* a STUTTER build's repeat, ticks (0: none): psy.c sets it a tick */
 } fx = {.buf_want = -1, .cur = {.id = -1}, .old = {.id = -1}};
 
 /* the read: frame position p (a count, fractional), channel ch, between two samples */
@@ -98,21 +101,32 @@ static void fx_cmd(int id, int on)     /* (render: from the command queue) */
     }
 }
 
+static void fx_start(int id, float slice)   /* a buffer's effect from here (another playing fades out beneath it) */
+{
+    if (fx.cur.id >= 0) {
+        fx.old = fx.cur;
+        fx.xf = 1.0f;
+    }
+    fx.cur.id = (int8_t)id;
+    fx.cur.p0 = fx.cap_w;
+    fx.cur.el = 0.0f;
+    fx.cur.tape_pos = 0.0f;
+    fx.cur.slice = slice;
+    fx.buf_on = 1;
+    fx.cap_hold = 0;                   /* the new one's first time through is written as it plays */
+}
+
 static void fx_sixteenth(int beat)     /* a sixteenth begins (beat: a beat too): a pressed buffer's effect starts here */
 {
     fx.six_el = 0.0f;
-    if (fx.buf_want >= 0 && (fx.buf_want != fx.cur.id || !fx.buf_on) && (beat || fx.buf_want > FX_R4)) {
-        if (fx.cur.id >= 0) {          /* another playing: it fades out beneath the new one */
-            fx.old = fx.cur;
-            fx.xf = 1.0f;
-        }
-        fx.cur.id = fx.buf_want;
-        fx.cur.p0 = fx.cap_w;
-        fx.cur.el = 0.0f;
-        fx.cur.tape_pos = 0.0f;
-        fx.buf_on = 1;
-        fx.cap_hold = 0;               /* the new one's first time through is written as it plays */
-    }
+    if (fx.buf_want >= 0) {            /* a key's */
+        if ((fx.buf_want != fx.cur.id || !fx.buf_on) && (beat || fx.buf_want > FX_R4))
+            fx_start(fx.buf_want, 0.0f);
+    } else if (fx.auto_slice) {        /* a STUTTER build's: anew as its slice shortens (a quarter's from a beat) */
+        if ((fx.cur.id != FX_AUTO || !fx.buf_on || fx.cur.slice != (float)fx.auto_slice) && (beat || fx.auto_slice < 24u))
+            fx_start(FX_AUTO, (float)fx.auto_slice);
+    } else if (fx.cur.id == FX_AUTO)   /* its breath: back to the music */
+        fx.buf_on = 0;
 }
 
 /* a buffer's effect, a frame: its read into l and r; *hold set when it replays what the buffer took */
@@ -122,8 +136,8 @@ static void fx_buffer(bufv_t *v, float tick_len, float *l, float *r, int *hold)
     int id = v->id;
     float len, u, p, w = 1.0f, base = (float)(v->p0 % CAP_N);
     *hold = 0;
-    if (id <= FX_R8 || id == FX_STAIRS) {
-        len = fm_minf(tick_len * (id == FX_STAIRS ? 6.0f : SLICE[id]), (float)(CAP_N - 256u));
+    if (id <= FX_R8 || id == FX_STAIRS || id == FX_AUTO) {
+        len = fm_minf(tick_len * (id == FX_STAIRS ? 6.0f : id == FX_AUTO ? v->slice : SLICE[id]), (float)(CAP_N - 256u));
         u = v->el - len * fm_floorf(v->el / len);
         w = fm_minf(u, len - u);       /* the slice's edges, softened */
         if (id == FX_STAIRS) {         /* each time round a whole tone higher, up to an octave and a fifth */
