@@ -414,12 +414,20 @@ static void key_throw(int k, int stepped)   /* key k's sound now (its cycle on; 
     float bite = 0.5f * (float)ev.vel[k] / 127.0f + (float)ev.press[k] / 127.0f;
     r.note = (int8_t)clampi(r.note + stepped, 24, 108);
     r.cyc = (uint8_t)(1u + ev.kcyc[k]++ % 8u);
-    ev_start(&r, bite, 1.0f);
-    if (take.rec && take.n < TAKE_N) {   /* into the keys' loop, where it fell */
-        take.e[take.n].r = r;
-        take.e[take.n].pos = (uint8_t)(s.tick % TAKE_TICKS);
-        take.e[take.n].bite = (uint8_t)(bite * 100.0f);
-        take.n++;
+    {   /* the keys' loop: the same sound on the same tick already in it (a key held round again): it plays, once */
+        uint32_t pos = s.tick % TAKE_TICKS, i;
+        for (i = 0; i < take.n; i++)
+            if (take.e[i].pos == pos && take.e[i].r.snd == r.snd && take.e[i].r.note == r.note)
+                break;
+        if (i == take.n) {
+            ev_start(&r, bite, 1.0f);
+            if (take.rec && take.n < TAKE_N) {   /* into the keys' loop, where it fell */
+                take.e[take.n].r = r;
+                take.e[take.n].pos = (uint8_t)pos;
+                take.e[take.n].bite = (uint8_t)(bite * 100.0f);
+                take.n++;
+            }
+        }
     }
     ev.last_type = EV_NTYPE + r.snd - 1;   /* (the screen names it: the key's sound) */
     ps_ui.thrown_type = (int8_t)ev.last_type;
