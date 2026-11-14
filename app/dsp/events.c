@@ -8,12 +8,11 @@
  * keeps a 4-bar loop of slots on offbeat sixteenths, resolved into recipes as they come round (below, ev_resolve),
  * and Drift redraws a few of them as a phrase (8 bars) begins.
  *
- * The keys: the white keys are sounds, the black keys rhythms. Each white key its own sound (one of the six types in
- * one of three flavours, no two neighbours alike; the register leans the family: low dive and growl, middle zap and
- * gurgle, high chirp and laser), thrown on the next sixteenth; held, again each sixteenth, the sound turning a little
- * as it repeats (a cycle of eight: its depth, its glide, its place left and right). A black key is a rhythm (KEY_RHYTHM):
- * held, the white keys held with it throw on its beats instead; alone, it plays its rhythm in the sound of the white key
- * below it. Pressed harder, a throw bites more. What is thrown is remembered: the generator takes it up later.
+ * The keys: the white keys are sounds, the black keys rhythms. Each white key its own sound (KEY_SOUND, sixteen, low
+ * to high), thrown on the next sixteenth; held, again each sixteenth, the sound turning a little as it repeats (a cycle
+ * of eight: its depth, its glide, its place left and right). A black key chooses a rhythm (KEY_RHYTHM), one at a time,
+ * lit: the white keys then throw on its beats instead; the lit key again, the sixteenths. Pressed harder, a throw bites
+ * more. What is thrown is remembered: the generator takes it up later.
  *
  * Their types (ALGORITHM on the EVENTS page), over every recipe, taken as a voice begins:
  *   ALIVE   the recipes as they are
@@ -34,7 +33,7 @@ typedef struct {
     uint8_t type, run;
     int8_t note;                       /* MIDI note */
     uint8_t var;                       /* a small, fixed variation (pan, length) */
-    uint8_t flav;                      /* the keys' flavour of the type (0 as it is, 1 sharper, 2 off and wobbling) */
+    uint8_t snd;                       /* a white key's sound (1..16, KEY_SOUND; 0: the type's) */
     uint8_t cyc;                       /* a held key's repeat (1..: its sound turning; 0: none) */
 } recipe_t;
 
@@ -77,11 +76,10 @@ static struct {
     } run[4];
     /* the keys: thrown on the next sixteenth; held, again each sixteenth */
     uint32_t held, pending, down;
-    int8_t rk;                         /* the black key whose rhythm leads (-1: none) */
+    int8_t rk;                         /* the black key whose rhythm is chosen, lit (-1: none) */
     uint8_t rstart;                    /* its first beat waits for a sixteenth */
     uint8_t rwait;                     /* ticks to its next beat */
     uint32_t ri;                       /* its beats so far */
-    uint32_t rtick;                    /* ticks since its first */
     uint8_t kcyc[27];                  /* each key's repeats (its sound's cycle) */
     volatile uint8_t press[27];        /* each key's pressure (the UI writes it directly: not through the queue) */
     uint8_t vel[27];
@@ -91,11 +89,34 @@ static struct {
 
 static int key_black(int k) { int pc = (k + 5) % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
 
-/* the white keys' sounds, F3 to G5: type and flavour, no two neighbours alike */
-static const uint8_t KEY_SOUND[16][2] = {
-    {EV_DIVE, 0}, {EV_GROWL, 0}, {EV_DIVE, 1}, {EV_GROWL, 1}, {EV_GURGLE, 0},                 /* F3 G3 A3 B3 C4 */
-    {EV_ZAP, 0}, {EV_GURGLE, 1}, {EV_ZAP, 1}, {EV_GROWL, 2}, {EV_ZAP, 2}, {EV_GURGLE, 2},    /* D4 E4 F4 G4 A4 B4 */
-    {EV_CHIRP, 0}, {EV_LASER, 0}, {EV_CHIRP, 1}, {EV_LASER, 1}, {EV_CHIRP, 2},               /* C5 D5 E5 F5 G5 */
+/* the white keys' sounds, F3 to G5, each its own: its family (a type: for the palette and the screen), the pitch of
+ * the key's note it starts at, how far it glides (octaves) and how (0 even, higher: fast at first), its length and
+ * decay, its modulator and modulation (from, to), its wobble (rate, on the pitch, on the modulation), whether it crosses
+ * the field, its level (matched by ear-equal RMS) */
+typedef struct {
+    const char *name;
+    uint8_t type;
+    float mul, oct, glide_k, dur, tau, ratio, idx0, idx1, lfo_hz, lfo_pitch, lfo_idx;
+    uint8_t cross;
+    float level;
+} key_sound_t;
+static const key_sound_t KEY_SOUND[16] = {
+    {"DIVE", EV_DIVE, 1.0f, -1.5f, 0.0f, 0.36f, 0.18f, 0.5f, 3.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0, 1.19f},     /* F3 */
+    {"GROWL", EV_GROWL, 1.0f, 0.0f, 0.0f, 0.34f, 0.25f, 1.0f, 1.6f, 1.6f, 8.0f, 0.0f, 2.4f, 1, 0.90f},   /* G3 */
+    {"CROAK", EV_GROWL, 0.5f, 0.2f, 3.0f, 0.22f, 0.12f, 0.5f, 3.0f, 3.0f, 18.0f, 0.05f, 2.0f, 0, 1.48f}, /* A3 */
+    {"SPRING", EV_DIVE, 1.0f, 0.0f, 0.0f, 0.30f, 0.15f, 1.0f, 1.2f, 0.6f, 22.0f, 0.25f, 0.0f, 0, 1.01f}, /* B3 */
+    {"SIREN", EV_GURGLE, 1.0f, 0.0f, 0.0f, 0.45f, 0.35f, 2.0f, 1.5f, 1.5f, 3.0f, 0.5f, 0.5f, 1, 0.71f},  /* C4 */
+    {"ZAP", EV_ZAP, 8.0f, -4.0f, 6.0f, 0.09f, 0.045f, 1.0f, 4.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1, 1.23f},     /* D4 */
+    {"GURGLE", EV_GURGLE, 1.0f, 0.0f, 0.0f, 0.30f, 0.15f, 0.5f, 2.5f, 2.5f, 30.0f, 0.15f, 2.0f, 0, 0.94f},  /* E4 */
+    {"SQUELCH", EV_ZAP, 1.0f, 0.3f, 4.0f, 0.12f, 0.07f, 1.0f, 6.0f, 0.3f, 0.0f, 0.0f, 0.0f, 0, 0.92f},  /* F4 */
+    {"DROP", EV_CHIRP, 1.0f, 1.2f, 10.0f, 0.09f, 0.05f, 1.0f, 0.4f, 0.4f, 0.0f, 0.0f, 0.0f, 0, 1.12f},  /* G4 */
+    {"BUZZ", EV_ZAP, 1.0f, 0.0f, 0.0f, 0.10f, 0.06f, 1.0f, 5.0f, 5.0f, 0.0f, 0.0f, 0.0f, 0, 0.99f},     /* A4 */
+    {"RATTLE", EV_GURGLE, 1.0f, 0.0f, 0.0f, 0.25f, 0.14f, 3.3f, 2.5f, 2.5f, 38.0f, 0.0f, 2.5f, 0, 0.71f},  /* B4 */
+    {"CHIRP", EV_CHIRP, 2.0f, 1.0f, 8.0f, 0.075f, 0.025f, 3.53f, 2.0f, 0.5f, 0.0f, 0.0f, 0.0f, 0, 1.26f},  /* C5 */
+    {"LASER", EV_LASER, 1.0f, 3.0f, 0.0f, 0.15f, 0.08f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1, 1.07f},   /* D5 */
+    {"BELL", EV_CHIRP, 2.0f, 0.0f, 0.0f, 0.50f, 0.30f, 2.76f, 1.8f, 0.4f, 0.0f, 0.0f, 0.0f, 0, 0.56f},   /* E5 */
+    {"TWEET", EV_LASER, 2.0f, 0.5f, 3.0f, 0.20f, 0.12f, 1.0f, 0.3f, 0.3f, 30.0f, 0.12f, 0.0f, 0, 0.76f},  /* F5 */
+    {"SPARK", EV_CHIRP, 2.0f, 0.0f, 0.0f, 0.04f, 0.02f, 7.13f, 8.0f, 2.0f, 0.0f, 0.0f, 0.0f, 0, 1.53f},  /* G5 */
 };
 
 /* the black keys' rhythms, F#3 to F#5: the ticks between throws (24 a beat), going round; a pitch step a throw */
@@ -128,13 +149,13 @@ static int key_blacki(int k)           /* the black keys' index (k black) */
     return n;
 }
 
-static recipe_t key_recipe(int k)      /* key 0 is F3 (MIDI 53); a black key: the white key below it's sound */
+static recipe_t key_recipe(int k)      /* key 0 is F3 (MIDI 53): a white key's sound */
 {
     recipe_t r;
     int w = key_white(key_black(k) ? k - 1 : k);
     r.note = (int8_t)(53 + k + 12 * key_oct);   /* (OCT- / OCT+) */
-    r.type = KEY_SOUND[w][0];
-    r.flav = KEY_SOUND[w][1];
+    r.type = KEY_SOUND[w].type;
+    r.snd = (uint8_t)(w + 1);
     r.run = RUN_ONE;
     r.var = (uint8_t)(k * 37);
     r.cyc = 0;
@@ -202,6 +223,16 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
         v->pan1 = -v->pan0;
         break;
     }
+    if (r->snd) {                      /* a white key's own sound */
+        const key_sound_t *ks = &KEY_SOUND[(r->snd - 1u) & 15u];
+        v->f0 = f * ks->mul; v->oct = ks->oct; v->glide_k = ks->glide_k;
+        v->dur = ks->dur * (0.9f + 0.2f * b); v->tau = ks->tau;
+        v->ratio = ks->ratio; v->idx0 = ks->idx0; v->idx1 = ks->idx1;
+        v->lfo_hz = ks->lfo_hz * (0.9f + 0.2f * a); v->lfo_pitch = ks->lfo_pitch; v->lfo_idx = ks->lfo_idx;
+        v->pan0 *= ks->cross ? 1.0f : 0.5f;
+        v->pan1 = ks->cross ? -v->pan0 : v->pan0;
+        v->level *= ks->level;
+    }
     v->hold = 0;
     switch (s.type[PART_EVENTS]) {
     case 1:                            /* METAL */
@@ -242,25 +273,6 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
         v->hc = 0;
         v->level *= EV_GAIN_SHARD;
         break;
-    }
-    if (r->flav == 1) {                /* sharper: further, quicker, brighter */
-        v->oct *= 1.5f;
-        if (v->lfo_hz > 0.0f)
-            v->lfo_hz *= 1.6f;
-        v->ratio *= 2.0f;
-        v->dur *= 0.65f;
-        v->tau *= 0.65f;
-    } else if (r->flav == 2) {         /* off the harmonics, wobbling, nearer */
-        v->ratio += 0.41f;
-        if (v->lfo_hz > 0.0f) {
-            v->lfo_hz *= 0.6f;
-            v->lfo_idx *= 1.4f;
-        } else {
-            v->lfo_hz = 11.0f;
-            v->lfo_idx = 1.4f;
-        }
-        v->oct *= 0.7f;
-        v->dur *= 1.15f;
     }
     if (r->cyc) {                      /* a held key's repeat: the sound turning through a cycle of eight */
         float p = (float)((r->cyc - 1u) % 8u) / 8.0f, sn = fm_sin_turns(p), cs = fm_sin_turns(p + 0.25f);
@@ -352,7 +364,7 @@ static recipe_t ev_resolve(const world_t *w, uint32_t i)   /* what slot i plays 
     r.note = (int8_t)(m.root + 36 + deg + (r.type >= EV_CHIRP ? 12 : r.type <= EV_GROWL ? -12 : 0));
     r.run = sl->run < (uint32_t)ev_runs_now(w) ? (r.type <= EV_GROWL ? RUN_ROLL : RUN_STAIRS) : RUN_ONE;
     r.var = sl->var;
-    r.flav = r.cyc = 0;
+    r.snd = r.cyc = 0;
     return r;
 }
 
@@ -386,8 +398,8 @@ static void key_throw(int k, int stepped)   /* key k's sound now (its cycle on; 
     r.note = (int8_t)clampi(r.note + stepped, 24, 108);
     r.cyc = (uint8_t)(1u + ev.kcyc[k]++ % 8u);
     ev_start(&r, bite, 1.0f);
-    ev.last_type = r.type;
-    ps_ui.thrown_type = (int8_t)r.type;
+    ev.last_type = EV_NTYPE + r.snd - 1;   /* (the screen names it: the key's sound) */
+    ps_ui.thrown_type = (int8_t)ev.last_type;
     ps_ui.hits[HIT_THROW]++;
 }
 
@@ -404,11 +416,6 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
             ev.run[k].wait = ev.run[k].step;
             ev.run[k].left--;
         }
-    if (ev.rk >= 0 && !(ev.down >> ev.rk & 1u) && ev.rtick >= TPB)   /* the rhythm's key let go (a tap: a beat of it):
-                                                                      * the sixteenths again */
-        ev.rk = -1;
-    if (ev.rk >= 0 && !ev.rstart)
-        ev.rtick++;
     if (ev.rk >= 0 && !(ev.rstart && t % 6u) && (ev.rstart || --ev.rwait == 0u)) {   /* a rhythm's beat (its first
                                                                                    * on a sixteenth) */
         int b = key_blacki(ev.rk), stepped = (int)(ev.ri % 8u) * (int)KEY_RHYTHM[b].step;
@@ -416,12 +423,9 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
         ev.rstart = 0;
         ev.pending = 0;                /* (the white keys wait for its beats) */
         ev.held = 0;
-        if (whites) {
-            for (k = 0; k < 27; k++)
-                if (whites >> k & 1u)
-                    key_throw(k, stepped);
-        } else
-            key_throw(ev.rk, stepped);
+        for (k = 0; k < 27; k++)       /* (none held: its beats go by unheard) */
+            if (whites >> k & 1u)
+                key_throw(k, stepped);
         ev.rwait = KEY_RHYTHM[b].iv[ev.ri % KEY_RHYTHM[b].n];
         ev.ri++;
     }
@@ -453,14 +457,13 @@ static void ev_key(int k, int down, int press)   /* (render: from the command qu
         return;
     if (down) {
         recipe_t r = key_recipe(k);
-        if (key_black(k)) {            /* a rhythm, from the next sixteenth (the latest pressed leads) */
-            ev.rk = (int8_t)k;
+        if (key_black(k)) {            /* a rhythm chosen (its beats from the next sixteenth), or the lit one let go */
+            ev.rk = ev.rk == k ? -1 : (int8_t)k;
             ev.ri = 0;
             ev.rstart = 1;
-            ev.rtick = 0;
-            r.run = r.type <= EV_GROWL ? RUN_ROLL : RUN_STAIRS;   /* (remembered as a run, as the generator plays) */
-        } else
-            ev.kcyc[k] = 0;            /* its sound's cycle from the start */
+            return;
+        }
+        ev.kcyc[k] = 0;                /* its sound's cycle from the start */
         ev.pending |= 1u << k;
         ev.down |= 1u << k;
         ev.vel[k] = (uint8_t)press;    /* (on a press, the value is the velocity) */

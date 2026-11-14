@@ -638,6 +638,16 @@ static void input(void)
                 if (key_black((int)k) && pl < NPART && (ps_ui.muted >> pl & 1u))
                     klit |= 1u << k;
             }
+        {   /* the black key whose rhythm is chosen: lit (and named as it changes) */
+            static int shown = -1;
+            int rk = ps_rhythm();
+            if (rk != shown) {
+                app_say("RHYTHM", rk >= 0 ? ps_rhythm_name(rk) : "OFF");
+                shown = rk;
+            }
+            if (rk >= 0 && !grid_mode())
+                klit |= 1u << rk;
+        }
         plat_lights(lit, klit, dim, kdim, set.lights);
     }
 }
@@ -1018,6 +1028,8 @@ int app_expect(const char *what, int *got)
         *got = ps_type_now(PART_PERC);
     else if (!strcmp(what, "kick_type"))     /* the kick's type, 0..3 */
         *got = ps_type_now(PART_KICK);
+    else if (!strcmp(what, "rhythm"))        /* the black key whose rhythm is chosen (-1: none) */
+        *got = ps_rhythm();
     else if (!strcmp(what, "auto"))          /* breaks on their own */
         *got = !(set.flags & SET_NOAUTO);
     else if (!strcmp(what, "lines"))         /* the line's notes so far */

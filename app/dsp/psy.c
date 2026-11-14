@@ -554,7 +554,17 @@ void ps_cue(int how)
 }
 int ps_section(void) { return s.sec; }
 int ps_stat(int which) { return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : ev.last_type; }
-const char *ps_event_name(int type) { return EV_NAME[(unsigned)type % EV_NTYPE]; }
+const char *ps_event_name(int type)
+{
+    return type >= EV_NTYPE ? KEY_SOUND[(unsigned)(type - EV_NTYPE) % 16u].name : EV_NAME[(unsigned)type % EV_NTYPE];
+}
+int ps_rhythm(void) { return ev.rk; }
+const char *ps_rhythm_name(int k)
+{
+    static const char *const N[11] = {"3/16", "1/8", "1/8T", "GALLOP", "PAIRS", "1/16T", "1/32", "FASTER", "SLOWER",
+                                      "CLIMB", "FALL"};
+    return k >= 0 && k < 27 && key_black(k) ? N[key_blacki(k)] : "";
+}
 
 static void mods(const world_t *w)     /* the macros and the moved tempo and root, as a block begins */
 {

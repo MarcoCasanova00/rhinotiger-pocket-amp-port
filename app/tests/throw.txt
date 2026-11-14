@@ -1,30 +1,40 @@
-# The keys throw events: recorded (build/host/throw-*.wav) to listen to.
+# The keys throw events: each white key its own sound (thrown_type 6 + the white key's index); a black key chooses a
+# rhythm the white keys throw on, lit, until tapped again. Recorded (build/host/throw-*.wav) to listen to.
 jack in
+listen
 wav throw-cold-signal.wav
 # the generator's own events from bar 4, a 4-bar loop (COLD SIGNAL, 152: a bar is 1.58 s): by bar 8 all of it
 wait 13000
 expect events >0
-# a low white key (F3): a dive or a growl, on the next sixteenth
+# a low white key (F3): its sound (DIVE), on the next sixteenth
 tapkey w0
 wait 400
 expect thrown 1
-expect thrown_type <2
-# a middle white key: a zap or a gurgle
+expect thrown_type 6
+shot throw-dive.png
+# a middle white key (F4): SQUELCH
 tapkey w7
 wait 400
-expect thrown_type >1
-expect thrown_type <4
-# a high white key: a chirp or a laser
+expect thrown_type 13
+# a high white key (F5): TWEET
 tapkey w14
 wait 400
-expect thrown_type >3
-# black keys: runs (a roll low, staircases above)
+expect thrown_type 20
+# a black key (G#3): eighths chosen, lit; a white key held on them, then the black key again: none
+expect rhythm -1
 tapkey b1
+wait 100
+expect rhythm 3
+said RHYTHM
+shot throw-rhythm.png
+key w5 down 90
+wait 1580
+key w5 up
+wait 200
+tapkey b1
+wait 100
+expect rhythm -1
 wait 600
-tapkey b5
-wait 600
-tapkey b9
-wait 800
 # a middle key held two seconds, pressed harder as it goes: thrown again every sixteenth
 expect events <30
 key w8 down 90
@@ -35,9 +45,9 @@ key w8 down 90 100
 wait 600
 key w8 up
 wait 2000
-expect thrown 7
+expect thrown 5
 # held two seconds: thrown again each sixteenth (152: about 10 a second): some 20 more, the generator's on top
-expect events >40
+expect events >35
 # the generator takes up what was thrown: let it run some phrases
 wait 30000
 wavstop
