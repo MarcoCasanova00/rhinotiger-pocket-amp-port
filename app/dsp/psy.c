@@ -1095,7 +1095,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.drop_seen = drop_n;
         s.drops = 0;                   /* (the intro again: the events quiet its first bars) */
         s.out = s.pat = s.fill_beat = 0;
-        ev.pending = ev.held = 0;      /* (keys pressed while resting are not thrown in a heap) */
+        ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */
     }
     while (cmd_r != cmd_w) {           /* the keys, the effects, the parts */
         uint32_t c = cmd_q[cmd_r % CMD_N];

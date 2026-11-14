@@ -1028,8 +1028,10 @@ int app_expect(const char *what, int *got)
         *got = ps_type_now(PART_PERC);
     else if (!strcmp(what, "kick_type"))     /* the kick's type, 0..3 */
         *got = ps_type_now(PART_KICK);
-    else if (!strcmp(what, "rhythm"))        /* the black key whose rhythm is chosen (-1: none) */
+    else if (!strcmp(what, "rhythm"))        /* the black key held whose rhythm leads (-1: none) */
         *got = ps_rhythm();
+    else if (!strcmp(what, "throws"))        /* the keys' throws so far */
+        *got = (int)ps_ui.hits[HIT_THROW];
     else if (!strcmp(what, "auto"))          /* breaks on their own */
         *got = !(set.flags & SET_NOAUTO);
     else if (!strcmp(what, "lines"))         /* the line's notes so far */

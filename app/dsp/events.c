@@ -74,8 +74,8 @@ static struct {
         uint8_t i;                     /* the notes so far */
         float bite;
     } run[4];
-    /* the keys: thrown on the next sixteenth; held, again each sixteenth */
-    uint32_t held, pending, down;
+    /* the keys: pressed, thrown on the next sixteenth (or a rhythm's beat); down, again each */
+    uint32_t pending, down;
     int8_t rk;                         /* the black key held whose rhythm leads (-1: none) */
     uint8_t rstart;                    /* its first beat waits for a sixteenth */
     uint8_t rwait;                     /* ticks to its next beat */
@@ -423,7 +423,6 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
         uint32_t whites = (ev.down | ev.pending) & ~KEY_BLACKS;   /* (held, or tapped since its last beat) */
         ev.rstart = 0;
         ev.pending = 0;                /* (the white keys wait for its beats) */
-        ev.held = 0;
         for (k = 0; k < 27; k++)       /* (none held: its beats go by unheard) */
             if (whites >> k & 1u)
                 key_throw(k, stepped);
@@ -441,14 +440,12 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
         }
     }
     if (ev.rk < 0) {                   /* no rhythm: the white keys on the sixteenths */
-        if (ev.pending | ev.held) {    /* the newly pressed, and the held again */
-            uint32_t keys = (ev.pending | ev.held) & ~KEY_BLACKS;
-            ev.pending = 0;
-            for (k = 0; k < 27; k++)
-                if (keys >> k & 1u)
-                    key_throw(k, 0);
-            ev.held = keys & ev.down;  /* still down: again on the next sixteenth */
-        }
+        uint32_t keys = (ev.pending | ev.down) & ~KEY_BLACKS;   /* the newly pressed (if let go since), and the held
+                                                                * (again each sixteenth; a rhythm let go: on) */
+        ev.pending = 0;
+        for (k = 0; keys && k < 27; k++)
+            if (keys >> k & 1u)
+                key_throw(k, 0);
     }
 }
 
@@ -475,7 +472,6 @@ static void ev_key(int k, int down, int press)   /* (render: from the command qu
             ev.nmem++;
     } else {
         ev.down &= ~(1u << k);
-        ev.held &= ~(1u << k);
         if (ev.rk == k) {              /* its rhythm let go: another black key still held, or the sixteenths */
             int b;
             ev.rk = -1;
