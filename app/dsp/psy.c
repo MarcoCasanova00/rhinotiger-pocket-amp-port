@@ -306,6 +306,7 @@ enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE };
 static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; 0: none yet beyond the world's own */
     [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW"},
     [PART_LINE] = {"ACID", "GLASS", "GROWL", "REED"},
+    [PART_EVENTS] = {"ALIVE", "METAL", "LIQUID", "SHARD"},
 };
 int ps_ntypes(int part) { return part >= 0 && part < NPART && TYPE_NAME[part][1] ? PS_NTYPE : 1; }
 const char *ps_type_name(int part, int t)

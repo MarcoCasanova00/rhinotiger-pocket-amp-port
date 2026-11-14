@@ -25,6 +25,14 @@ turn ALGO -2
 wait 100
 expect line_type 3
 expect colour 3
+# on the EVENTS page: the events' type
+tap ARP
+wait 30
+turn ALGO 3
+wait 100
+expect events_type 3
+said EVENTS
+expect line_type 3
 tap HOME
 wait 30
 tap EDIT

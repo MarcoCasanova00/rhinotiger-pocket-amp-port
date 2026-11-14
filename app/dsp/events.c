@@ -9,7 +9,18 @@
  * and Drift redraws a few of them as a phrase (8 bars) begins. The keys
  * throw recipes in, on the next sixteenth: the register says the family (low: dive, growl; middle: zap, gurgle;
  * high: chirp, laser), the key the note, a white key one event, a black key a run. A key held goes on throwing, a
- * sixteenth apart; pressed harder, it bites more. What is thrown is remembered: the generator takes it up later. */
+ * sixteenth apart; pressed harder, it bites more. What is thrown is remembered: the generator takes it up later.
+ *
+ * Their types (ALGORITHM on the EVENTS page), over every recipe, taken as a voice begins:
+ *   ALIVE   the recipes as they are
+ *   METAL   the modulator off the harmonics, the glides shorter, ringing longer: struck sheet and wire
+ *   LIQUID  wobbling slower and deeper, the glides even, longer: things under water
+ *   SHARD   short, harsh, the sound held in steps (a lower rate, its aliasing): broken glass, a machine's fault */
+/* the types' levels, matched to ALIVE's by the RMS of the events alone (LIQUID's last longer, SHARD's are brighter: a
+ * little over and under it). SHARD's steps are its sound: tools/clicks.py counts them. */
+#define EV_GAIN_METAL 0.72f
+#define EV_GAIN_LIQUID 0.85f
+#define EV_GAIN_SHARD 1.0f
 
 enum { EV_DIVE, EV_GROWL, EV_ZAP, EV_GURGLE, EV_CHIRP, EV_LASER, EV_NTYPE };
 static const char *const EV_NAME[EV_NTYPE] = {"DIVE", "GROWL", "ZAP", "GURGLE", "CHIRP", "LASER"};
@@ -31,6 +42,8 @@ typedef struct {
     float tau;                         /* the decay (s to 1/e) */
     float pan0, pan1;                  /* -1 left .. 1 right, from and to */
     float level;
+    float hx;                          /* SHARD: the sample held, */
+    uint8_t hold, hc;                  /* for hold samples (0: none), counted */
     float cph, mph, lph;
 } evoice_t;
 
@@ -136,6 +149,47 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
         v->f0 = f; v->oct = 3.0f; v->dur = 0.12f + 0.06f * b; v->tau = 0.08f;
         v->ratio = 1.0f; v->idx0 = v->idx1 = 1.0f;
         v->pan1 = -v->pan0;
+        break;
+    }
+    v->hold = 0;
+    switch (s.type[PART_EVENTS]) {
+    case 1:                            /* METAL */
+        v->ratio += 1.41f;
+        v->oct *= 0.5f;
+        v->lfo_pitch *= 0.3f;
+        v->dur *= 1.3f;
+        v->tau *= 1.8f;
+        v->idx0 *= 0.8f;
+        v->idx1 = v->idx0 * 0.6f;
+        v->level *= EV_GAIN_METAL;
+        break;
+    case 2:                            /* LIQUID */
+        if (v->lfo_hz > 0.0f) {
+            v->lfo_hz *= 0.5f;
+            v->lfo_idx *= 1.5f;
+        } else {
+            v->lfo_hz = 5.0f + 4.0f * a;
+            v->lfo_pitch = 0.04f;
+            v->lfo_idx = 1.2f;
+        }
+        v->glide_k = 0.0f;
+        if (v->ratio > 2.0f)
+            v->ratio = 1.0f;
+        v->dur *= 1.4f;
+        v->tau *= 1.5f;
+        v->idx0 *= 0.8f;
+        v->idx1 *= 0.8f;
+        v->level *= EV_GAIN_LIQUID;
+        break;
+    case 3:                            /* SHARD */
+        v->ratio = v->ratio * 2.0f + 0.76f;
+        v->dur *= 0.55f;
+        v->tau *= 0.5f;
+        v->idx0 *= 1.6f;
+        v->idx1 *= 1.6f;
+        v->hold = (uint8_t)(5u + (uint32_t)(4.0f * b));   /* about 9..5 kHz */
+        v->hc = 0;
+        v->level *= EV_GAIN_SHARD;
         break;
     }
     if (r->run == RUN_ROLL)
@@ -349,6 +403,13 @@ static float ev_render(float dt, float *l, float *r)
         v->cph -= fm_floorf(v->cph);
         x = fm_sin_turns(v->cph + idx * fm_sin_turns(v->mph) * 0.159155f);
         amp = (v->t < 0.001f ? v->t / 0.001f : 1.0f) * fm_expf(-v->t / v->tau) * (1.0f - u * u);
+        if (v->hold) {                 /* (SHARD) held in steps */
+            if (v->hc == 0u)
+                v->hx = x;
+            if (++v->hc >= v->hold)
+                v->hc = 0;
+            x = v->hx;
+        }
         x = fm_tanhf(1.4f * x) * amp * v->level * 0.28f;
         pan = v->pan0 + (v->pan1 - v->pan0) * u;
         el += x * (1.0f - 0.5f * pan);

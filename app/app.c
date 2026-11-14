@@ -1005,6 +1005,8 @@ int app_expect(const char *what, int *got)
         *got = ps_colour_now();
     else if (!strcmp(what, "line_type"))     /* the line's type, 0..3 */
         *got = ps_type_now(PART_LINE);
+    else if (!strcmp(what, "events_type"))   /* the events' type, 0..3 */
+        *got = ps_type_now(PART_EVENTS);
     else if (!strcmp(what, "auto"))          /* breaks on their own */
         *got = !(set.flags & SET_NOAUTO);
     else if (!strcmp(what, "lines"))         /* the line's notes so far */
