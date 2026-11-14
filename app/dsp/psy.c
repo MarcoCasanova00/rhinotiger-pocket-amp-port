@@ -44,8 +44,9 @@ typedef struct {
     float bpm;
     int root;                          /* MIDI note of the bass (and the kick's tuning) */
     /* the bass: K-B-B-B, and now and then a phrase of another shape (the user: triplets "there may be some, but
-     * rare"; a gallop, K-.-B-B, may sit better) */
-    uint8_t trip, gallop;              /* % of phrases in sixteenth triplets (K-b-b-b-b-b), in a gallop */
+     * rare"; a gallop, K-.-B-B, may sit better, a little more of it; an offbeat, K-.-B-., too). How often each
+     * comes, counted: tools/stats.c */
+    uint8_t trip, gallop, off;         /* % of phrases in sixteenth triplets (K-b-b-b-b-b), a gallop, an offbeat */
     uint8_t skip, jump;                /* % of notes resting (a stutter), jumping (an octave or a fifth up) */
     float ratio;                       /* the bass's modulator to carrier */
     float index, index_ms;             /* the modulation at the note's start, and how fast it falls (ms to 1/e) */
@@ -80,56 +81,56 @@ typedef struct {
 /* the eight worlds, slow and wet to fast and fine (notes/psytrance.md 6) */
 static const world_t W[PS_NWORLD] = {
     /* low and muffled, a soft stuttering bass, wet clicks, a thick murmur */
-    {.name = "SWAMP RADIO", .bpm = 145, .root = 29, .gallop = 15, .skip = 9,
+    {.name = "SWAMP RADIO", .bpm = 145, .root = 29, .gallop = 20, .off = 15, .skip = 9,
      .ratio = 1.0f, .index = 1.8f, .index_ms = 22, .floor = 0.2f, .gate = 0.82f, .drive = 1.1f, .kick_len = 1.0f, .kick_bright = 0.5f,
      .hat_ms = 18, .open_ms = 70, .hat_hp = 0.70f, .clap_hz = 900,
      .ev_density = 6, .ev_low = 35, .ev_mid = 45, .ev_runs = 10, .atmos = 0.8f, .brk = 16,
      .line = 0.1f, .line_dens = 0.25f, .line_oct = 24, .line_range = 7, .line_chrom = 30, .line_slide = 30,
      .line_ratio = 1.0f, .line_index = 1.5f, .line_ms = 60, .line_gate = 0.6f, .line_wah = 0.3f},
     /* deep and long, a thick low bass, a growl now and then, sinking sounds, a dark swell; long breaks */
-    {.name = "UNDER THE ROOTS", .bpm = 148, .root = 28, .gallop = 10,
+    {.name = "UNDER THE ROOTS", .bpm = 148, .root = 28, .gallop = 15, .off = 15,
      .ratio = 0.5f, .index = 2.6f, .index_ms = 18, .floor = 0.3f, .gate = 0.8f, .drive = 1.5f, .kick_len = 1.0f, .kick_bright = 0.7f,
      .hat_ms = 14, .open_ms = 60, .hat_hp = 0.78f, .clap_hz = 1000,
      .ev_density = 4, .ev_low = 55, .ev_mid = 30, .ev_runs = 10, .atmos = 0.55f, .brk = 24,
      .line = 0.35f, .line_dens = 0.3f, .line_oct = 12, .line_range = 5, .line_chrom = 50, .line_slide = 50,
      .line_ratio = 1.5f, .line_index = 3.0f, .line_ms = 120, .line_gate = 0.9f, .line_wah = 0.2f},
     /* cold dark psy: hard, short sixteenths, a short phrase creeping in semitones, lasers, a thin band of noise */
-    {.name = "COLD SIGNAL", .bpm = 152, .root = 30, .gallop = 10,
+    {.name = "COLD SIGNAL", .bpm = 152, .root = 30, .gallop = 15, .off = 10,
      .ratio = 1.0f, .index = 3.2f, .index_ms = 14, .floor = 0.35f, .gate = 0.72f, .drive = 1.6f, .kick_len = 0.95f, .kick_bright = 1.0f,
      .hat_ms = 14, .open_ms = 55, .hat_hp = 0.80f, .clap_hz = 1100,
      .ev_density = 5, .ev_low = 30, .ev_mid = 55, .ev_runs = 15, .atmos = 0.2f, .brk = 16,
      .line = 0.6f, .line_dens = 0.35f, .line_oct = 24, .line_range = 4, .line_chrom = 70, .line_slide = 10,
      .line_ratio = 3.0f, .line_index = 2.5f, .line_ms = 25, .line_gate = 0.45f},
     /* bouncing: the bass jumps now and then, a talking FM line, gurgles; sudden turns */
-    {.name = "RUBBER CIRCUS", .bpm = 156, .root = 31, .trip = 5, .gallop = 20, .jump = 12,
+    {.name = "RUBBER CIRCUS", .bpm = 156, .root = 31, .trip = 5, .gallop = 25, .off = 10, .jump = 12,
      .ratio = 1.0f, .index = 3.0f, .index_ms = 16, .floor = 0.3f, .gate = 0.6f, .drive = 1.4f, .kick_len = 0.9f, .kick_bright = 1.2f,
      .hat_ms = 12, .open_ms = 50, .hat_hp = 0.82f, .clap_hz = 1300,
      .ev_density = 7, .ev_low = 20, .ev_mid = 60, .ev_runs = 20, .atmos = 0.1f, .brk = 8,
      .line = 0.7f, .line_dens = 0.45f, .line_oct = 24, .line_range = 9, .line_chrom = 20, .line_slide = 35,
      .line_ratio = 1.0f, .line_index = 4.0f, .line_ms = 40, .line_gate = 0.6f, .line_wah = 0.8f},
     /* heavy, a distorted bass, a long dragging phrase, groans; big breaks */
-    {.name = "BLACK UNDERTOW", .bpm = 160, .root = 28, .gallop = 10,
+    {.name = "BLACK UNDERTOW", .bpm = 160, .root = 28, .gallop = 15, .off = 10,
      .ratio = 1.0f, .index = 3.6f, .index_ms = 20, .floor = 0.45f, .gate = 0.75f, .drive = 2.2f, .kick_len = 1.0f, .kick_bright = 1.1f,
      .hat_ms = 14, .open_ms = 55, .hat_hp = 0.78f, .clap_hz = 1000,
      .ev_density = 9, .ev_low = 50, .ev_mid = 35, .ev_runs = 15, .atmos = 0.25f, .brk = 16,
      .line = 0.6f, .line_dens = 0.25f, .line_oct = 12, .line_range = 6, .line_chrom = 50, .line_slide = 60,
      .line_ratio = 2.0f, .line_index = 3.5f, .line_ms = 200, .line_gate = 1.0f, .line_wah = 0.1f},
     /* tight, a short metallic repeat, the staircases begin; now and then a phrase of triplets */
-    {.name = "COPPER NERVE", .bpm = 168, .root = 29, .trip = 15, .gallop = 10,
+    {.name = "COPPER NERVE", .bpm = 168, .root = 29, .trip = 15, .gallop = 15, .off = 5,
      .ratio = 2.0f, .index = 2.8f, .index_ms = 11, .floor = 0.3f, .gate = 0.72f, .drive = 1.5f, .kick_len = 0.93f, .kick_bright = 1.1f,
      .hat_ms = 11, .open_ms = 45, .hat_hp = 0.85f, .clap_hz = 1300, .ride = 1,
      .ev_density = 8, .ev_low = 20, .ev_mid = 45, .ev_runs = 30, .atmos = 0.1f, .brk = 8,
      .line = 0.7f, .line_dens = 0.4f, .line_oct = 36, .line_range = 5, .line_chrom = 30, .line_slide = 5,
      .line_ratio = 3.5f, .line_index = 2.5f, .line_ms = 18, .line_gate = 0.5f},
     /* bright hi-tech: clean sixteenths, a bright metallic lead, staircases flying left and right; short breaks */
-    {.name = "GLASS INSECTS", .bpm = 176, .root = 30, .gallop = 5,
+    {.name = "GLASS INSECTS", .bpm = 176, .root = 30, .gallop = 10, .off = 5,
      .ratio = 2.0f, .index = 2.4f, .index_ms = 9, .floor = 0.25f, .gate = 0.76f, .drive = 1.3f, .kick_len = 0.92f, .kick_bright = 1.2f,
      .hat_ms = 10, .open_ms = 40, .hat_hp = 0.88f, .clap_hz = 1500, .ride = 1,
      .ev_density = 9, .ev_low = 10, .ev_mid = 40, .ev_runs = 35, .atmos = 0.05f, .brk = 8,
      .line = 0.6f, .line_dens = 0.4f, .line_oct = 36, .line_range = 12, .line_slide = 15,
      .line_ratio = 2.0f, .line_index = 2.0f, .line_ms = 30, .line_gate = 0.6f},
     /* fast and fine: the detail in the line's fragments and the events, the densest; changing all the time */
-    {.name = "CHROME SWARM", .bpm = 186, .root = 31,
+    {.name = "CHROME SWARM", .bpm = 186, .root = 31, .gallop = 5, .off = 5,
      .ratio = 2.0f, .index = 2.2f, .index_ms = 8, .floor = 0.25f, .gate = 0.7f, .drive = 1.3f, .kick_len = 0.9f, .kick_bright = 1.3f,
      .hat_ms = 8, .open_ms = 35, .hat_hp = 0.90f, .clap_hz = 1700, .ride = 1,
      .ev_density = 14, .ev_low = 10, .ev_mid = 35, .ev_runs = 50, .brk = 4,
@@ -215,7 +216,8 @@ static struct {
     uint32_t p_hc;                     /* its count */
     uint32_t rng;
     uint8_t out;                       /* the part sitting out this phrase: 0 none, 1 hats, 2 open, 3 clap, 4 ride */
-    uint8_t pat;                       /* the bass's shape this phrase: 0 K-B-B-B, 1 a gallop (K-.-B-B), 2 triplets */
+    uint8_t pat;                       /* the bass's shape this phrase: 0 K-B-B-B, 1 a gallop (K-.-B-B), 2 triplets,
+                                        * 3 an offbeat (K-.-B-.) */
     /* the echo: ping-pong */
     float e_lp[2];
     float lim;                         /* the master limiter's gain */
@@ -487,7 +489,7 @@ int ps_lane(int lane, uint8_t out[24])
                 out[i] = i % 6u ? 2 : 0;
         } else
             for (i = 0; i < 16u; i++)
-                out[i] = i % 4u == 0u || (s.pat == 1u && i % 4u == 1u) ? 0 : 2;
+                out[i] = i % 4u == 0u || (s.pat == 1u && i % 4u == 1u) || (s.pat == 3u && i % 4u != 2u) ? 0 : 2;
         if (fill_now(rb, 3))
             for (i = (uint32_t)n * 3u / 4u; i < (uint32_t)n; i++)
                 out[i] = 0;
@@ -757,7 +759,8 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     ln_step(w, t, bar, rb, (uint32_t)((s.tick - s.origin * TPBAR) / 6u));
     if (t == 0u && beat == 0u && rb % 8u == 0u && groove) {   /* a phrase: the bass's shape, now and then another */
         uint32_t r = rnd() % 100u;
-        s.pat = (uint8_t)(rb == 0u || r >= (uint32_t)(w->trip + w->gallop) ? 0 : r < w->trip ? 2 : 1);
+        s.pat = (uint8_t)(rb == 0u || r >= (uint32_t)(w->trip + w->gallop + w->off) ? 0 : r < w->trip ? 2
+                          : r < (uint32_t)(w->trip + w->gallop) ? 1 : 3);
     }
     ps_ui.section = (int8_t)s.sec;
     ps_ui.sec_bar = (uint8_t)(groove ? rb % 8u : s.sec_bar);
@@ -775,17 +778,18 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         return;
     }
     {
-        uint32_t roll = s.pat == 2u ? 4u : 6u;   /* triplets: K-b-b-b-b-b; a gallop: K-.-B-B */
-        bass = t % roll == 0u && !(s.pat == 1u && t == 6u);
+        uint32_t roll = s.pat == 2u ? 4u : 6u;   /* triplets: K-b-b-b-b-b; a gallop: K-.-B-B; an offbeat: K-.-B-. */
+        uint32_t span = s.pat == 3u ? 12u : roll;   /* the room a note has (the offbeat's: to the next kick) */
+        bass = t % roll == 0u && !(s.pat == 1u && t == 6u) && !(s.pat == 3u && t != 12u);
         if (!bass || bass_rests)
             return;
         if (w->skip && rnd() % 100u < w->skip)   /* a stutter: this one rests */
             return;
         s.b_t = 0.0f;
         s.b_cph = s.b_mph = 0.0f;      /* every note from the same place: the roll is tight */
-        s.b_gate = w->gate * (0.6f + 0.8f * (float)par[P_BASS_LEN] / 100.0f) * s.tick_len * (float)roll / PS_SR;
+        s.b_gate = w->gate * (0.6f + 0.8f * (float)par[P_BASS_LEN] / 100.0f) * s.tick_len * (float)span / PS_SR;
         {   /* room for its 3 ms release before the next */
-            float most = fm_minf(0.95f * s.tick_len * (float)roll / PS_SR, s.tick_len * (float)roll / PS_SR - 0.0035f);
+            float most = fm_minf(0.95f * s.tick_len * (float)span / PS_SR, s.tick_len * (float)span / PS_SR - 0.0035f);
             if (s.b_gate > most)
                 s.b_gate = most;
         }
