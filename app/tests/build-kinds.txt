@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The builds' kinds: ALGORITHM on the PHASE page (SEQ) chooses ROLL, KICK, FILTER, TRIPLET (or AUTO); ARP from the
+# groove, a build each (4 bars), then the drop. Recorded (build/host/build-kinds.wav) to listen to, a look at each.
+# COLD SIGNAL, 152: a bar is about 1.58 s.
+jack in
+wait 1500
+tap SEQ
+wait 60
+expect page 2
+expect buildset 0
+expect build 0
+listen
+wav build-kinds.wav
+turn ALGO 1
+wait 30
+expect buildset 1
+said BUILD ROLL
+tap ARP
+wait 1700
+expect section 2
+expect build 1
+wait 3200
+shot build-roll.png
+wait 3400
+expect section 0
+wait 3200
+turn ALGO 1
+wait 30
+expect buildset 2
+tap ARP
+wait 1700
+expect section 2
+expect build 2
+wait 3200
+shot build-kick.png
+wait 3400
+expect section 0
+wait 3200
+turn ALGO 1
+wait 30
+expect buildset 3
+tap ARP
+wait 1700
+expect section 2
+expect build 3
+wait 3200
+shot build-filter.png
+wait 3400
+expect section 0
+wait 3200
+turn ALGO 1
+wait 30
+expect buildset 4
+tap ARP
+wait 1700
+expect section 2
+expect build 4
+wait 3200
+shot build-triplet.png
+wait 3400
+expect section 0
+wait 3200
+wavstop
+# back round to AUTO: a build its own (not TRIPLET, the last, again)
+turn ALGO 1
+wait 30
+expect buildset 0
+tap ARP
+wait 1700
+expect section 2
+expect build <4
+shot build-auto.png

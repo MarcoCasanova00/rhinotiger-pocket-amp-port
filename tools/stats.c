@@ -2,10 +2,10 @@
  * Copyright (C) 2026 hacha */
 /* The structure, counted: each world played on its own (no hands) for a while, bar by bar: how long the grooves run
  * between breaks, how long the breaks are, how often the bass's phrases gallop or sit on the offbeat (the rest
- * K-B-B-B) or have a bar of triplets, how much of the time the line plays, a part sits out, and the events and the
- * line's notes a bar. The engine at its defaults, Drift moved by an argument. Usage: stats [minutes] [drift (-1: its
- * default)] [world (-1: all)]. Built (from the repository's top): cc -O2 -ffp-contract=off -Ibase/include -o
- * build/stats tools/stats.c -lm */
+ * K-B-B-B) or have a bar of triplets, the builds' kinds, how much of the time the line plays, a part sits out, and the
+ * events and the line's notes a bar. The engine at its defaults, Drift moved by an argument. Usage: stats [minutes]
+ * [drift (-1: its default)] [world (-1: all)]. Built (from the repository's top): cc -O2 -ffp-contract=off
+ * -Ibase/include -o build/stats tools/stats.c -lm */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -26,6 +26,7 @@ int main(int argc, char **argv)
         uint32_t bars = 0, last_bar = 0, n_brk = 0, brk_bars = 0, n_grv = 0, grv_bars = 0, run = 0, phr = 0, gal = 0,
                  tri = 0, off = 0, ln_on = 0, sit = 0, ev0, lh0, grv_bars_main = 0, drops = 0;
         uint8_t d_prev;
+        uint32_t bk[PS_NBUILD] = {0};      /* the builds, by kind (AUTO's choosing) */
         uint32_t gmin = 1u << 30, gmax = 0, bmin = 1u << 30, bmax = 0;
         int sec_prev = SEC_MAIN;
         float lim_min = 1.0f;
@@ -73,6 +74,8 @@ int main(int argc, char **argv)
                     sit += s.out != 0u;
                 }
             }
+            if (ps_ui.section != sec_prev && ps_ui.section == SEC_BUILD)
+                bk[ps_ui.build_kind % PS_NBUILD]++;
             if (ps_ui.section != sec_prev) {
                 if (sec_prev == SEC_MAIN && ps_ui.section == SEC_BREAK) {
                     n_grv++;
@@ -93,6 +96,8 @@ int main(int argc, char **argv)
                phr ? 100.0 * ln_on / phr : 0.0,
                phr ? 100.0 * sit / phr : 0.0, (double)(ps_ui.hits[HIT_EVENT] - ev0) / bars,
                (double)(ps_ui.hits[HIT_LINE] - lh0) / bars);
+        printf("%-16s builds: ROLL %u, KICK %u, FILTER %u, TRIPLET %u\n", "", bk[PS_BUILD_ROLL], bk[PS_BUILD_KICK],
+               bk[PS_BUILD_FILTER], bk[PS_BUILD_TRIP]);
         printf("%-16s the limiter: over 1 dB %.1f%% of the time, at most %.1f dB\n", "", 100.0 * lim_n * 256.0 / samples,
                -20.0 * log10f(lim_min));
         (void)bmin; (void)bmax; (void)grv_bars_main;

@@ -26,9 +26,10 @@
  *  12 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
  *                            (off by default); SAVE here keeps it all
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
- * play or rest. ALGORITHM: the type of the page's part (elsewhere the bass's colour; a drop chooses another on its
- * own). OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held: the keys' throws
- * taken into a loop of two bars (pressed again: a take anew; tapped: the loop gone; lit while one plays).
+ * play or rest. ALGORITHM: the type of the page's part (on PHASE the builds' kind: AUTO, ROLL, KICK, FILTER, TRIPLET;
+ * elsewhere the bass's colour; a drop chooses another on its own). OCT- / OCT+: the keys' events an octave down or up
+ * (-1..+2; both lit away from 0). REC held: the keys' throws taken into a loop of two bars (pressed again: a take anew;
+ * tapped: the loop gone; lit while one plays).
  * SAVE and ARP, side by side, the sections (but on GLOBAL, where SAVE keeps the settings): SAVE down, a break from
  * the next bar (in a break or a build: nothing); ARP up, a build from the next bar (from the groove or a break), the
  * drop after it (in a build: the drop at the next bar); ARP held, the drop at the next bar. SAVE lit in a break, ARP
@@ -640,7 +641,11 @@ static void input(void)
         page_go((int)ui.page + (int)e);
     if ((e = plat_enc(EN_PRESET)) != 0)
         world_step(e);
-    if ((e = plat_enc(EN_ALGO)) != 0) {     /* the type of the page's part (elsewhere, for now: the bass's colour) */
+    if ((e = plat_enc(EN_ALGO)) != 0 && ui.page == PG_PHASE) {   /* PHASE: the builds' kind */
+        int c = (ps_build_kind_now() + (int)e % PS_NBUILD + PS_NBUILD) % PS_NBUILD;
+        ps_build_kind(c);
+        app_say("BUILD", ps_build_name(c));
+    } else if (e != 0) {                     /* the type of the page's part (elsewhere, for now: the bass's colour) */
         static const char *const PNAME[NPART] = {"KICK", "BASS", "PERC", "LINE", "EVENTS", "ATMOS"};
         int part = algo_part(), n = ps_ntypes(part);
         if (n > 1) {
@@ -936,7 +941,13 @@ static void draw_rule(void)
         ctx = "SAVE: KEEP IT";
     if (ctx)
         xs = cv_text(6, 0, &FONT_XS, ctx, C_AMB) + 6;
-    else if (ui.page >= PG_KICK && ui.page <= PG_ATMOS && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
+    else if (ui.page == PG_PHASE) {    /* the builds' kind (AUTO in a build: the one it chose too) */
+        int k = ps_build_kind_now();
+        xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
+        xs = cv_text(xs, 0, &FONT_XS, ps_build_name(k), C_HI) + 6;
+        if (k == PS_BUILD_AUTO && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0)
+            xs = cv_text(xs - 2, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_GRAY) + 6;
+    } else if (ui.page >= PG_KICK && ui.page <= PG_ATMOS && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
         int part = algo_part();
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
         xs = cv_text(xs, 0, &FONT_XS, ps_type_name(part, ps_type_now(part)), part_txt(PART_HUE[part], 255)) + 6;
@@ -1087,6 +1098,10 @@ int app_expect(const char *what, int *got)
         *got = (int)ps_ui.hits[HIT_THROW];
     else if (!strcmp(what, "auto"))          /* breaks on their own (BREAKS above 0) */
         *got = set.par[P_BREAKS] > 0;
+    else if (!strcmp(what, "build"))         /* the latest build's kind (PS_BUILD_*; 0 none yet) */
+        *got = ps_ui.build_kind;
+    else if (!strcmp(what, "buildset"))      /* the kind ALGORITHM chose on PHASE (0 AUTO) */
+        *got = ps_build_kind_now();
     else if (!strcmp(what, "take"))          /* the throws in the keys' loop */
         *got = ps_take();
     else if (!strcmp(what, "lines"))         /* the line's notes so far */

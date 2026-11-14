@@ -48,6 +48,7 @@ typedef struct {
      * phrase of them, too much). How often each comes, counted: tools/stats.c */
     uint8_t trip;                      /* % of phrases with a bar of sixteenth triplets (K-b-b-b-b-b): its 4th or 8th */
     uint8_t gallop, off;               /* % of phrases in a gallop, an offbeat */
+    uint8_t bk[4];                     /* the builds' leaning (AUTO): ROLL, KICK, FILTER, TRIPLET, out of their sum */
     uint8_t skip, jump;                /* % of notes resting (a stutter), jumping (an octave or a fifth up) */
     float ratio;                       /* the bass's modulator to carrier */
     float index, index_ms;             /* the modulation at the note's start, and how fast it falls (ms to 1/e) */
@@ -82,56 +83,56 @@ typedef struct {
 /* the eight worlds, slow and wet to fast and fine (notes/psytrance.md 6) */
 static const world_t W[PS_NWORLD] = {
     /* low and muffled, a soft stuttering bass, wet clicks, a thick murmur */
-    {.name = "SWAMP RADIO", .bpm = 145, .root = 29, .gallop = 20, .off = 15, .skip = 9,
+    {.name = "SWAMP RADIO", .bpm = 145, .root = 29, .gallop = 20, .off = 15, .bk = {30, 20, 40, 10}, .skip = 9,
      .ratio = 1.0f, .index = 1.8f, .index_ms = 22, .floor = 0.2f, .gate = 0.82f, .drive = 1.1f, .kick_len = 1.0f, .kick_bright = 0.5f,
      .hat_ms = 18, .open_ms = 70, .hat_hp = 0.70f, .clap_hz = 900,
      .ev_density = 6, .ev_low = 35, .ev_mid = 45, .ev_runs = 10, .atmos = 0.8f, .brk = 16,
      .line = 0.1f, .line_dens = 0.25f, .line_oct = 24, .line_range = 7, .line_chrom = 30, .line_slide = 30,
      .line_ratio = 1.0f, .line_index = 1.5f, .line_ms = 60, .line_gate = 0.6f, .line_wah = 0.3f},
     /* deep and long, a thick low bass, a growl now and then, sinking sounds, a dark swell; long breaks */
-    {.name = "UNDER THE ROOTS", .bpm = 148, .root = 28, .gallop = 15, .off = 15,
+    {.name = "UNDER THE ROOTS", .bpm = 148, .root = 28, .gallop = 15, .off = 15, .bk = {30, 20, 40, 10},
      .ratio = 0.5f, .index = 2.6f, .index_ms = 18, .floor = 0.3f, .gate = 0.8f, .drive = 1.5f, .kick_len = 1.0f, .kick_bright = 0.7f,
      .hat_ms = 14, .open_ms = 60, .hat_hp = 0.78f, .clap_hz = 1000,
      .ev_density = 4, .ev_low = 55, .ev_mid = 30, .ev_runs = 10, .atmos = 0.55f, .brk = 24,
      .line = 0.35f, .line_dens = 0.3f, .line_oct = 12, .line_range = 5, .line_chrom = 50, .line_slide = 50,
      .line_ratio = 1.5f, .line_index = 3.0f, .line_ms = 120, .line_gate = 0.9f, .line_wah = 0.2f},
     /* cold dark psy: hard, short sixteenths, a short phrase creeping in semitones, lasers, a thin band of noise */
-    {.name = "COLD SIGNAL", .bpm = 152, .root = 30, .gallop = 15, .off = 10,
+    {.name = "COLD SIGNAL", .bpm = 152, .root = 30, .gallop = 15, .off = 10, .bk = {35, 30, 25, 10},
      .ratio = 1.0f, .index = 3.2f, .index_ms = 14, .floor = 0.35f, .gate = 0.72f, .drive = 1.6f, .kick_len = 0.95f, .kick_bright = 1.0f,
      .hat_ms = 14, .open_ms = 55, .hat_hp = 0.80f, .clap_hz = 1100,
      .ev_density = 5, .ev_low = 30, .ev_mid = 55, .ev_runs = 15, .atmos = 0.2f, .brk = 16,
      .line = 0.6f, .line_dens = 0.35f, .line_oct = 24, .line_range = 4, .line_chrom = 70, .line_slide = 10,
      .line_ratio = 3.0f, .line_index = 2.5f, .line_ms = 25, .line_gate = 0.45f},
     /* bouncing: the bass jumps now and then, a talking FM line, gurgles; sudden turns */
-    {.name = "RUBBER CIRCUS", .bpm = 156, .root = 31, .trip = 25, .gallop = 25, .off = 10, .jump = 12,
+    {.name = "RUBBER CIRCUS", .bpm = 156, .root = 31, .trip = 25, .gallop = 25, .off = 10, .bk = {30, 25, 20, 25}, .jump = 12,
      .ratio = 1.0f, .index = 3.0f, .index_ms = 16, .floor = 0.3f, .gate = 0.6f, .drive = 1.4f, .kick_len = 0.9f, .kick_bright = 1.2f,
      .hat_ms = 12, .open_ms = 50, .hat_hp = 0.82f, .clap_hz = 1300,
      .ev_density = 7, .ev_low = 20, .ev_mid = 60, .ev_runs = 20, .atmos = 0.1f, .brk = 8,
      .line = 0.7f, .line_dens = 0.45f, .line_oct = 24, .line_range = 9, .line_chrom = 20, .line_slide = 35,
      .line_ratio = 1.0f, .line_index = 4.0f, .line_ms = 40, .line_gate = 0.6f, .line_wah = 0.8f},
     /* heavy, a distorted bass, a long dragging phrase, groans; big breaks */
-    {.name = "BLACK UNDERTOW", .bpm = 160, .root = 28, .gallop = 15, .off = 10,
+    {.name = "BLACK UNDERTOW", .bpm = 160, .root = 28, .gallop = 15, .off = 10, .bk = {30, 35, 25, 10},
      .ratio = 1.0f, .index = 3.6f, .index_ms = 20, .floor = 0.45f, .gate = 0.75f, .drive = 2.2f, .kick_len = 1.0f, .kick_bright = 1.1f,
      .hat_ms = 14, .open_ms = 55, .hat_hp = 0.78f, .clap_hz = 1000,
      .ev_density = 9, .ev_low = 50, .ev_mid = 35, .ev_runs = 15, .atmos = 0.25f, .brk = 16,
      .line = 0.6f, .line_dens = 0.25f, .line_oct = 12, .line_range = 6, .line_chrom = 50, .line_slide = 60,
      .line_ratio = 2.0f, .line_index = 3.5f, .line_ms = 200, .line_gate = 1.0f, .line_wah = 0.1f},
     /* tight, a short metallic repeat, the staircases begin; now and then a bar of triplets */
-    {.name = "COPPER NERVE", .bpm = 168, .root = 29, .trip = 40, .gallop = 15, .off = 5,
+    {.name = "COPPER NERVE", .bpm = 168, .root = 29, .trip = 40, .gallop = 15, .off = 5, .bk = {25, 25, 20, 30},
      .ratio = 2.0f, .index = 2.8f, .index_ms = 11, .floor = 0.3f, .gate = 0.72f, .drive = 1.5f, .kick_len = 0.93f, .kick_bright = 1.1f,
      .hat_ms = 11, .open_ms = 45, .hat_hp = 0.85f, .clap_hz = 1300, .ride = 1,
      .ev_density = 8, .ev_low = 20, .ev_mid = 45, .ev_runs = 30, .atmos = 0.1f, .brk = 8,
      .line = 0.7f, .line_dens = 0.4f, .line_oct = 36, .line_range = 5, .line_chrom = 30, .line_slide = 5,
      .line_ratio = 3.5f, .line_index = 2.5f, .line_ms = 18, .line_gate = 0.5f},
     /* bright hi-tech: clean sixteenths, a bright metallic lead, staircases flying left and right; short breaks */
-    {.name = "GLASS INSECTS", .bpm = 176, .root = 30, .gallop = 10, .off = 5,
+    {.name = "GLASS INSECTS", .bpm = 176, .root = 30, .gallop = 10, .off = 5, .bk = {30, 30, 15, 25},
      .ratio = 2.0f, .index = 2.4f, .index_ms = 9, .floor = 0.25f, .gate = 0.76f, .drive = 1.3f, .kick_len = 0.92f, .kick_bright = 1.2f,
      .hat_ms = 10, .open_ms = 40, .hat_hp = 0.88f, .clap_hz = 1500, .ride = 1,
      .ev_density = 9, .ev_low = 10, .ev_mid = 40, .ev_runs = 35, .atmos = 0.05f, .brk = 8,
      .line = 0.6f, .line_dens = 0.4f, .line_oct = 36, .line_range = 12, .line_slide = 15,
      .line_ratio = 2.0f, .line_index = 2.0f, .line_ms = 30, .line_gate = 0.6f},
     /* fast and fine: the detail in the line's fragments and the events, the densest; changing all the time */
-    {.name = "CHROME SWARM", .bpm = 186, .root = 31, .gallop = 5, .off = 5,
+    {.name = "CHROME SWARM", .bpm = 186, .root = 31, .gallop = 5, .off = 5, .bk = {30, 35, 10, 25},
      .ratio = 2.0f, .index = 2.2f, .index_ms = 8, .floor = 0.25f, .gate = 0.7f, .drive = 1.3f, .kick_len = 0.9f, .kick_bright = 1.3f,
      .hat_ms = 8, .open_ms = 35, .hat_hp = 0.90f, .clap_hz = 1700, .ride = 1,
      .ev_density = 14, .ev_low = 10, .ev_mid = 35, .ev_runs = 50, .brk = 4,
@@ -233,6 +234,8 @@ static struct {
     uint32_t origin;                   /* the bar the phrases count from: the last drop's */
     uint32_t last_drop;
     uint32_t sec_bar, sec_len;         /* bars into the section; a break's length (0: until cued), a build's */
+    uint8_t bk;                        /* the build's kind (PS_BUILD_ROLL ..), taken as it begins */
+    float hp_hz, hp_b[2], hp_u[2][2];  /* FILTER's high-pass: its cutoff (glides; 0 none), the bass's, the upper's */
     uint32_t cue_seen, drop_seen, build_seen;
     uint8_t fill_beat;                 /* this beat a fill (cued by a black key) */
     float part_g[NPART];               /* the parts' gains, gliding to their mutes */
@@ -406,6 +409,14 @@ int ps_type_now(int part) { return part >= 0 && part < NPART ? s.type[part] : 0;
 void ps_colour(int c) { ps_type(PART_BASS, c & 3); }
 int ps_colour_now(void) { return s.type[PART_BASS]; }
 void ps_line_new(void) { line_new = 1; }
+static volatile int build_want;        /* PS_BUILD_* (AUTO: the world leans) */
+void ps_build_kind(int k) { build_want = k >= 0 && k < PS_NBUILD ? k : PS_BUILD_AUTO; }
+int ps_build_kind_now(void) { return build_want; }
+const char *ps_build_name(int k)
+{
+    static const char *const N[PS_NBUILD] = {"AUTO", "ROLL", "KICK", "FILTER", "TRIPLET"};
+    return N[(unsigned)k % PS_NBUILD];
+}
 void ps_octave(int o) { key_oct = o < -1 ? -1 : o > 2 ? 2 : o; }
 void ps_shed(int on) { shed = (uint8_t)(on != 0); }
 int ps_shedding(void) { return shed; }
@@ -465,26 +476,46 @@ void ps_key(int k, int down, int value)
 static int fill_now(uint32_t bar, uint32_t beat);
 static uint32_t bass_pat(uint32_t rb) { return rb % 8u == s.trip_at ? 2u : s.pat; }   /* the shape of bar rb */
 
+/* a build's roll in a lane: n steps (16, or TRIPLET's 24), quarters, eighths (or eighth triplets), then the finest;
+ * louder as it goes; the breath (its last bar's last beat) empty */
+static int lane_roll(uint8_t out[24], uint32_t lo)
+{
+    uint32_t len = s.sec_len, last = s.sec_bar + 1u >= len, trip = s.bk == PS_BUILD_TRIP, per = trip ? 6u : 4u, i;
+    for (i = 0; i < per * 4u; i++) {
+        uint32_t pb = s.sec_bar * 4u + i / per, every = pb < len ? per : pb < 2u * len ? 2u : 1u;
+        if (i % every == 0u && !(last && i / per == 3u))
+            out[i] = (uint8_t)(lo + (pb >= 2u * len) + last);
+    }
+    return (int)(per * 4u);
+}
+
 /* the bar now as it will play (psy.h): read by the UI while the render moves on (a frame's glance, no lock) */
 int ps_lane(int lane, uint8_t out[24])
 {
     const world_t *w = &W[world];
     uint32_t tick = s.tick ? s.tick - 1u : 0u, bar = tick / TPBAR, rb = bar - s.origin, i;
-    int groove = s.sec == SEC_MAIN, n = 16;
+    int groove = s.sec == SEC_MAIN, n = 16, build = s.sec == SEC_BUILD, flt = build && s.bk == PS_BUILD_FILTER;
+    int breath = build && s.sec_bar + 1u >= s.sec_len;   /* (this bar's last beat) */
     for (i = 0; i < 24u; i++)
         out[i] = 0;
     if (!playing)
         return 16;
     switch (lane) {
     case LANE_KICK:
-        if (groove)
+        if (build && s.bk == PS_BUILD_KICK) {
+            n = lane_roll(out, 1u);
+            break;
+        }
+        if (groove || flt)
             for (i = 0; i < 16u; i += 4u)
                 out[i] = 3;
         if (groove && par[P_FILLS] && rb % 32u == 31u)
             out[12] = 0;
+        if (flt && breath)
+            out[12] = 0;
         break;
     case LANE_BASS:
-        if (!groove)
+        if (!groove && !flt)
             break;
         if (bass_pat(rb) == 2u) {      /* triplets: six a beat, the kick on the first */
             n = 24;
@@ -494,21 +525,15 @@ int ps_lane(int lane, uint8_t out[24])
             for (i = 0; i < 16u; i++)
                 out[i] = i % 4u == 0u || (bass_pat(rb) == 1u && i % 4u == 1u) || (bass_pat(rb) == 3u && i % 4u != 2u)
                        ? 0 : 2;
-        if (fill_now(rb, 3))
+        if (fill_now(rb, 3) || (flt && breath))
             for (i = (uint32_t)n * 3u / 4u; i < (uint32_t)n; i++)
                 out[i] = 0;
         break;
     case LANE_PERC:
-        if (s.sec == SEC_BUILD) {      /* the roll: quarters, eighths, sixteenths; the breath */
-            uint32_t len = s.sec_len, last = s.sec_bar + 1u >= len;
-            for (i = 0; i < 16u; i++) {
-                uint32_t pb = s.sec_bar * 4u + i / 4u, every = pb < len ? 4u : pb < 2u * len ? 2u : 1u;
-                if (i % every == 0u)
-                    out[i] = (uint8_t)(1u + (pb >= 2u * len) + last);
-            }
-            if (last)
-                out[12] = out[13] = out[14] = out[15] = 0;
-        } else if (groove) {
+        if (build && !flt) {           /* the roll (KICK's in the kick's lane) */
+            if (s.bk != PS_BUILD_KICK)
+                n = lane_roll(out, 1u);
+        } else if (groove || flt) {
             static const uint8_t HAT[4] = {1, 2, 0, 2};
             for (i = 0; i < 16u; i++) {
                 uint32_t j = i % 4u;
@@ -519,9 +544,12 @@ int ps_lane(int lane, uint8_t out[24])
                 if ((i == 4u || i == 12u) && bar >= 16u && s.out != 3u)
                     out[i] = 3;
             }
-            if (fill_now(rb, 3))
+            if (groove && fill_now(rb, 3))
                 for (i = 12; i < 16u; i++)
                     out[i] = (uint8_t)(1u + (i - 12u) / 2u + (i == 15u));
+            if (flt && breath)
+                for (i = 12; i < 16u; i++)
+                    out[i] = 0;
         }
         break;
     case LANE_LINE:
@@ -615,13 +643,23 @@ static void mods(const world_t *w)     /* the macros and the moved tempo and roo
     m.bpm = ext_bpm > 0.0f ? ext_bpm : w->bpm + (float)par[P_TEMPO];
 }
 
-/* the build's roll: quarters for its first quarter, eighths for its second, then sixteenths, louder beat by beat;
- * its last beat silent */
+static int build_breath(uint32_t beat) { return s.sec == SEC_BUILD && s.sec_bar + 1u >= s.sec_len && beat == 3u; }
+
+/* the build's roll: quarters for its first quarter, eighths for its second, then sixteenths (TRIPLET: eighth and
+ * sixteenth triplets), louder beat by beat; a clap's, or (KICK) the kick's; its last beat silent. FILTER: none (the
+ * groove goes on: perc_step) */
 static void build_step(uint32_t t, uint32_t beat)
 {
-    uint32_t len = s.sec_len, pb = s.sec_bar * 4u + beat, every = pb < len ? 24u : pb < 2u * len ? 12u : 6u;
-    if ((s.sec_bar + 1u >= len && beat == 3u) || t % every)
+    uint32_t len = s.sec_len, pb = s.sec_bar * 4u + beat, trip = s.bk == PS_BUILD_TRIP;
+    uint32_t every = pb < len ? 24u : pb < 2u * len ? (trip ? 8u : 12u) : (trip ? 4u : 6u);
+    if (build_breath(beat) || t % every)
         return;
+    if (s.bk == PS_BUILD_KICK) {
+        s.k_t = 0.0f;
+        s.k_ph = 0.0f;
+        ps_ui.hits[HIT_KICK]++;
+        return;
+    }
     s.c_t = 0.0f;
     s.c_v = 0.35f + 0.65f * (float)pb / (float)(4u * len - 1u);
     ps_ui.hits[HIT_PERC]++;
@@ -633,9 +671,14 @@ static void perc_step(const world_t *w, uint32_t t, uint32_t beat, uint32_t bar,
     uint32_t six = t / 6u;             /* the sixteenth in the beat */
     static const float HAT_V[4] = {0.55f, 0.80f, 0.0f, 1.0f};
     float hats = (float)par[P_HATS] / 50.0f;
-    if (s.sec == SEC_BUILD) {
+    if (s.sec == SEC_BUILD && s.bk != PS_BUILD_FILTER) {
         build_step(t, beat);
         return;
+    }
+    if (s.sec == SEC_BUILD) {          /* FILTER: the groove's, the hats harder as it rises; its last beat silent */
+        if (build_breath(beat))
+            return;
+        hats *= 1.0f + 0.6f * ((float)s.sec_bar * 4.0f + (float)beat) / (float)(4u * s.sec_len);
     }
     if (s.sec == SEC_BREAK)
         return;
@@ -699,6 +742,28 @@ static void enter(int sec, uint32_t len)
     s.sec_len = len;
 }
 
+static void enter_build(const world_t *w)   /* a build: BUILD's bars, its kind (AUTO: by the world's leaning, not the
+                                             * last one again) */
+{
+    int k = build_want;
+    if (k == PS_BUILD_AUTO) {
+        uint32_t sum = 0, r, i;
+        for (i = 0; i < 4u; i++)
+            sum += s.bk == PS_BUILD_ROLL + (int)i ? 0u : w->bk[i];
+        r = sum ? rnd() % sum : 0u;
+        for (i = 0; i < 4u; i++) {
+            uint32_t p = s.bk == PS_BUILD_ROLL + (int)i ? 0u : w->bk[i];
+            if (r < p)
+                break;
+            r -= p;
+        }
+        k = PS_BUILD_ROLL + (int)(i < 4u ? i : 0u);
+    }
+    s.bk = (uint8_t)k;
+    ps_ui.build_kind = (int8_t)k;
+    enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN], 0, 2)]);
+}
+
 static void drop(uint32_t bar)         /* on this bar's first tick: the groove again, a shade other */
 {
     enter(SEC_MAIN, 0);
@@ -726,7 +791,7 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
     if (s.sec == SEC_MAIN) {
         uint32_t rb = bar - s.origin;
         if (build)                     /* a build straight from the groove */
-            enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN], 0, 2)]);
+            enter_build(w);
         else if (brk)
             enter(SEC_BREAK, 0);
         else if (par[P_BREAKS] > 0 && rb && rb % 32u == 0u && bar - s.last_drop >= GAP_BARS[clampi(par[P_GAP], 0, 3)] &&
@@ -736,7 +801,7 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
         }
     } else if (s.sec == SEC_BREAK) {
         if (build || (s.sec_len && s.sec_bar >= s.sec_len))   /* (a break cued in a break: nothing) */
-            enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN], 0, 2)]);
+            enter_build(w);
     } else if (s.sec_bar >= s.sec_len) {
         drop(bar);
     }
@@ -745,7 +810,7 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
 static void step(const world_t *w)     /* a tick begins: what strikes on it */
 {
     uint32_t t = s.tick % TPB, beat = s.tick / TPB % 4u, bar = s.tick / TPBAR, rb;
-    int groove, bass_rests, kick_rests, bass;
+    int groove, on, bass_rests, kick_rests, bass;
     if (s.tick % TPBAR == 0u)
         section_bar(w, bar);
     if (t % 6u == 0u)
@@ -756,8 +821,9 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     }
     rb = bar - s.origin;
     groove = s.sec == SEC_MAIN;
-    bass_rests = !groove || fill_now(rb, beat) || s.fill_beat;
-    kick_rests = !groove || (par[P_FILLS] && rb % 32u == 31u && beat == 3u);   /* every 32nd bar's: the kick too */
+    on = groove || (s.sec == SEC_BUILD && s.bk == PS_BUILD_FILTER && !build_breath(beat));   /* the kick and the bass */
+    bass_rests = !on || fill_now(rb, beat) || s.fill_beat;
+    kick_rests = !on || (par[P_FILLS] && rb % 32u == 31u && beat == 3u);   /* every 32nd bar's: the kick too */
     perc_step(w, t, beat, bar, rb, groove && bass_rests);
     ev_step(w, t, rb, (uint32_t)((s.tick - s.origin * TPBAR) / 6u), (bar < 4u && !s.drops) || s.sec == SEC_BUILD);
     ln_step(w, t, bar, rb, (uint32_t)((s.tick - s.origin * TPBAR) / 6u));
@@ -1101,9 +1167,11 @@ static void coefs(const world_t *w)    /* as a block begins: what changes slowly
     static const int8_t IV[2][3] = {{24, 31, 36}, {24, 30, 25}};   /* the atmos over the root: fifths; dark, a tritone and a second */
     float colour = (float)par[P_ATMOS_COLOUR] / 100.0f + 0.4f * build_progress();
     int i;
-    cf.kick_f0 = note_hz(m.root + par[P_KICK_TUNE]);
+    float bp = s.sec == SEC_BUILD ? build_progress() : 0.0f;
+    cf.kick_f0 = note_hz(m.root + par[P_KICK_TUNE]) * (s.bk == PS_BUILD_KICK ? fm_exp2f(bp) : 1.0f);   /* (KICK: an
+                                                                                                       * octave up) */
     cf.kick_bright = w->kick_bright;
-    cf.clap_f = 2.0f * fm_sinf(3.14159265f * w->clap_hz / PS_SR);
+    cf.clap_f = 2.0f * fm_sinf(3.14159265f * w->clap_hz * (s.bk == PS_BUILD_TRIP ? fm_exp2f(1.3f * bp) : 1.0f) / PS_SR);
     cf.z_f = 2.0f * fm_sinf(3.14159265f * 300.0f * fm_exp2f(4.5f * build_progress()) / PS_SR);   /* 300 Hz to 6.8 kHz */
     cf.air_f = 2.0f * fm_sinf(3.14159265f * (1200.0f + 900.0f * fm_sin_turns(s.a_lfo) + 1500.0f * colour) / PS_SR);
     for (i = 0; i < 3; i++)
@@ -1137,6 +1205,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
     float fb = (float)par[P_ECHO_FB] / 100.0f, tone = 0.12f + 0.46f * (float)par[P_ECHO_TONE] / 100.0f;
     uint32_t i;
     static float fx_send;              /* what the effects sent to the echo (the next frame takes it) */
+    float hp_to, hp_g;                 /* FILTER's cutoff, the block's target (0: none); its share now */
     if (want_play != playing || restart_n != restart_seen) {
         restart_seen = restart_n;
         playing = want_play;
@@ -1170,6 +1239,11 @@ void ps_render(float *outl, float *outr, uint32_t n)
         send_g = 0.0f;
     }
     flush_states();
+    {   /* FILTER's high-pass, its cutoff now: 30 Hz rising to ~680 Hz through the build; its breath and after, down */
+        uint32_t tk = s.tick ? s.tick - 1u : 0u;
+        hp_to = s.sec == SEC_BUILD && s.bk == PS_BUILD_FILTER && !build_breath(tk / TPB % 4u)
+              ? 30.0f * fm_exp2f(4.5f * build_progress()) : 0.0f;
+    }
     for (i = 0; i < n; i++) {
         {
             int k;
@@ -1200,6 +1274,15 @@ void ps_render(float *outl, float *outr, uint32_t n)
             int k;
             for (k = 0; k < NPART; k++)        /* the parts' gains glide to their mutes (~3 ms) */
                 pg[k] += (((fx.muted | fx.out) >> k & 1u ? 0.0f : 1.0f) - pg[k]) * 0.008f;
+            s.hp_hz += (hp_to - s.hp_hz) * 0.001f;   /* ~23 ms */
+            hp_g = fm_clampf((s.hp_hz - 10.0f) / 30.0f, 0.0f, 1.0f);   /* (in and out by degrees: no step) */
+            if (s.hp_hz > 10.0f) {     /* FILTER: the bass thinned from under (a Chamberlin's high, 12 dB an octave) */
+                float f = 6.2831853f * s.hp_hz / PS_SR, hi = s_bass - s.hp_b[0] - s.hp_b[1];
+                s.hp_b[1] += f * hi;
+                s.hp_b[0] += f * s.hp_b[1];
+                s_bass += (hi - s_bass) * hp_g;
+            } else
+                s.hp_b[0] = s.hp_b[1] = 0.0f;
             c = kick_g * pg[PART_KICK] * s_kick + bass_g * pg[PART_BASS] * s_bass;
             perc(w, dt, &l, &r);
             l *= pg[PART_PERC];
@@ -1244,6 +1327,17 @@ void ps_render(float *outl, float *outr, uint32_t n)
             echo_w++;
             ml = perc_g * l + ev_g * el + ll + al;     /* above the kick and the bass: THROW and DUB take it */
             mr = perc_g * r + ev_g * er + lr + ar;
+            if (s.hp_hz > 10.0f) {     /* FILTER: the rest thinned from under too */
+                float f = 6.2831853f * s.hp_hz / PS_SR, hl = ml - s.hp_u[0][0] - s.hp_u[0][1],
+                      hr = mr - s.hp_u[1][0] - s.hp_u[1][1];
+                s.hp_u[0][1] += f * hl;
+                s.hp_u[0][0] += f * s.hp_u[0][1];
+                s.hp_u[1][1] += f * hr;
+                s.hp_u[1][0] += f * s.hp_u[1][1];
+                ml += (hl - ml) * hp_g;
+                mr += (hr - mr) * hp_g;
+            } else
+                s.hp_u[0][0] = s.hp_u[0][1] = s.hp_u[1][0] = s.hp_u[1][1] = 0.0f;
             outl[i] = c + ml + ret_g * xl;
             outr[i] = c + mr + ret_g * xr;
             fx_send = fx_render(s.tick_len, &outl[i], &outr[i], ml, mr, n);
