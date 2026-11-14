@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The echo's kinds: ALGORITHM on ECHO (FX) chooses PING-PONG, STRAIGHT, TAPE, SMEAR; a THROW (w8) a beat into each,
+# then its repeats. Recorded (build/host/echo-kinds.wav) to listen to. COLD SIGNAL, 152: a beat is about 0.39 s.
+jack in
+wait 600
+tap FX
+wait 30
+expect page 10
+expect echo_kind 0
+listen
+wait 1000
+wav echo-kinds.wav
+key w8 down 90
+wait 400
+key w8 up
+wait 3600
+turn ALGO 1
+wait 30
+expect echo_kind 1
+said ECHO STRAIGHT
+key w8 down 90
+wait 400
+key w8 up
+wait 3600
+turn ALGO 1
+wait 30
+expect echo_kind 2
+said ECHO TAPE
+key w8 down 90
+wait 400
+key w8 up
+wait 3600
+turn ALGO 1
+wait 30
+expect echo_kind 3
+said ECHO SMEAR
+key w8 down 90
+wait 400
+key w8 up
+wait 3600
+shot echo-smear.png
+# FREEZE over SMEAR: the blur held
+key w8 down 90
+wait 400
+key w8 up
+key w10 down 90
+wait 3200
+key w10 up
+wait 2000
+wavstop
+# round to PING-PONG again
+turn ALGO 1
+wait 30
+expect echo_kind 0

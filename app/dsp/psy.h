@@ -73,6 +73,18 @@ enum { PS_CUE_BREAK = 1, PS_CUE_DROP, PS_CUE_BUILD };
 enum { PS_BUILD_AUTO, PS_BUILD_ROLL, PS_BUILD_KICK, PS_BUILD_FILTER, PS_BUILD_TRIP, PS_BUILD_STUTTER, PS_BUILD_POLY,
        PS_BUILD_SINK, PS_BUILD_FAKE, PS_NBUILD };
 void ps_build_kind(int k);
+/* the bass's shape (ALGORITHM on GROOVE): AUTO (the world's: K-B-B-B, now and then a gallop, an offbeat, a bar of
+ * triplets), or one held: K-B-B-B, GALLOP, OFFBEAT (from the next bar, no triplets) */
+enum { PS_SHAPE_AUTO, PS_SHAPE_ROLL, PS_SHAPE_GALLOP, PS_SHAPE_OFF, PS_NSHAPE };
+void ps_bass_shape(int k);
+int ps_bass_shape_now(void);
+const char *ps_bass_shape_name(int k);
+/* the echo's kind (ALGORITHM on ECHO): PING-PONG (left, right, in turn), STRAIGHT (both at once, in the middle), TAPE
+ * (wavering, darker, a little driven), SMEAR (each repeat blurred more, towards a reverb). Changed by degrees. */
+enum { PS_ECHO_PING, PS_ECHO_STRAIGHT, PS_ECHO_TAPE, PS_ECHO_SMEAR, PS_NECHO };
+void ps_echo_kind(int k);
+int ps_echo_kind_now(void);
+const char *ps_echo_kind_name(int k);
 int ps_build_kind_now(void);           /* the one chosen (AUTO or another) */
 const char *ps_build_name(int k);
 void ps_cue(int how);

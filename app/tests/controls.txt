@@ -1,11 +1,34 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The buttons beyond the pages: ALGORITHM the type of the page's part (MAIN: the bass's colour), OCT the keys' octave,
+# The buttons beyond the pages: ALGORITHM the type of the page's part (MAIN: none; GROOVE: the bass's shape; ECHO: the
+# echo's kind), OCT the keys' octave,
 # and the PHASE page's K1 (BREAKS): 0 the breaks only when cued, above 0 on their own (kept by SAVE on GLOBAL).
 # Pages: HOME (MAIN, GROOVE), SEQ (PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ), EDIT (EVENTS, ATMOS), FX (ECHO), GLO.
 listen
 wait 1500
 expect colour 0
+turn ALGO 2
+wait 100
+expect colour 0
+said NO ALGO
+# on GROOVE: the bass's shape held (from the next bar), and back to AUTO
+tap HOME
+wait 30
+expect page 1
+turn ALGO 3
+wait 100
+expect shape 3
+said BASS OFFBEAT
+wait 1700
+shot algo-groove.png
+turn ALGO 1
+wait 100
+expect shape 0
+# on the BASS page: the bass's colour
+tap SEL
+wait 30
+tap SEL
+wait 30
 turn ALGO 2
 wait 100
 expect colour 2

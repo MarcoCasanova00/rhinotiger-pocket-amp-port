@@ -26,10 +26,11 @@
  *  12 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
  *                            (off by default); SAVE here keeps it all
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
- * play or rest. ALGORITHM: the type of the page's part (on PHASE the builds' kind: AUTO, ROLL, KICK, FILTER, TRIPLET;
- * elsewhere the bass's colour; a drop chooses another on its own). OCT- / OCT+: the keys' events an octave down or up
- * (-1..+2; both lit away from 0). REC held: the keys' throws taken into a loop of two bars (pressed again: a take anew;
- * tapped: the loop gone; lit while one plays).
+ * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on PHASE the
+ * builds' kind, on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN and GLOBAL none (MAIN's: all the parts'
+ * types at once, later). OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
+ * the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the loop gone; lit while one
+ * plays).
  * SAVE and ARP, side by side, the sections (but on GLOBAL, where SAVE keeps the settings): SAVE down, a break from
  * the next bar (in a break or a build: nothing); ARP up, a build from the next bar (from the groove or a break), the
  * drop after it (in a build: the drop at the next bar); ARP held, the drop at the next bar. SAVE lit in a break, ARP
@@ -189,11 +190,7 @@ static int page_part(int p)              /* the part a page shows (PART_*), or -
     default: return -1;
     }
 }
-static int algo_part(void)               /* ALGORITHM's part: the page's (MAIN, GROOVE, PHASE, ECHO, GLOBAL: the bass, for now) */
-{
-    int p = page_part(ui.page);
-    return p < 0 ? PART_BASS : p;
-}
+static int algo_part(void) { return page_part(ui.page); }   /* ALGORITHM's part: the page's (-1: none) */
 
 static int grid_mode(void) { return ui.page == PG_ECHO; }
 
@@ -645,7 +642,15 @@ static void input(void)
         int c = (ps_build_kind_now() + (int)e % PS_NBUILD + PS_NBUILD) % PS_NBUILD;
         ps_build_kind(c);
         app_say("BUILD", ps_build_name(c));
-    } else if (e != 0) {                     /* the type of the page's part (elsewhere, for now: the bass's colour) */
+    } else if (e != 0 && ui.page == PG_GROOVE) {   /* GROOVE: the bass's shape */
+        int c = (ps_bass_shape_now() + (int)e % PS_NSHAPE + PS_NSHAPE) % PS_NSHAPE;
+        ps_bass_shape(c);
+        app_say("BASS", ps_bass_shape_name(c));
+    } else if (e != 0 && ui.page == PG_ECHO) {     /* ECHO: the echo's kind */
+        int c = (ps_echo_kind_now() + (int)e % PS_NECHO + PS_NECHO) % PS_NECHO;
+        ps_echo_kind(c);
+        app_say("ECHO", ps_echo_kind_name(c));
+    } else if (e != 0 && algo_part() >= 0) {      /* a part's page: its type */
         static const char *const PNAME[NPART] = {"KICK", "BASS", "PERC", "LINE", "EVENTS", "ATMOS"};
         int part = algo_part(), n = ps_ntypes(part);
         if (n > 1) {
@@ -654,7 +659,8 @@ static void input(void)
             app_say(PNAME[part], ps_type_name(part, c));
         } else
             app_say(PNAME[part], "ONE TYPE");
-    }
+    } else if (e != 0)                             /* MAIN, GLOBAL: none */
+        app_say("NO ALGO", "");
     if (down & (1u << B_OCTDN | 1u << B_OCTUP)) {
         char t[4];
         ui.oct = (int8_t)clamp(ui.oct + (down & 1u << B_OCTUP ? 1 : 0) - (down & 1u << B_OCTDN ? 1 : 0), -1, 2);
@@ -947,6 +953,10 @@ static void draw_rule(void)
         xs = cv_text(xs, 0, &FONT_XS, ps_build_name(k), C_HI) + 6;
         if (k == PS_BUILD_AUTO && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0)
             xs = cv_text(xs - 2, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_GRAY) + 6;
+    } else if (ui.page == PG_GROOVE || ui.page == PG_ECHO) {   /* the bass's shape; the echo's kind */
+        xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
+        xs = cv_text(xs, 0, &FONT_XS, ui.page == PG_GROOVE ? ps_bass_shape_name(ps_bass_shape_now())
+                                                           : ps_echo_kind_name(ps_echo_kind_now()), C_HI) + 6;
     } else if (ui.page >= PG_KICK && ui.page <= PG_ATMOS && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
         int part = algo_part();
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
@@ -1100,6 +1110,10 @@ int app_expect(const char *what, int *got)
         *got = set.par[P_BREAKS] > 0;
     else if (!strcmp(what, "build"))         /* the latest build's kind (PS_BUILD_*; 0 none yet) */
         *got = ps_ui.build_kind;
+    else if (!strcmp(what, "shape"))         /* the bass's shape held (GROOVE's ALGORITHM; 0 AUTO) */
+        *got = ps_bass_shape_now();
+    else if (!strcmp(what, "echo_kind"))     /* the echo's kind (ECHO's ALGORITHM) */
+        *got = ps_echo_kind_now();
     else if (!strcmp(what, "buildset"))      /* the kind ALGORITHM chose on PHASE (0 AUTO) */
         *got = ps_build_kind_now();
     else if (!strcmp(what, "take"))          /* the throws in the keys' loop */

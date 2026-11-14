@@ -225,6 +225,8 @@ static struct {
     uint8_t kf, kf_bars;               /* the phrase's kick twist at its end (KF_*), BARE's bars (1 or 2) */
     /* the echo: ping-pong */
     float e_lp[2];
+    float e_route, e_smear, e_tape;    /* the echo's kind, by degrees: STRAIGHT's share, SMEAR's, TAPE's */
+    float e_wow, e_flut;               /* TAPE's waver (turns) */
     float lim;                         /* the master limiter's gain */
 #define NG 7
     float g[NG];                       /* the levels, gliding: kick, bass, perc, events, line, the events' send, the echo */
@@ -340,6 +342,28 @@ static float hp2(hp2_t *h, float x, float a)
     return y2;
 }
 static hp2_t echo_hp;                  /* the echo's input */
+/* SMEAR: three all-passes a side in the echo's loop, each repeat through them again (lengths prime, the sides apart) */
+#define AP_N 6
+static const uint16_t AP_LEN[AP_N] = {142, 379, 607, 163, 401, 641};
+static float ap_buf[142 + 379 + 607 + 163 + 401 + 641];
+static uint16_t ap_pos[AP_N];
+static float smear(int ch, float x)
+{
+    int k;
+    float *b = ap_buf;
+    for (k = 0; k < ch * 3; k++)
+        b += AP_LEN[k];
+    for (k = ch * 3; k < ch * 3 + 3; k++) {
+        float y, d = b[ap_pos[k]];
+        y = d - 0.55f * x;
+        b[ap_pos[k]] = x + 0.55f * y;
+        if (++ap_pos[k] >= AP_LEN[k])
+            ap_pos[k] = 0;
+        b += AP_LEN[k];
+        x = y;
+    }
+    return x;
+}
 
 static int build_breath(uint32_t beat);
 #include "events.c"
@@ -415,6 +439,22 @@ void ps_colour(int c) { ps_type(PART_BASS, c & 3); }
 int ps_colour_now(void) { return s.type[PART_BASS]; }
 void ps_line_new(void) { line_new = 1; }
 static volatile int build_want;        /* PS_BUILD_* (AUTO: the world leans) */
+static volatile int shape_want;        /* PS_SHAPE_* (AUTO: the world's) */
+static volatile int echo_kind;         /* PS_ECHO_* */
+void ps_bass_shape(int k) { shape_want = k >= 0 && k < PS_NSHAPE ? k : PS_SHAPE_AUTO; }
+int ps_bass_shape_now(void) { return shape_want; }
+const char *ps_bass_shape_name(int k)
+{
+    static const char *const N[PS_NSHAPE] = {"AUTO", "K-B-B-B", "GALLOP", "OFFBEAT"};
+    return N[(unsigned)k % PS_NSHAPE];
+}
+void ps_echo_kind(int k) { echo_kind = k >= 0 && k < PS_NECHO ? k : PS_ECHO_PING; }
+int ps_echo_kind_now(void) { return echo_kind; }
+const char *ps_echo_kind_name(int k)
+{
+    static const char *const N[PS_NECHO] = {"PING-PONG", "STRAIGHT", "TAPE", "SMEAR"};
+    return N[(unsigned)k % PS_NECHO];
+}
 void ps_build_kind(int k) { build_want = k >= 0 && k < PS_NBUILD ? k : PS_BUILD_AUTO; }
 int ps_build_kind_now(void) { return build_want; }
 const char *ps_build_name(int k)
@@ -972,6 +1012,11 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
             s.kf_bars = (uint8_t)(1u + (rnd() & 1u));
         }
     }
+    if (t == 0u && beat == 0u && shape_want != PS_SHAPE_AUTO) {   /* a shape held (GROOVE's ALGORITHM): from this bar */
+        static const uint8_t PAT[PS_NSHAPE] = {0, 0, 1, 3};
+        s.pat = PAT[shape_want & 3];
+        s.trip_at = 255;
+    }
     ps_ui.section = (int8_t)s.sec;
     ps_ui.sec_bar = (uint8_t)(groove ? rb % 8u : s.sec_bar);
     ps_ui.sec_len = (uint8_t)(s.sec == SEC_BUILD ? s.sec_len : 0u);
@@ -1453,6 +1498,20 @@ void ps_render(float *outl, float *outr, uint32_t n)
             ar *= pg[PART_ATMOS];
             if (s.echo_d < 1.0f)
                 s.echo_d = dt_e;
+            {   /* the echo's kind, by degrees (~45 ms) */
+                int ek = echo_kind;
+                s.e_route += ((ek == PS_ECHO_STRAIGHT ? 1.0f : 0.0f) - s.e_route) * 0.0005f;
+                s.e_smear += ((ek == PS_ECHO_SMEAR ? 1.0f : 0.0f) - s.e_smear) * 0.0005f;
+                s.e_tape += ((ek == PS_ECHO_TAPE ? 1.0f : 0.0f) - s.e_tape) * 0.0005f;
+            }
+            if (s.e_tape > 0.0005f) {  /* TAPE: wow (0.6 Hz) and flutter (6.3 Hz), ~0.5 % and ~0.15 % */
+                if ((s.e_wow += 0.6f / PS_SR) >= 1.0f)
+                    s.e_wow -= 1.0f;
+                if ((s.e_flut += 6.3f / PS_SR) >= 1.0f)
+                    s.e_flut -= 1.0f;
+                dt_e = fm_minf(dt_e * (1.0f + s.e_tape * (0.005f * fm_sin_turns(s.e_wow) + 0.0015f * fm_sin_turns(s.e_flut))),
+                               (float)(ECHO_N - 2u));
+            }
             if (fx.held >> FX_DUB & 1u) {  /* DUB: half again as long over ~2 s, wavering ~0.3 % at 0.7 Hz */
                 if ((s.dub_ph += 0.7f / PS_SR) >= 1.0f)
                     s.dub_ph -= 1.0f;
@@ -1472,10 +1531,25 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 send = hp2(&echo_hp, send + fx_send, HP150);   /* nothing under 150 Hz into the echo */
             else
                 send = 0.0f;
-            s.e_lp[0] += (xr * fb + send * 0.5f - s.e_lp[0]) * tone;   /* into the left: the right's, and the send */
-            s.e_lp[1] += (xl * fb - s.e_lp[1]) * tone;                  /* into the right: the left's */
-            echo_buf[0][echo_w % ECHO_N] = (int16_t)(soft(s.e_lp[0]) * 32767.0f);   /* (a throw rounded, not cut) */
-            echo_buf[1][echo_w % ECHO_N] = (int16_t)(soft(s.e_lp[1]) * 32767.0f);
+            {   /* PING-PONG: into the left the right's and the send, into the right the left's; STRAIGHT: each its own,
+                 * the send into both. TAPE darker, driven a little; SMEAR blurred */
+                float rt = s.e_route, tn = tone * (1.0f - 0.35f * s.e_tape), wl, wr;
+                s.e_lp[0] += ((xr + (xl - xr) * rt) * fb + send * (0.5f - 0.15f * rt) - s.e_lp[0]) * tn;
+                s.e_lp[1] += ((xl + (xr - xl) * rt) * fb + send * 0.35f * rt - s.e_lp[1]) * tn;
+                wl = s.e_lp[0];
+                wr = s.e_lp[1];
+                if (s.e_smear > 0.0005f) {
+                    wl += (smear(0, wl) - wl) * s.e_smear;
+                    wr += (smear(1, wr) - wr) * s.e_smear;
+                }
+                if (s.e_tape > 0.0005f) {
+                    float g = 1.0f + 0.5f * s.e_tape;
+                    wl = soft(wl * g) / g;
+                    wr = soft(wr * g) / g;
+                }
+                echo_buf[0][echo_w % ECHO_N] = (int16_t)(soft(wl) * 32767.0f);   /* (a throw rounded, not cut) */
+                echo_buf[1][echo_w % ECHO_N] = (int16_t)(soft(wr) * 32767.0f);
+            }
             echo_w++;
             ml = perc_g * l + ev_g * el + ll + al;     /* above the kick and the bass: THROW and DUB take it */
             mr = perc_g * r + ev_g * er + lr + ar;
