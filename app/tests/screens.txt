@@ -20,3 +20,16 @@ shot screen-phase.png
 turn K1 -30
 wait 100
 shot screen-phase-cued.png
+tap LFO
+wait 40
+turn ALGO 2
+wait 100
+shot screen-line.png
+tap SEQ
+wait 80
+shot screen-line-seq.png
+press REC
+tapkey w3
+wait 200
+shot screen-rec.png
+release REC

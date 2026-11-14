@@ -953,7 +953,7 @@ static void draw_rule(void)
     const char *ctx = 0, *name = PAGE_NAME[ui.page];
     int32_t xd = 231 - NPAGE * 5, xt = xd - 6 - text_w(&FONT_XS, name), xs = 0, i;
     if (ui.btn & 1u << B_REC)
-        ctx = "REC: THE KEYS, TWO BARS";
+        ctx = "REC: THE KEYS";
     else if (ui.page == PG_GLOBAL && set_dirty)
         ctx = "SAVE: KEEP IT";
     if (ctx)
