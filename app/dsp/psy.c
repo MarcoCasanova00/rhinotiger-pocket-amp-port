@@ -142,7 +142,7 @@ const char *ps_world_name(int w) { return W[(unsigned)w % PS_NWORLD].name; }
 static const ps_param_t PAR[P_NPARAMS] = {
     {"ENERGY", 0, 100, 50}, {"DETAIL", 0, 100, 50}, {"DARK", 0, 100, 50}, {"DRIFT", 0, 100, 50},
     {"TEMPO", -20, 20, 0}, {"ROOT", -5, 6, 0}, {"FILLS", 0, 4, 3}, {"SIT OUT", 0, 100, 25},
-    {"LEVEL", 0, 100, 80}, {"TUNE", -6, 6, 0}, {"LENGTH", 0, 100, 50}, {"PUNCH", 0, 100, 50},
+    {"LEVEL", 0, 100, 80}, {"TUNE", -6, 6, 0}, {"FALL", 0, 100, 50}, {"PUNCH", 0, 100, 50},
     {"LEVEL", 0, 100, 80}, {"BITE", 0, 100, 50}, {"LENGTH", 0, 100, 50}, {"DRIVE", 0, 100, 50},
     {"LEVEL", 0, 100, 80}, {"HATS", 0, 100, 50}, {"TONE", 0, 100, 50}, {"CLAP", 0, 100, 50},
     {"LEVEL", 0, 100, 80}, {"DENSITY", 0, 100, 50}, {"RUNS", 0, 100, 50}, {"ECHO", 0, 100, 50},
@@ -240,7 +240,8 @@ static struct {
 static struct {
     float kick_f0;                     /* the kick's resting pitch, Hz */
     float kick_bright;                 /* the world's punch */
-    float clap_f, z_f, air_f;          /* the clap's, the riser's and the atmos's air's band-passes */
+    float clap_f, z_f, air_f;
+    float k_fall;                      /* FALL: the kick's pitch fall, of its type's */          /* the clap's, the riser's and the atmos's air's band-passes */
     float a_inc[3];                    /* the atmos's notes, turns a sample */
 } cf;
 
@@ -754,7 +755,7 @@ static float kick(float dt)
         return 0.0f;
     }
     f0 = cf.kick_f0;                                /* tuned to the key */
-    f = f0 + f0 * (4.0f + 5.0f * punch) * ty[KT_SWEEP] * fm_expf(-t / ty[KT_FALL]);   /* the pitch falls: Punch, from how high */
+    f = f0 + f0 * (4.0f + 5.0f * punch) * ty[KT_SWEEP] * fm_expf(-t / (ty[KT_FALL] * cf.k_fall));   /* the pitch falls: Punch, from how high */
     s.k_ph += f * dt;
     if (s.k_ph >= 1.0f)
         s.k_ph -= 1.0f;
@@ -1040,7 +1041,11 @@ static void tempo(const world_t *w)
 {
     mods(w);
     s.tick_len = PS_SR * 60.0f / m.bpm / (float)TPB;
-    s.k_len = w->kick_len * (0.7f + 0.6f * (float)par[P_KICK_LEN] / 100.0f) * s.tick_len * 6.0f / PS_SR;
+    s.k_len = w->kick_len * s.tick_len * 6.0f / PS_SR;   /* the world's (not a knob's: up to the bass is all it has) */
+    {   /* FALL: the pitch's fall, of the type's, a third as long (0) to three times (100); 50 as it is */
+        int v = par[P_KICK_FALL];
+        cf.k_fall = v == 50 ? 1.0f : fm_exp2f((float)(v - 50) / 50.0f * 1.585f);
+    }
     if (s.k_len > 0.98f * s.tick_len * 4.0f / PS_SR)   /* never into the bass's first note (a triplet's, the soonest) */
         s.k_len = 0.98f * s.tick_len * 4.0f / PS_SR;
     coefs(w);
