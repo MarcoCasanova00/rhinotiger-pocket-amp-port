@@ -49,6 +49,14 @@ turn ALGO 1
 wait 100
 expect perc_type 1
 said PERC
+shot algo-perc.png
+# on the KICK page: the kick's type
+tap SEQ
+wait 30
+turn ALGO 1
+wait 100
+expect kick_type 1
+said KICK
 tap HOME
 wait 30
 tap EDIT

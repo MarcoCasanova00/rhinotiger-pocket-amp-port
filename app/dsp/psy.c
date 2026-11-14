@@ -186,6 +186,8 @@ static struct {
     float h_hp1, h_hp2, h_x1, h_x2;    /* the hats' two one-pole high-passes (shared by closed and open) */
     float c_low, c_band;               /* the clap's band-pass (state variable) */
     float r_ph[3];                     /* the ride's partials */
+    const float *k_ty;                 /* the kick's type, taken as it strikes (KICK_TYPE) */
+    float k_mph;                       /* KNOCK's modulator */
     float h_k, o_k, c_k, r_k;          /* each one's decay, of the world's: its type's, taken as it strikes */
     float p_w[4];                      /* the percussion's source, moving to its type's: noise, metal, grit; its level */
     float p_ph[6], p_nh;               /* TIN's six squares; GRIT's noise held, */
@@ -311,6 +313,7 @@ static hp2_t echo_hp;                  /* the echo's input */
 /* the queue's commands: bits 16.. the kind (0 a key, 1 an effect, 2 a mute, 3 out, 4 a fill) */
 enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE };
 static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; 0: none yet beyond the world's own */
+    [PART_KICK] = {"SOLID", "HARD", "KNOCK", "ZIP"},
     [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW"},
     [PART_LINE] = {"ACID", "GLASS", "GROWL", "REED"},
     [PART_PERC] = {"HISS", "TIN", "TICK", "GRIT"},
@@ -344,6 +347,21 @@ static const float PERC_TYPE[PS_NTYPE][PT_N] = {
     {1.4f, 1.3f, 1.0f, 1.3f, 0.0f, 0.3f, 1.0f, 0.0f, 1.15f},
     {0.45f, 0.5f, 0.4f, 0.5f, 0.06f, 1.0f, 0.0f, 0.0f, 1.25f},
     {1.1f, 1.1f, 1.2f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.55f},
+};
+
+/* the kick's types (ALGORITHM on the KICK page), taken as it strikes. None longer than the world's: after it is the
+ * bass's place.
+ *   SOLID  the world's own
+ *   HARD   the pitch falling faster, the click louder, driven: a harder edge
+ *   KNOCK  a modulator a little off the note, gone in a few ms, the body shorter: wood under the boom
+ *   ZIP    the pitch falling from higher and slower, the body shorter: the zip of a dark kick */
+enum { KT_FALL, KT_SWEEP, KT_BODY, KT_CLICK, KT_DRIVE, KT_FM, KT_LEVEL, KT_N };
+static const float KICK_TYPE[PS_NTYPE][KT_N] = {
+    /* fall (s)  sweep  body   click  drive  fm     level (matched to SOLID's) */
+    {0.011f, 1.0f, 0.45f, 1.0f, 1.8f, 0.0f, 1.0f},
+    {0.008f, 1.2f, 0.40f, 1.6f, 3.2f, 0.0f, 0.77f},
+    {0.011f, 0.9f, 0.35f, 0.6f, 1.8f, 2.5f, 1.08f},
+    {0.022f, 1.6f, 0.40f, 0.8f, 2.0f, 0.0f, 1.0f},
 };
 
 int ps_ntypes(int part) { return part >= 0 && part < NPART && TYPE_NAME[part][1] ? PS_NTYPE : 1; }
@@ -499,6 +517,7 @@ void ps_init(void)
     s.k_t = s.b_t = -1.0f;
     s.h_t = s.o_t = s.c_t = s.r_t = -1.0f;
     s.h_k = s.o_k = s.c_k = s.r_k = 1.0f;
+    s.k_ty = KICK_TYPE[0];
     s.p_w[0] = s.p_w[3] = 1.0f;
     s.rng = 0x9E3779B9u;
     s.lim = 1.0f;
@@ -722,26 +741,38 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
 static float kick(float dt)
 {
     float f0, f, env, x, t = s.k_t, punch = (float)par[P_KICK_PUNCH] / 50.0f * cf.kick_bright;
+    const float *ty;
     if (t < 0.0f)
         return 0.0f;
+    if (t == 0.0f) {                                /* its type, as it strikes */
+        s.k_ty = KICK_TYPE[s.type[PART_KICK]];
+        s.k_mph = 0.0f;
+    }
+    ty = s.k_ty;
     if (t >= s.k_len) {
         s.k_t = -1.0f;
         return 0.0f;
     }
     f0 = cf.kick_f0;                                /* tuned to the key */
-    f = f0 + f0 * (4.0f + 5.0f * punch) * fm_expf(-t / 0.011f);   /* the pitch falls: Punch, from how high */
+    f = f0 + f0 * (4.0f + 5.0f * punch) * ty[KT_SWEEP] * fm_expf(-t / ty[KT_FALL]);   /* the pitch falls: Punch, from how high */
     s.k_ph += f * dt;
     if (s.k_ph >= 1.0f)
         s.k_ph -= 1.0f;
-    env = fm_expf(-t / (s.k_len * 0.45f));
+    env = fm_expf(-t / (s.k_len * ty[KT_BODY]));
     env *= 1.0f - t / s.k_len;                      /* to nothing by its end: the bass's place stays clear */
     if (t < 0.0002f)                                /* its first 0.2 ms a slope, not a step (the click too) */
         env *= t / 0.0002f;
-    x = fm_sin_turns(s.k_ph) * env;
-    x += (t < 0.002f ? 0.35f * punch * (1.0f - t / 0.002f) : 0.0f) * fm_sin_turns(s.k_ph * 7.0f) *   /* the click */
+    if (ty[KT_FM] > 0.0f) {                         /* KNOCK: a modulator a little off the note, its depth falling fast */
+        float mo = fm_sin_turns(s.k_mph) * ty[KT_FM] * fm_expf(-t / 0.004f) * 0.159155f;
+        if ((s.k_mph += f * 1.53f * dt) >= 1.0f)
+            s.k_mph -= 1.0f;
+        x = fm_sin_turns(s.k_ph + mo) * env;
+    } else
+        x = fm_sin_turns(s.k_ph) * env;
+    x += (t < 0.002f ? 0.35f * punch * ty[KT_CLICK] * (1.0f - t / 0.002f) : 0.0f) * fm_sin_turns(s.k_ph * 7.0f) *   /* the click */
          (t < 0.0002f ? t / 0.0002f : 1.0f);
     s.k_t = t + dt;
-    return fm_tanhf(x * 1.8f);
+    return fm_tanhf(x * ty[KT_DRIVE]) * ty[KT_LEVEL];
 }
 
 static const float COLOUR[4][2] = {{1.0f, 1.0f}, {1.0f, 1.35f}, {1.5f, 0.8f}, {0.5f, 1.25f}};   /* ratio, bite */

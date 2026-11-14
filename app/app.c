@@ -863,7 +863,7 @@ static void draw_lanes(uint32_t now)
 }
 
 /* the rule over the knobs (after HYP-1's): at its left what the knobs act on if it needs saying (SEL held: MAIN's
- * four; GLOBAL with something unsaved: SAVE keeps it); at its right the page's name, then a short bar a page, the one
+ * four; GLOBAL with something unsaved: SAVE keeps it), else on a part's page its type (ALGORITHM chooses it); at its right the page's name, then a short bar a page, the one
  * shown lit, its button's other page a little brighter */
 static void draw_rule(void)
 {
@@ -877,6 +877,11 @@ static void draw_rule(void)
         ctx = "SAVE: KEEP IT";
     if (ctx)
         xs = cv_text(6, 0, &FONT_XS, ctx, C_AMB) + 6;
+    else if (ui.page >= PG_KICK && ui.page <= PG_LINE && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
+        int part = algo_part();
+        xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
+        xs = cv_text(xs, 0, &FONT_XS, ps_type_name(part, ps_type_now(part)), part_txt(PART_HUE[part], 255)) + 6;
+    }
     if (xt - 6 > xs)
         cv_rect(xs, 5, xt - 6 - xs, 1, C_LINE);
     cv_text(xt, 0, &FONT_XS, name, C_HI);
@@ -1011,6 +1016,8 @@ int app_expect(const char *what, int *got)
         *got = ps_type_now(PART_ATMOS);
     else if (!strcmp(what, "perc_type"))     /* the percussion's type, 0..3 */
         *got = ps_type_now(PART_PERC);
+    else if (!strcmp(what, "kick_type"))     /* the kick's type, 0..3 */
+        *got = ps_type_now(PART_KICK);
     else if (!strcmp(what, "auto"))          /* breaks on their own */
         *got = !(set.flags & SET_NOAUTO);
     else if (!strcmp(what, "lines"))         /* the line's notes so far */
