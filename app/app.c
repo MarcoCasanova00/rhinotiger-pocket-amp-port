@@ -30,8 +30,8 @@
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
  * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on PHASE the
  * builds' kind, on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
- * those heard another type as the next bar begins, more turns more parts, and the groove (GROOVE on AUTO) another
- * shape for four bars, AUTO staying; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
+ * those heard another type as the next bar begins, more turns more parts, and the groove another shape for four
+ * bars, GROOVE's staying; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
  * the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the loop gone; lit while one
  * plays).
  * SAVE and ARP, side by side, the sections (but on GLOBAL, where SAVE keeps the settings): SAVE down, a break from
@@ -1005,7 +1005,7 @@ static void draw_rule(void)
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
         xs = cv_text(xs, 0, &FONT_XS, ui.page == PG_GROOVE ? ps_bass_shape_name(ps_bass_shape_now())
                                                            : ps_echo_kind_name(ps_echo_kind_now()), C_HI) + 6;
-        if (ui.page == PG_GROOVE && ps_ui.kit_shape != PS_SHAPE_AUTO)   /* AUTO, the kit's shape over it a while */
+        if (ui.page == PG_GROOVE && ps_ui.kit_shape != PS_SHAPE_AUTO)   /* GROOVE's, the kit's shape over it a while */
             xs = cv_text(xs - 2, 0, &FONT_XS, ps_bass_shape_name(ps_ui.kit_shape), C_GRAY) + 6;
     } else if (ui.page >= PG_KICK && ui.page <= PG_ATMOS && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
         int part = algo_part();

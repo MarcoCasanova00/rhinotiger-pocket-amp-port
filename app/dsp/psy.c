@@ -222,7 +222,8 @@ static struct {
     uint8_t pat;                       /* the bass's shape this phrase: 0 K-B-B-B, 1 a gallop (K-.-B-B), 3 an offbeat
                                         * (K-.-B-.); 2 triplets (a bar's: bass_pat()) */
     uint8_t trip_at;                   /* the phrase's bar of triplets (3 or 7; 255: none) */
-    uint8_t kit_pat, kit_bars;         /* the kit's shape over AUTO's (s.pat's values), its bars to go (0: none) */
+    uint8_t kit_pat, kit_bars;         /* the kit's shape over the groove's (s.pat's values), its bars to go (0: none) */
+    uint8_t shape_was;                 /* GROOVE's ALGORITHM as the last bar began (turned: the kit's shape gone) */
     uint8_t kf, kf_bars;               /* the phrase's kick twist at its end (KF_*), BARE's bars (1 or 2) */
     /* the echo: ping-pong */
     float e_lp[2];
@@ -447,9 +448,9 @@ static volatile int shape_want;        /* PS_SHAPE_* (AUTO: the world's) */
  * another type for one part or a few (one turn: one, now and then two; more turns: as many, up to three), chosen
  * among the parts heard now (not muted or out, the kick and the bass not in a break, the line not resting, the events
  * not before they come in), not the ones the last kit changed if others are there, each to a type other than its
- * own; each part takes it at its next note. The groove too, where GROOVE's ALGORITHM is AUTO and the bass heard in
- * the groove: another shape for four bars over AUTO's, then AUTO's again (AUTO stays). Back, the kit before (up to
- * eight; a shape over AUTO's gone). */
+ * own; each part takes it at its next note. The groove too, the bass heard in the groove: another shape for four
+ * bars over GROOVE's (AUTO's or the one held, which stays; GROOVE's ALGORITHM turned meanwhile: gone). Back, the kit
+ * before (up to eight; the kit's shape gone). */
 #define KIT_GROOVE PS_KIT_GROOVE       /* the groove's bit in the kit's parts (after the parts') */
 #define KIT_HIST 8
 static struct {
@@ -475,7 +476,7 @@ static uint32_t kit_heard(void)        /* the parts heard now, 1 << PART_* (and 
         m &= ~(1u << PART_LINE);
     if ((bar < 4u && !s.drops) || s.sec == SEC_BUILD)
         m &= ~(1u << PART_EVENTS);
-    if (shape_want != PS_SHAPE_AUTO || s.sec != SEC_MAIN || !(m >> PART_BASS & 1u))
+    if (s.sec != SEC_MAIN || !(m >> PART_BASS & 1u))
         m &= ~(1u << KIT_GROOVE);
     return m;
 }
@@ -1029,7 +1030,7 @@ static void enter(int sec, uint32_t len)
     s.sec = (uint8_t)sec;
     s.sec_bar = 0;
     s.sec_len = len;
-    s.kit_bars = 0;                    /* (the kit's shape over AUTO's: the groove's only) */
+    s.kit_bars = 0;                    /* (the kit's shape: the groove's only) */
 }
 
 static void enter_build(const world_t *w)   /* a build: BUILD's bars, its kind (AUTO: by the world's leaning, not the
@@ -1141,11 +1142,15 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
             s.kf_bars = (uint8_t)(1u + (rnd() & 1u));
         }
     }
+    if (t == 0u && beat == 0u && shape_want != s.shape_was) {   /* GROOVE's ALGORITHM turned: the kit's shape gone */
+        s.shape_was = (uint8_t)shape_want;
+        s.kit_bars = 0;
+        ps_ui.kit_shape = PS_SHAPE_AUTO;
+    }
     if (t == 0u && beat == 0u && shape_want != PS_SHAPE_AUTO) {   /* a shape held (GROOVE's ALGORITHM): from this bar */
         static const uint8_t PAT[PS_NSHAPE] = {0, 0, 1, 3};
         s.pat = PAT[shape_want & 3];
         s.trip_at = 255;
-        s.kit_bars = 0;
     }
     ps_ui.section = (int8_t)s.sec;
     ps_ui.sec_bar = (uint8_t)(groove ? rb % 8u : s.sec_bar);
