@@ -209,6 +209,9 @@ static struct {
     /* the atmos */
     float a_lvl;                       /* its level now (glides between the sections) */
     float a_ph[3][2], a_mph[3];        /* the chord's notes, left and right; each note's modulator */
+    float a_m[6];                      /* the atmos's type, moving to it: AM_* */
+    float a_genv, a_gtar;              /* GRAIN: the chord's gate now, the grain's level */
+    uint32_t a_gn, a_rng;              /* samples to the next grain, its own dice (the music's stay as they were) */
     float a_vg[3];                     /* the chord's notes' gains (lighter: the upper two fade, and back) */
     float a_lfo, a_lp[2];              /* the slow wander; the chord's low-pass */
     float a_low, a_band;               /* the air's band-pass */
@@ -307,7 +310,22 @@ static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; 0: none yet bey
     [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW"},
     [PART_LINE] = {"ACID", "GLASS", "GROWL", "REED"},
     [PART_EVENTS] = {"ALIVE", "METAL", "LIQUID", "SHARD"},
+    [PART_ATMOS] = {"MIST", "CHIME", "DRONE", "GRAIN"},
 };
+/* the atmos's types (ALGORITHM on the ATMOS page), its values moving from one to the next:
+ *   MIST   the world's own: soft, a fifth's shimmer
+ *   CHIME  the modulator off the harmonics, brighter, the notes closer: bells far off
+ *   DRONE  the modulator on the note, deeper, darker, the notes apart: a slow beating hum
+ *   GRAIN  the chord broken into grains, more air: a forest's crackle */
+enum { AM_RATIO, AM_IDX, AM_DET, AM_LP, AM_AIR, AM_GRAIN, AM_N };
+static const float ATMOS_TYPE[PS_NTYPE][AM_N] = {
+    /* ratio  index  detune   lowpass  air    grain   (levels matched to MIST's: the index and the lowpass) */
+    {2.0f, 1.0f, 0.0016f, 1.0f, 1.0f, 0.0f},
+    {3.5f, 0.7f, 0.0008f, 1.6f, 0.6f, 0.0f},
+    {1.0f, 1.8f, 0.006f, 0.5f, 0.5f, 0.0f},
+    {2.0f, 1.2f, 0.0016f, 1.2f, 1.6f, 1.0f},
+};
+
 int ps_ntypes(int part) { return part >= 0 && part < NPART && TYPE_NAME[part][1] ? PS_NTYPE : 1; }
 const char *ps_type_name(int part, int t)
 {
@@ -463,6 +481,9 @@ void ps_init(void)
     s.rng = 0x9E3779B9u;
     s.lim = 1.0f;
     s.a_vg[0] = s.a_vg[1] = s.a_vg[2] = 1.0f;
+    for (k = 0; k < AM_N; k++)
+        s.a_m[k] = ATMOS_TYPE[0][k];
+    s.a_rng = 0x2545F491u;
     for (k = 0; k < EV_NVOICE; k++)
         ev.v[k].t = -1.0f;
     ln.t = -1.0f;
@@ -854,33 +875,51 @@ static float atmos(const world_t *w, float n, float *l, float *r)
     if ((s.a_lfo += 0.05f / PS_SR) >= 1.0f)
         s.a_lfo -= 1.0f;
     wob = fm_sin_turns(s.a_lfo);
+    {   /* the type: each of its values moving to the type's over ~45 ms (a held chord: no step) */
+        const float *tt = ATMOS_TYPE[s.type[PART_ATMOS]];
+        for (i = 0; i < AM_N; i++)
+            s.a_m[i] += (tt[i] - s.a_m[i]) * 0.0005f;
+    }
     for (i = 0; i < 3; i++) {          /* the chord: each note a little apart left and right, its modulator shared
                                         * (lighter: its root alone, the others fading over ~20 ms, their phases on) */
-        float inc = cf.a_inc[i], idx = (0.15f + 1.2f * colour) * (0.75f + 0.25f * wob), mo,
+        float inc = cf.a_inc[i], idx = (0.15f + 1.2f * colour) * (0.75f + 0.25f * wob) * s.a_m[AM_IDX], mo,
               g = (s.a_vg[i] += ((i && shed ? 0.0f : 1.0f) - s.a_vg[i]) * 0.0012f);
         if (g > 0.0005f) {
             mo = fm_sin_turns(s.a_mph[i]) * idx * 0.159155f;
             al += fm_sin_turns(s.a_ph[i][0] + mo) * g;
             ar += fm_sin_turns(s.a_ph[i][1] + mo) * g;
         }
-        if ((s.a_mph[i] += 2.0f * inc) >= 1.0f)
+        if ((s.a_mph[i] += s.a_m[AM_RATIO] * inc) >= 1.0f)
             s.a_mph[i] -= 1.0f;
-        if ((s.a_ph[i][0] += inc * (1.0f - 0.0016f * (float)(i + 1))) >= 1.0f)
+        if ((s.a_ph[i][0] += inc * (1.0f - s.a_m[AM_DET] * (float)(i + 1))) >= 1.0f)
             s.a_ph[i][0] -= 1.0f;
-        if ((s.a_ph[i][1] += inc * (1.0f + 0.0016f * (float)(i + 1))) >= 1.0f)
+        if ((s.a_ph[i][1] += inc * (1.0f + s.a_m[AM_DET] * (float)(i + 1))) >= 1.0f)
             s.a_ph[i][1] -= 1.0f;
     }
-    k = fm_clampf(0.03f + 0.35f * colour, 0.02f, 0.6f);
+    k = fm_minf(fm_clampf(0.03f + 0.35f * colour, 0.02f, 0.6f) * s.a_m[AM_LP], 0.9f);
     s.a_lp[0] += (al - s.a_lp[0]) * k;
     s.a_lp[1] += (ar - s.a_lp[1]) * k;
     {   /* the air: a band of noise, wandering, swaying left and right */
         float f = cf.air_f;
         s.a_band += f * (n - s.a_low - 0.7f * s.a_band);
         s.a_low += f * s.a_band;
-        x = s.a_band * air * 0.5f;
+        x = s.a_band * air * 0.5f * s.a_m[AM_AIR];
     }
-    al = s.a_lp[0] * 0.10f + x * (0.6f + 0.35f * wob);
-    ar = s.a_lp[1] * 0.10f + x * (0.6f - 0.35f * wob);
+    {   /* GRAIN: the chord in grains, 15..60 ms each, each at its own level (often none), their edges ~2 ms */
+        float g = s.a_m[AM_GRAIN], gate;
+        if (g > 0.0005f) {
+            if (s.a_gn == 0u) {
+                s.a_rng = s.a_rng * 1664525u + 1013904223u;
+                s.a_gn = 660u + (s.a_rng >> 8) % 2000u;
+                s.a_gtar = (s.a_rng >> 24) < 90u ? 0.0f : (float)((s.a_rng >> 16) & 255u) / 170.0f;   /* (to 1.5: the gaps' level back) */
+            }
+            s.a_gn--;
+            s.a_genv += (s.a_gtar - s.a_genv) * 0.01f;
+        }
+        gate = 1.0f - g + g * s.a_genv;
+        al = s.a_lp[0] * 0.10f * gate + x * (0.6f + 0.35f * wob);
+        ar = s.a_lp[1] * 0.10f * gate + x * (0.6f - 0.35f * wob);
+    }
     *l += al * s.a_lvl;
     *r += ar * s.a_lvl;
     return (al + ar) * s.a_lvl * (float)par[P_ATMOS_WASH] / 100.0f;
