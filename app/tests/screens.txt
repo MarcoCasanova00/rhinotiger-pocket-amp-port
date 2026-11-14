@@ -7,6 +7,11 @@ shot screen-main.png
 tapkey w7
 wait 120
 shot screen-thrown.png
+turn PRESET 1
+wait 150
+shot screen-world.png
+wait 400
+shot screen-world-after.png
 tap ENV
 wait 40
 turn K2 3

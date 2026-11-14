@@ -25,10 +25,10 @@
  *  11 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
  *  12 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
  *                            (off by default); SAVE here keeps it all
- * PRESETS: the world, from the next bar. PLAY: play or rest. ALGORITHM: the type of the page's part (elsewhere the
- * bass's colour; a drop chooses another on its own). OCT- / OCT+: the keys' events an octave down or up (-1..+2; both
- * lit away from 0). REC held: the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the
- * loop gone; lit while one plays).
+ * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
+ * play or rest. ALGORITHM: the type of the page's part (elsewhere the bass's colour; a drop chooses another on its
+ * own). OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held: the keys' throws
+ * taken into a loop of two bars (pressed again: a take anew; tapped: the loop gone; lit while one plays).
  * SAVE and ARP, side by side, the sections (but on GLOBAL, where SAVE keeps the settings): SAVE down, a break from
  * the next bar (in a break or a build: nothing); ARP up, a build from the next bar (from the groove or a break), the
  * drop after it (in a build: the drop at the next bar); ARP held, the drop at the next bar. SAVE lit in a break, ARP
@@ -160,6 +160,7 @@ static int page_lane(int p)              /* the lane a page acts on (the screen 
 static struct {
     char msg[2][32];
     uint32_t msg_until;
+    uint32_t world_until;                /* PRESETS turned: the header's name white till (0: none) */
     uint32_t keys, btn;
     uint32_t turned_at[4];               /* each knob's last turn (the strip lights it) */
     uint32_t last_draw;
@@ -397,7 +398,15 @@ static void world_step(int32_t d)
     set.world = (uint8_t)(((int32_t)set.world + d % PS_NWORLD + PS_NWORLD) % PS_NWORLD);
     set_dirty = 1;
     ps_world(set.world);
-    app_say("WORLD", ps_world_name(set.world));
+    ui.msg_until = 0;                    /* no message: the header's own name changes, white a moment, the BPM stays */
+    ui.world_until = plat_ms() + 400u;
+    ui.redraw = 1;
+    if (ann_on()) {
+        char line[50];
+        uint32_t k = str_put(line, sizeof line, "WORLD ");
+        str_put(line + k, sizeof line - k, ps_world_name(set.world));
+        ann_say(line, 0, ANN_NOW);
+    }
 }
 
 static void save(void)
@@ -784,7 +793,9 @@ static void draw_header(uint32_t now)
         cv_text(x + 8, y, big ? &FONT_B : &FONT_XS, ui.msg[1], C_HI);
     } else {
         uint32_t tick = ps_ui.tick, beat = tick / PS_TPB % 4u;
-        if (ps_playing())                    /* the world's name, a rainbow drifting with the hues */
+        if (now < ui.world_until)            /* just turned to */
+            cv_text(10, 6, &FONT_B, ps_world_name(set.world), C_WHITE);
+        else if (ps_playing())               /* the world's name, a rainbow drifting with the hues */
             text_rainbow(10, 6, &FONT_B, ps_world_name(set.world), HUE_MAGENTA + hue.shift, -70, 150, 255);
         else
             cv_text(10, 6, &FONT_B, ps_world_name(set.world), C_GRAY);
@@ -1017,6 +1028,10 @@ void app_frame(void)
     hue_update();
     if (ui.msg_until && now >= ui.msg_until) {
         ui.msg_until = 0;
+        ui.redraw = 1;
+    }
+    if (ui.world_until && now >= ui.world_until) {
+        ui.world_until = 0;
         ui.redraw = 1;
     }
     if (shed_at && now - shed_at > 8000u) {   /* lighter no more */
