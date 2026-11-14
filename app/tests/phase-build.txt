@@ -4,10 +4,8 @@
 # the 4 of sections.txt), then the drop. COLD SIGNAL, 152: a bar is about 1.58 s.
 jack in
 wait 1500
-tap HOME
-wait 30
-tap HOME
-wait 30
+tap SEQ
+wait 60
 expect page 2
 spin K3 -5
 wait 30

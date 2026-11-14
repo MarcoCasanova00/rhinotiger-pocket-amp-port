@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
 # RhinoTiger in the host simulator: ./test.sh basic
-# It plays from the start, on MAIN. Buttons: HOME (MAIN, GROOVE, PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE),
-# SEQ (LINE SEQ, tried in seq.txt), EDIT (EVENTS, ATMOS), FX (ECHO), GLO (GLOBAL); SELECT steps through the pages in that order.
+# It plays from the start, on MAIN. Buttons: HOME (MAIN, GROOVE), SEQ (PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ),
+# EDIT (EVENTS, ATMOS), FX (ECHO), GLO (GLOBAL); SELECT steps through the pages in that order.
 wait 600
 expect playing 1
 expect page 0
@@ -13,7 +13,7 @@ shot logo.png
 wait 700
 shot main.png
 # SELECT turns through every page (MAIN GROOVE PHASE KICK BASS PERC LINE, LINE SEQ, EVENTS ATMOS ECHO GLOBAL); the buttons jump
-# (HOME again: GROOVE, again PHASE, then MAIN; SEL: KICK, BASS; ENV: PERC; LFO: LINE; EDIT: EVENTS, ATMOS; FX: ECHO; GLO: GLOBAL)
+# (HOME again: GROOVE, again MAIN; SEQ: PHASE; SEL: KICK, BASS; ENV: PERC; LFO: LINE, LINE SEQ; EDIT: EVENTS, ATMOS; FX: ECHO; GLO: GLOBAL)
 turn SELECT 1
 wait 30
 expect page 1
@@ -40,10 +40,13 @@ wait 30
 expect page 1
 tap HOME
 wait 30
-expect page 2
-tap HOME
-wait 30
 expect page 0
+tap SEQ
+wait 30
+expect page 2
+tap SEQ
+wait 30
+expect page 2
 tap SEL
 wait 30
 expect page 3
@@ -53,6 +56,12 @@ expect page 4
 tap ENV
 wait 30
 expect page 5
+tap LFO
+wait 30
+expect page 6
+tap LFO
+wait 30
+expect page 7
 tap LFO
 wait 30
 expect page 6

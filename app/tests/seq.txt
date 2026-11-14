@@ -1,21 +1,22 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The SEQ button: a part's pattern. Tapped (under 500 ms, acts on release) on LINE it opens LINE SEQ (page 7), again it goes
-# back to LINE (6); on a part with no pattern yet it stays and says so; from a page without a part (MAIN, GROOVE, PHASE,
-# ECHO, GLOBAL) it acts for the part last shown (LINE at the start). Held from 500 ms the pattern is drawn anew (LINE only)
-# and the release does not also navigate. LINE SEQ's knobs: K1..K4 Density (param33), Mutate (param35), Range (param40),
-# Slide (param41); ALGO there is the line's type.
+# LFO and SEQ. LFO cycles LINE (page 6) and LINE SEQ (7); SEQ goes to PHASE (2), and tapped again stays there: neither
+# is held-sensitive, and the line's phrase is no button's. LINE SEQ's knobs: K1..K4 Density (param33), Mutate (param35),
+# Range (param40), Slide (param41), each changing its own parameter only; ALGO there is the line's type.
 listen
 wait 600
 expect page 0
-# from MAIN, nothing shown yet: the last part is LINE
-tap SEQ
-wait 50
-expect page 7
-tap SEQ
+# LFO: LINE, again LINE SEQ, again LINE
+tap LFO
 wait 50
 expect page 6
-tap SEQ
+tap LFO
+wait 50
+expect page 7
+tap LFO
+wait 50
+expect page 6
+tap LFO
 wait 50
 expect page 7
 # LINE SEQ's knobs: K3 is Range (param40) and nothing else
@@ -48,70 +49,45 @@ wait 100
 expect line_type 2
 expect colour 0
 said LINE
-# held: a new pattern, and the page stays
+# SEQ from LINE SEQ: PHASE, and again it stays
 said_none
-press SEQ
-wait 700
-release SEQ
+tap SEQ
 wait 50
-said LINE NEW PATTERN
-expect page 7
-wait 600
-expect page 7
-# the same on LINE
+expect page 2
+said PHASE
+said_none
+tap SEQ
+wait 50
+expect page 2
+# LFO from PHASE: the first of its own, LINE
 tap LFO
-wait 30
-expect page 6
-press SEQ
-wait 700
-release SEQ
 wait 50
-said LINE NEW PATTERN
 expect page 6
-# a tap on a short press just under the hold: still a tap
-press SEQ
-wait 300
-release SEQ
-wait 50
-expect page 7
-unsaid NEW PATTERN
+# SEQ from LINE: PHASE
 tap SEQ
 wait 50
-expect page 6
-# KICK: no pattern yet, the page stays
+expect page 2
+# SEQ from every other page
+tap HOME
+wait 30
+expect page 0
+tap SEQ
+wait 50
+expect page 2
+tap HOME
+wait 30
+tap HOME
+wait 30
+expect page 1
+tap SEQ
+wait 50
+expect page 2
 tap SEL
 wait 30
 expect page 3
-said KICK
 tap SEQ
 wait 50
-expect page 3
-said KICK NO PATTERN YET
-# held on a part without one says the same, still no navigation
-press SEQ
-wait 700
-release SEQ
-wait 50
-expect page 3
-said KICK NO PATTERN YET
-unsaid NEW PATTERN
-# from MAIN after KICK: the last part shown is KICK
-tap HOME
-wait 30
-expect page 0
-tap SEQ
-wait 50
-expect page 0
-said KICK NO PATTERN YET
-# GROOVE, ECHO the same
-tap HOME
-wait 30
-expect page 1
-tap SEQ
-wait 50
-expect page 1
-said KICK NO PATTERN YET
-# the other parts: BASS (SEL from GROOVE is KICK, again BASS), PERC, EVENTS, ATMOS
+expect page 2
 tap SEL
 wait 30
 tap SEL
@@ -119,34 +95,69 @@ wait 30
 expect page 4
 tap SEQ
 wait 50
-expect page 4
-said BASS NO PATTERN YET
+expect page 2
 tap ENV
 wait 30
-tap SEQ
-wait 50
 expect page 5
-said PERC NO PATTERN YET
+tap SEQ
+wait 50
+expect page 2
 tap EDIT
 wait 30
 expect page 8
 tap SEQ
 wait 50
-expect page 8
-said EVENTS NO PATTERN YET
+expect page 2
+tap EDIT
+wait 30
 tap EDIT
 wait 30
 expect page 9
 tap SEQ
 wait 50
-expect page 9
-said ATMOS NO PATTERN YET
-# back to LINE: from GLOBAL SEQ goes to LINE SEQ again
-tap LFO
+expect page 2
+tap FX
 wait 30
+expect page 10
+tap SEQ
+wait 50
+expect page 2
 tap GLO
 wait 30
 expect page 11
 tap SEQ
 wait 50
+expect page 2
+# held for 700 ms: only the page, nothing said but PHASE, nothing else changed
+tap LFO
+wait 50
+expect page 6
+tap LFO
+wait 50
 expect page 7
+said LINE SEQ
+said_none
+press SEQ
+wait 700
+release SEQ
+wait 50
+expect page 2
+said PHASE
+unsaid NEW PATTERN
+wait 600
+expect page 2
+# held from PHASE: still PHASE, still no new pattern
+said_none
+press SEQ
+wait 700
+release SEQ
+wait 50
+expect page 2
+unsaid NEW PATTERN
+unsaid NO PATTERN YET
+# the knobs and type are as they were
+expect param33 58
+expect param35 42
+expect param40 30
+expect param41 62
+expect line_type 2

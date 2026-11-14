@@ -12,9 +12,7 @@ wait 40
 turn K2 3
 wait 100
 shot screen-perc.png
-tap HOME
-tap HOME
-tap HOME
+tap SEQ
 wait 40
 shot screen-phase.png
 turn K1 -30
@@ -25,7 +23,7 @@ wait 40
 turn ALGO 2
 wait 100
 shot screen-line.png
-tap SEQ
+tap LFO
 wait 80
 shot screen-line-seq.png
 press REC
