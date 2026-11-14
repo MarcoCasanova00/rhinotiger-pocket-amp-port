@@ -531,6 +531,7 @@ void ps_init(void)
         ev.v[k].t = -1.0f;
     ln.t = -1.0f;
     ev.last_type = -1;
+    ev.rk = -1;
     ps_ui.thrown_type = -1;
     s.tick = 0;
     s.next = 0.0f;
