@@ -1167,7 +1167,8 @@ static void perc(const world_t *w, float dt, float *l, float *r)
             float u = t - 0.008f * fm_floorf(t / 0.008f);
             env = fm_expf(-u / 0.0025f) * (u < 0.0001f ? u / 0.0001f : 1.0f);   /* (each burst from a slope) */
         } else {
-            env = 0.8f * fm_expf(-(t - 0.024f) / (0.045f * s.c_k));
+            float u = t - 0.024f;      /* (from a slope as the bursts are: no step out of the third) */
+            env = 0.8f * fm_expf(-u / (0.045f * s.c_k)) * (u < 0.0001f ? u / 0.0001f : 1.0f);
         }
         x = s.c_band * env * s.c_v * 1.4f * (t < 0.0001f ? t / 0.0001f : 1.0f);   /* (its first 0.1 ms a slope) */
         *l += x;
