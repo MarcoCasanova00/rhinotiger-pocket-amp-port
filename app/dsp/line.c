@@ -4,12 +4,13 @@
  * sixteenths over the bass, a two-operator FM voice, mono.
  *
  * The phrase: 32 steps, each on or not (leaning to the beat's offbeat sixteenths, Density), its note (a walk in the
- * Phrygian scale over the world's register, or a semitone's creep: the world's, and Dark more), an accent, a slide to
- * the next. Every 4 bars Mutate (and Drift) rewrites a few steps; a drop draws it anew. It comes in after the intro,
+ * Phrygian scale over the world's register, as far up as Range lets it, or a semitone's creep: the world's, and Dark
+ * more), an accent, a slide to the next (Slide: how many). Every 4 bars Mutate (and Drift) rewrites a few steps; a drop
+ * draws it anew, and SEQ held. What Density, Range and Slide change is heard as steps are drawn. It comes in after the intro,
  * and as each phrase (8 bars) begins it plays or rests by the world's presence. In a break it stays, softer.
  *
- * The voice: the modulation falls from the accent's height to the world's floor (a wah in some worlds: it swings with
- * the note); the pitch glides on a slide; the note's length is Length's share of its step. Over 150 Hz only: a low
+ * The voice: the modulation falls from the accent's height to the world's floor (Bite: both higher or lower; Decay:
+ * the fall slower or quicker; a wah in some worlds: it swings with the note); the pitch glides on a slide; the note's length is Length's share of its step. Over 150 Hz only: a low
  * line's growl is its harmonics, the sub stays the kick's and the bass's.
  *
  * Its types (ALGORITHM on the LINE page), each from the world's voice, taken at a note's start:
@@ -47,11 +48,16 @@ static int ln_scale_note(int deg)      /* a degree (any whole number) of the Phr
     return o * 12 + PHRYGIAN[deg - o * 7];
 }
 
+static int ln_range(const world_t *w)  /* how far the notes go up (Range: none .. twice the world's) */
+{
+    return (int)w->line_range * par[P_LINE_RANGE] / 50;
+}
+
 static void ln_draw_step(const world_t *w, uint32_t i)   /* step i anew */
 {
     static const float WEIGHT[4] = {0.25f, 0.85f, 1.0f, 0.8f};   /* in the beat: on the kick, then the offbeats */
     float dens = w->line_dens * (float)par[P_LINE_DENSITY] / 50.0f * (1.0f + 0.4f * m.energy);
-    int prev = ln.note[(i + LN_STEPS - 1u) % LN_STEPS], range = w->line_range + (m.dark > 0.0f ? (int)(6.0f * m.dark) : 0);
+    int prev = ln.note[(i + LN_STEPS - 1u) % LN_STEPS], range = ln_range(w) + (m.dark > 0.0f ? (int)(6.0f * m.dark) : 0);
     int chrom = clampi((int)w->line_chrom + (int)(40.0f * m.dark), 0, 100), n;
     ln.on[i] = (float)(rnd() % 1000u) < 1000.0f * dens * WEIGHT[i % 4u];
     if ((int)(rnd() % 100u) < chrom)   /* a semitone's creep from the step before */
@@ -64,7 +70,7 @@ static void ln_draw_step(const world_t *w, uint32_t i)   /* step i anew */
     }
     ln.note[i] = (int8_t)clampi(n, -2, range);
     ln.acc[i] = rnd() % 100u < 25u;
-    ln.slide[i] = (int)(rnd() % 100u) < (int)w->line_slide;
+    ln.slide[i] = (int)(rnd() % 100u) < (int)w->line_slide * par[P_LINE_SLIDE] / 50;
 }
 
 static void ln_draw(const world_t *w)
@@ -102,6 +108,8 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
     {
         float f = note_hz(m.root + w->line_oct + ln.note[i]) / PS_SR;
         int sounding = ln.t >= 0.0f, glide = ln.slide[(i + LN_STEPS - 1u) % LN_STEPS] && sounding;
+        float bite = (float)par[P_LINE_BITE] / 50.0f, d = (float)par[P_LINE_DECAY],   /* (50: the world's, as it was) */
+              ms = w->line_ms * (d >= 50.0f ? 1.0f + (d - 50.0f) / 12.5f : 0.25f + 0.75f * d / 50.0f);   /* x0.25 .. x5 */
         ln.inc_to = f;
         if (!glide) {
             ln.inc = f;
@@ -110,9 +118,9 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
         }
         ln.t = 0.0f;
         ln.gate = step_s * (ln.slide[i] ? 1.05f : w->line_gate * (0.4f + 1.2f * (float)par[P_LINE_LEN] / 100.0f));
-        ln.idx = w->line_index * (ln.acc[i] ? 1.5f : 1.0f) * (1.0f + 0.4f * m.dark);
-        ln.idx_floor = w->line_index * 0.15f;
-        ln.idx_k = fm_expf(-1000.0f / (w->line_ms * PS_SR));
+        ln.idx = w->line_index * (ln.acc[i] ? 1.5f : 1.0f) * (1.0f + 0.4f * m.dark) * bite;
+        ln.idx_floor = w->line_index * 0.15f * bite;
+        ln.idx_k = fm_expf(-1000.0f / (ms * PS_SR));
         ln.ratio = w->line_ratio;
         ln.wah = w->line_wah;
         ln.drive = 0.0f;
@@ -122,7 +130,7 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
             ln.ratio = w->line_ratio + 2.41f;
             ln.idx *= 0.6f;
             ln.idx_floor *= 0.3f;
-            ln.idx_k = fm_expf(-1000.0f / (fm_maxf(4.0f * w->line_ms, 150.0f) * PS_SR));
+            ln.idx_k = fm_expf(-1000.0f / (fm_maxf(4.0f * ms, 150.0f) * PS_SR));
             ln.wah = 0.0f;
             ln.gain = LN_GAIN_GLASS;
             break;

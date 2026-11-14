@@ -151,6 +151,7 @@ static const ps_param_t PAR[P_NPARAMS] = {
     {"LEVEL", 0, 100, 70}, {"COLOUR", 0, 100, 50}, {"AIR", 0, 100, 50}, {"WASH", 0, 100, 50},
     {"LEVEL", 0, 100, 70}, {"DENSITY", 0, 100, 50}, {"LENGTH", 0, 100, 50}, {"MUTATE", 0, 100, 50},
     {"BREAKS", 0, 100, 50}, {"BREAK", 0, 4, 0}, {"BUILD", 0, 2, 1}, {"GAP", 0, 3, 1},
+    {"RANGE", 0, 100, 50}, {"SLIDE", 0, 100, 50}, {"BITE", 0, 100, 50}, {"DECAY", 0, 100, 50},
 };
 static const uint8_t BREAK_BARS[5] = {0, 4, 8, 16, 32};   /* P_BREAK_LEN (0: the world's) */
 static const uint8_t BUILD_BARS[3] = {2, 4, 8};           /* P_BUILD_LEN */
@@ -527,7 +528,7 @@ int ps_lane(int lane, uint8_t out[24])
     }
     return n;
 }
-int ps_line_range(void) { return W[world].line_range + 8; }   /* (+2 below the register, Dark's +6 above) */
+int ps_line_range(void) { return ln_range(&W[world]) + 8; }   /* (+2 below the register, Dark's +6 above) */
 
 void ps_init(void)
 {
