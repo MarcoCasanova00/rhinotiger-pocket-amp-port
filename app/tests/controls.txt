@@ -41,6 +41,14 @@ turn ALGO 2
 wait 100
 expect atmos_type 2
 said ATMOS
+# on the PERC page: the percussion's type
+tap SEQ
+tap SEQ
+wait 30
+turn ALGO 1
+wait 100
+expect perc_type 1
+said PERC
 tap HOME
 wait 30
 tap EDIT

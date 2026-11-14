@@ -1009,6 +1009,8 @@ int app_expect(const char *what, int *got)
         *got = ps_type_now(PART_EVENTS);
     else if (!strcmp(what, "atmos_type"))    /* the atmos's type, 0..3 */
         *got = ps_type_now(PART_ATMOS);
+    else if (!strcmp(what, "perc_type"))     /* the percussion's type, 0..3 */
+        *got = ps_type_now(PART_PERC);
     else if (!strcmp(what, "auto"))          /* breaks on their own */
         *got = !(set.flags & SET_NOAUTO);
     else if (!strcmp(what, "lines"))         /* the line's notes so far */

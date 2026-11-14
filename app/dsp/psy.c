@@ -186,6 +186,10 @@ static struct {
     float h_hp1, h_hp2, h_x1, h_x2;    /* the hats' two one-pole high-passes (shared by closed and open) */
     float c_low, c_band;               /* the clap's band-pass (state variable) */
     float r_ph[3];                     /* the ride's partials */
+    float h_k, o_k, c_k, r_k;          /* each one's decay, of the world's: its type's, taken as it strikes */
+    float p_w[4];                      /* the percussion's source, moving to its type's: noise, metal, grit; its level */
+    float p_ph[6], p_nh;               /* TIN's six squares; GRIT's noise held, */
+    uint32_t p_hc;                     /* its count */
     uint32_t rng;
     uint8_t out;                       /* the part sitting out this phrase: 0 none, 1 hats, 2 open, 3 clap, 4 ride */
     uint8_t pat;                       /* the bass's shape this phrase: 0 K-B-B-B, 1 a gallop (K-.-B-B), 2 triplets */
@@ -309,6 +313,7 @@ enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE };
 static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; 0: none yet beyond the world's own */
     [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW"},
     [PART_LINE] = {"ACID", "GLASS", "GROWL", "REED"},
+    [PART_PERC] = {"HISS", "TIN", "TICK", "GRIT"},
     [PART_EVENTS] = {"ALIVE", "METAL", "LIQUID", "SHARD"},
     [PART_ATMOS] = {"MIST", "CHIME", "DRONE", "GRAIN"},
 };
@@ -324,6 +329,21 @@ static const float ATMOS_TYPE[PS_NTYPE][AM_N] = {
     {3.5f, 0.7f, 0.0008f, 1.6f, 0.6f, 0.0f},
     {1.0f, 1.8f, 0.006f, 0.5f, 0.5f, 0.0f},
     {2.0f, 1.2f, 0.0016f, 1.2f, 1.6f, 1.0f},
+};
+
+/* the percussion's types (ALGORITHM on the PERC page): the hats' source (moving to it) and each one's decay (taken as
+ * it strikes), of the world's:
+ *   HISS  the world's own: noise
+ *   TIN   six squares, inharmonic, a little noise, ringing longer: a small cheap cymbal
+ *   TICK  short and thin, the clap's tail clipped: dry ticks
+ *   GRIT  the noise held in steps (a lower rate), the clap too: dust in the machine */
+enum { PT_HAT, PT_OPEN, PT_CLAP, PT_RIDE, PT_THIN, PT_NOISE, PT_METAL, PT_GRIT, PT_LEVEL, PT_N };
+static const float PERC_TYPE[PS_NTYPE][PT_N] = {
+    /* decays: hat  open   clap   ride   thin   noise  metal  grit   level (matched to HISS's) */
+    {1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+    {1.4f, 1.3f, 1.0f, 1.3f, 0.0f, 0.3f, 1.0f, 0.0f, 1.15f},
+    {0.45f, 0.5f, 0.4f, 0.5f, 0.06f, 1.0f, 0.0f, 0.0f, 1.25f},
+    {1.1f, 1.1f, 1.2f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.55f},
 };
 
 int ps_ntypes(int part) { return part >= 0 && part < NPART && TYPE_NAME[part][1] ? PS_NTYPE : 1; }
@@ -478,6 +498,8 @@ void ps_init(void)
         par[k] = PAR[k].def;
     s.k_t = s.b_t = -1.0f;
     s.h_t = s.o_t = s.c_t = s.r_t = -1.0f;
+    s.h_k = s.o_k = s.c_k = s.r_k = 1.0f;
+    s.p_w[0] = s.p_w[3] = 1.0f;
     s.rng = 0x9E3779B9u;
     s.lim = 1.0f;
     s.a_vg[0] = s.a_vg[1] = s.a_vg[2] = 1.0f;
@@ -771,39 +793,70 @@ static float noise(void) { return (float)(int32_t)rnd() * (1.0f / 2147483648.0f)
 /* the percussion, a sample: l and r added to */
 static void perc(const world_t *w, float dt, float *l, float *r)
 {
-    float n = noise(), hp, x, a = fm_clampf(w->hat_hp + 0.002f * (float)(par[P_HAT_TONE] - 50) - 0.05f * m.dark, 0.5f, 0.97f);
+    const float *pt = PERC_TYPE[s.type[PART_PERC]];
+    float n = noise(), hp, x, a, src, cn;
+    int i;
+    for (i = 0; i < 4; i++)            /* the source, moving to the type's over ~3 ms (the hats ring through it) */
+        s.p_w[i] += (pt[PT_NOISE + i] - s.p_w[i]) * 0.008f;
+    a = fm_clampf(w->hat_hp + 0.002f * (float)(par[P_HAT_TONE] - 50) - 0.05f * m.dark + pt[PT_THIN], 0.5f, 0.97f);
+    src = n * s.p_w[0];
+    if (s.p_w[1] > 0.0005f) {          /* TIN: six squares, inharmonic */
+        static const float SQ[6] = {307.9f, 456.6f, 554.4f, 784.0f, 810.0f, 1200.0f};
+        float sq = 0.0f;
+        for (i = 0; i < 6; i++) {
+            if ((s.p_ph[i] += SQ[i] / PS_SR) >= 1.0f)
+                s.p_ph[i] -= 1.0f;
+            sq += s.p_ph[i] < 0.5f ? 1.0f : -1.0f;
+        }
+        src += sq * (1.0f / 6.0f) * s.p_w[1];
+    }
+    if (s.p_w[2] > 0.0005f) {          /* GRIT: the noise held six samples (about 7 kHz) */
+        if (s.p_hc++ % 6u == 0u)
+            s.p_nh = n;
+        src += s.p_nh * s.p_w[2];
+    }
+    cn = (n * (1.0f - s.p_w[2]) + s.p_nh * s.p_w[2]) * s.p_w[3];   /* the clap's noise: GRIT's too */
+    src *= s.p_w[3];
     /* the hats: noise through two high-passes */
-    s.h_hp1 = a * (s.h_hp1 + n - s.h_x1);
-    s.h_x1 = n;
+    s.h_hp1 = a * (s.h_hp1 + src - s.h_x1);
+    s.h_x1 = src;
     s.h_hp2 = a * (s.h_hp2 + s.h_hp1 - s.h_x2);
     s.h_x2 = s.h_hp1;
     hp = s.h_hp2;
+    if (s.h_t == 0.0f)                 /* (each takes its type's decay as it strikes) */
+        s.h_k = pt[PT_HAT];
+    if (s.o_t == 0.0f)
+        s.o_k = pt[PT_OPEN];
+    if (s.c_t == 0.0f)
+        s.c_k = pt[PT_CLAP];
+    if (s.r_t == 0.0f)
+        s.r_k = pt[PT_RIDE];
     if (s.h_t >= 0.0f) {
-        x = hp * s.h_v * fm_expf(-s.h_t * 1000.0f / w->hat_ms) * 0.20f * (s.h_t < 0.0001f ? s.h_t / 0.0001f : 1.0f);
+        x = hp * s.h_v * fm_expf(-s.h_t * 1000.0f / (w->hat_ms * s.h_k)) * 0.20f * (s.h_t < 0.0001f ? s.h_t / 0.0001f : 1.0f);
         *l += 0.8f * x;
         *r += 1.1f * x;
-        if ((s.h_t += dt) > w->hat_ms * 0.008f)
+        if ((s.h_t += dt) > w->hat_ms * s.h_k * 0.008f)
             s.h_t = -1.0f;
     }
     if (s.o_t >= 0.0f) {
-        x = hp * s.o_v * fm_expf(-s.o_t * 1000.0f / w->open_ms) * 0.22f * (s.o_t < 0.0001f ? s.o_t / 0.0001f : 1.0f);
+        x = hp * s.o_v * fm_expf(-s.o_t * 1000.0f / (w->open_ms * s.o_k)) * 0.22f * (s.o_t < 0.0001f ? s.o_t / 0.0001f : 1.0f);
         *l += 1.05f * x;
         *r += 0.85f * x;
-        if ((s.o_t += dt) > w->open_ms * 0.008f)
+        if ((s.o_t += dt) > w->open_ms * s.o_k * 0.008f)
             s.o_t = -1.0f;
     }
     /* the clap: a band of noise, three quick bursts, then its tail */
     if (s.c_t >= 0.0f) {
         float t = s.c_t, f = cf.clap_f, hi, env;
         (void)w;
-        hi = n - s.c_low - 0.9f * s.c_band;
+        hi = cn - s.c_low - 0.9f * s.c_band;
         s.c_band += f * hi;
         s.c_low += f * s.c_band;
         if (t < 0.024f) {
             float u = t - 0.008f * fm_floorf(t / 0.008f);
             env = fm_expf(-u / 0.0025f) * (u < 0.0001f ? u / 0.0001f : 1.0f);   /* (each burst from a slope) */
         } else {
-            env = 0.8f * fm_expf(-(t - 0.024f) / 0.045f);
+            env = 0.8f * fm_expf(-(t - 0.024f) / (0.045f * s.c_k));
         }
         x = s.c_band * env * s.c_v * 1.4f * (t < 0.0001f ? t / 0.0001f : 1.0f);   /* (its first 0.1 ms a slope) */
         *l += x;
@@ -814,7 +867,7 @@ static void perc(const world_t *w, float dt, float *l, float *r)
     /* the ride: three inharmonic partials and a little of the hats' noise */
     if (s.r_t >= 0.0f) {
         static const float RH[3] = {3120.0f, 4617.0f, 7394.0f};
-        float mo = 0.0f, env = fm_expf(-s.r_t / 0.16f);
+        float mo = 0.0f, env = fm_expf(-s.r_t / (0.16f * s.r_k));
         int i;
         for (i = 0; i < 3; i++) {
             s.r_ph[i] += RH[i] * dt;
