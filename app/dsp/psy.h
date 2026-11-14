@@ -121,7 +121,8 @@ void ps_fill(void);
 /* the keys throw events (events.c): key 0..26 (F3..G5), down 1 (value: velocity), 0 up, 2 pressure (value 0..127). A
  * white key is a sound; a black key held, a rhythm for the white keys held with it */
 void ps_key(int k, int down, int value);
-int ps_stat(int which);                /* 0 events begun, 1 thrown and remembered (up to 8), 2 the latest thrown's type */
+int ps_stat(int which);                /* 0 events begun, 1 thrown and remembered (up to 8), 2 the latest thrown's type,
+                                        * 3 the line's phrases drawn whole */
 const char *ps_event_name(int type);
 int ps_rhythm(void);                   /* the black key held whose rhythm the white keys throw on (-1: none) */
 void ps_rec(int on);                   /* REC: pressed (1), a take of the keys anew; let go (0), it loops (two bars) */

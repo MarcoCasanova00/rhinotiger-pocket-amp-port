@@ -20,6 +20,8 @@
  *   6 PERC (ENV)             K1..K4 Level, Hats, Tone, Clap
  *   7 LINE (LFO)             K1..K4 Level, Bite (the modulation's height), Decay (its fall), Length
  *   8 LINE SEQ (LFO again)   K1..K4 Density, Mutate, Range (how far the notes go up), Slide (how many)
+ *                            On either LINE page LFO acts as it is let go (tapped: the other); held, the line's
+ *                            phrase drawn anew from the next bar
  *   9 EVENTS (EDIT)          K1..K4 Level, Density, Runs, Echo (the send)
  *  10 ATMOS (EDIT again)    K1..K4 Level, Colour, Air, Wash (the send)
  *  11 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
@@ -171,6 +173,8 @@ static struct {
     uint32_t thrown_at;                  /* a key's event named on the screen since (0: none) */
     uint32_t arp_at;                     /* ARP pressed at (tapped: a build, or in one the drop; held: the drop) */
     uint8_t arp_held;                    /* ARP held long enough: the drop cued */
+    uint32_t lfo_at;                     /* LFO pressed on a LINE page at (tapped: the next page; held: a phrase anew) */
+    uint8_t lfo_wait;                    /* LFO down on a LINE page, neither yet */
     int8_t thrown_type;
     uint8_t page;
     uint8_t redraw;
@@ -630,6 +634,19 @@ static void input(void)
     if (up & 1u << B_REC) {
         ps_rec(0);
         app_say("REC", ps_take() ? "LOOPING" : "CLEARED");
+    }
+    if ((down & 1u << B_LFO) && (ui.page == PG_LINE || ui.page == PG_LINE_SEQ)) {   /* LFO on LINE: tap or hold */
+        ui.lfo_at = plat_ms();
+        ui.lfo_wait = 1;
+        down &= ~(1u << B_LFO);
+    }
+    if (ui.lfo_wait && (btn & 1u << B_LFO) && plat_ms() - ui.lfo_at >= 500u) {   /* held: the phrase anew */
+        ui.lfo_wait = 0;
+        ps_line_new();
+        app_say("NEW PHRASE", "NEXT BAR");
+    } else if (ui.lfo_wait && (up & 1u << B_LFO)) {   /* tapped: the next page */
+        ui.lfo_wait = 0;
+        page_button(B_LFO);
     }
     for (k = 0; k < NB; k++)                 /* the pages' buttons */
         if (down >> k & 1u)
@@ -1134,6 +1151,8 @@ int app_expect(const char *what, int *got)
         *got = ps_stat(1);
     else if (!strcmp(what, "thrown_type"))
         *got = ps_stat(2);
+    else if (!strcmp(what, "phrases"))       /* the line's phrases drawn whole */
+        *got = ps_stat(3);
     else if (!strncmp(what, "param", 5))     /* paramN: parameter N (psy.h P_*) as the app keeps it */
         *got = set.par[atoi(what + 5) % P_NPARAMS];
     else if (!strncmp(what, "engine", 6))    /* engineN: as the engine has it */

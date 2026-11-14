@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# LFO and SEQ. LFO cycles LINE (page 6) and LINE SEQ (7); SEQ goes to PHASE (2), and tapped again stays there: neither
-# is held-sensitive, and the line's phrase is no button's. LINE SEQ's knobs: K1..K4 Density (param33), Mutate (param35),
-# Range (param40), Slide (param41), each changing its own parameter only; ALGO there is the line's type.
+# LFO and SEQ. LFO cycles LINE (page 6) and LINE SEQ (7); SEQ goes to PHASE (2), and tapped again stays there: SEQ is
+# not held-sensitive and draws no phrase (LFO held on a LINE page does: line-new). LINE SEQ's knobs: K1..K4 Density
+# (param33), Mutate (param35), Range (param40), Slide (param41), each changing its own parameter only; ALGO there is
+# the line's type.
 listen
 wait 600
 expect page 0

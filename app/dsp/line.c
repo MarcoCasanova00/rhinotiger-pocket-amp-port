@@ -6,7 +6,7 @@
  * The phrase: 32 steps, each on or not (leaning to the beat's offbeat sixteenths, Density), its note (a walk in the
  * Phrygian scale over the world's register, as far up as Range lets it, or a semitone's creep: the world's, and Dark
  * more), an accent, a slide to the next (Slide: how many). Every 4 bars Mutate (and Drift) rewrites a few steps; a drop
- * draws it anew, and SEQ held. What Density, Range and Slide change is heard as steps are drawn. It comes in after the intro,
+ * draws it anew, and LFO held on a LINE page (from the next bar). What Density, Range and Slide change is heard as steps are drawn. It comes in after the intro,
  * and as each phrase (8 bars) begins it plays or rests by the world's presence. In a break it stays, softer.
  *
  * The voice: the modulation falls from the accent's height to the world's floor (Bite: both higher or lower; Decay:
@@ -27,6 +27,7 @@ static struct {
     int8_t note[LN_STEPS];             /* semitones over the register */
     uint8_t on[LN_STEPS], acc[LN_STEPS], slide[LN_STEPS];
     uint8_t playing;                   /* this phrase it plays */
+    uint32_t drawn;                    /* phrases drawn whole (the host's checks) */
     /* the voice */
     float t, gate;                     /* seconds since the note (< 0: silent), its length */
     float amp;                         /* the level, following the envelope (a new note over an old: no step) */
@@ -76,6 +77,7 @@ static void ln_draw_step(const world_t *w, uint32_t i)   /* step i anew */
 static void ln_draw(const world_t *w)
 {
     uint32_t i;
+    ln.drawn++;
     for (i = 0; i < LN_STEPS; i++)
         ln_draw_step(w, i);
 }
@@ -89,7 +91,7 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
         return;
     if (pos16 % 16u == 0u && t == 0u) {
         if ((rb == 0u && pos16 == 0u) || line_new) {
-            ln_draw(w);                /* the start, a drop, EDIT: anew */
+            ln_draw(w);                /* the start, a drop, LFO held: anew */
             line_new = 0;
         }
         else if (rb % 4u == 0u) {      /* every 4 bars: Mutate rewrites a few */

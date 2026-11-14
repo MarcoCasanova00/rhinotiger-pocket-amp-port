@@ -724,7 +724,10 @@ void ps_cue(int how)
         cue_n++;
 }
 int ps_section(void) { return s.sec; }
-int ps_stat(int which) { return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : ev.last_type; }
+int ps_stat(int which)
+{
+    return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : which == 2 ? ev.last_type : (int)ln.drawn;
+}
 const char *ps_event_name(int type)
 {
     return type >= EV_NTYPE ? KEY_SOUND[(unsigned)(type - EV_NTYPE) % 16u].name : EV_NAME[(unsigned)type % EV_NTYPE];
