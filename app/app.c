@@ -638,16 +638,6 @@ static void input(void)
                 if (key_black((int)k) && pl < NPART && (ps_ui.muted >> pl & 1u))
                     klit |= 1u << k;
             }
-        {   /* the black key whose rhythm is chosen: lit (and named as it changes) */
-            static int shown = -1;
-            int rk = ps_rhythm();
-            if (rk != shown) {
-                app_say("RHYTHM", rk >= 0 ? ps_rhythm_name(rk) : "OFF");
-                shown = rk;
-            }
-            if (rk >= 0 && !grid_mode())
-                klit |= 1u << rk;
-        }
         plat_lights(lit, klit, dim, kdim, set.lights);
     }
 }
@@ -863,11 +853,21 @@ static void draw_lanes(uint32_t now)
         if (ps_ui.cued)                      /* a cue waiting for the next bar */
             cv_text(8, 126, &FONT_XS, ps_ui.cued == 2 ? "DROP >" : sec == SEC_MAIN ? "BREAK >" : "BUILD >", C_WHITE);
     }
-    if (ui.thrown_at && now - ui.thrown_at < 900u && ui.thrown_type >= 0) {   /* a key's event, named */
-        const char *n = ps_event_name(ui.thrown_type);
-        int32_t w = text_w(&FONT_B, n);
-        cv_rect(236 - w - 12, 126, w + 8, 20, C_LINE);
-        cv_text(236 - w - 8, 128, &FONT_B, n, C_WHITE);
+    {   /* a key's event, named at the right; the rhythm a black key holds, named left of it */
+        int32_t xr = 236;
+        if (ui.thrown_at && now - ui.thrown_at < 900u && ui.thrown_type >= 0) {
+            const char *n = ps_event_name(ui.thrown_type);
+            int32_t w = text_w(&FONT_B, n);
+            cv_rect(xr - w - 12, 126, w + 8, 20, C_LINE);
+            cv_text(xr - w - 8, 128, &FONT_B, n, C_WHITE);
+            xr -= w + 16;
+        }
+        if (ps_rhythm() >= 0 && !grid_mode()) {
+            const char *n = ps_rhythm_name(ps_rhythm());
+            int32_t w = text_w(&FONT_B, n);
+            cv_rect(xr - w - 12, 126, w + 8, 20, C_LINE);
+            cv_text(xr - w - 8, 128, &FONT_B, n, part_txt(LANE_HUE[LANE_EVENTS], 255));
+        }
     }
     cv_blit(0, 32);
 }

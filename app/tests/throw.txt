@@ -1,5 +1,5 @@
-# The keys throw events: each white key its own sound (thrown_type 6 + the white key's index); a black key chooses a
-# rhythm the white keys throw on, lit, until tapped again. Recorded (build/host/throw-*.wav) to listen to.
+# The keys throw events: each white key its own sound (thrown_type 6 + the white key's index); a black key held is a
+# rhythm the white keys held with it throw on. Recorded (build/host/throw-*.wav) to listen to.
 jack in
 listen
 wav throw-cold-signal.wav
@@ -20,18 +20,17 @@ expect thrown_type 13
 tapkey w14
 wait 400
 expect thrown_type 20
-# a black key (G#3): eighths chosen, lit; a white key held on them, then the black key again: none
+# a black key (G#3) held: eighths; a white key held with it throws on them; let go, none
 expect rhythm -1
-tapkey b1
+key b1 down 90
 wait 100
 expect rhythm 3
-said RHYTHM
-shot throw-rhythm.png
 key w5 down 90
-wait 1580
+wait 300
+shot throw-rhythm.png
+wait 1280
 key w5 up
-wait 200
-tapkey b1
+key b1 up
 wait 100
 expect rhythm -1
 wait 600

@@ -10,9 +10,9 @@
  *
  * The keys: the white keys are sounds, the black keys rhythms. Each white key its own sound (KEY_SOUND, sixteen, low
  * to high), thrown on the next sixteenth; held, again each sixteenth, the sound turning a little as it repeats (a cycle
- * of eight: its depth, its glide, its place left and right). A black key chooses a rhythm (KEY_RHYTHM), one at a time,
- * lit: the white keys then throw on its beats instead; the lit key again, the sixteenths. Pressed harder, a throw bites
- * more. What is thrown is remembered: the generator takes it up later.
+ * of eight: its depth, its glide, its place left and right). A black key held is a rhythm (KEY_RHYTHM): the white
+ * keys held with it throw on its beats instead (alone it is silent); let go, the sixteenths. Pressed harder, a throw
+ * bites more. What is thrown is remembered: the generator takes it up later.
  *
  * Their types (ALGORITHM on the EVENTS page), over every recipe, taken as a voice begins:
  *   ALIVE   the recipes as they are
@@ -76,7 +76,7 @@ static struct {
     } run[4];
     /* the keys: thrown on the next sixteenth; held, again each sixteenth */
     uint32_t held, pending, down;
-    int8_t rk;                         /* the black key whose rhythm is chosen, lit (-1: none) */
+    int8_t rk;                         /* the black key held whose rhythm leads (-1: none) */
     uint8_t rstart;                    /* its first beat waits for a sixteenth */
     uint8_t rwait;                     /* ticks to its next beat */
     uint32_t ri;                       /* its beats so far */
@@ -457,8 +457,9 @@ static void ev_key(int k, int down, int press)   /* (render: from the command qu
         return;
     if (down) {
         recipe_t r = key_recipe(k);
-        if (key_black(k)) {            /* a rhythm chosen (its beats from the next sixteenth), or the lit one let go */
-            ev.rk = ev.rk == k ? -1 : (int8_t)k;
+        if (key_black(k)) {            /* a rhythm while held (its beats from the next sixteenth; the latest leads) */
+            ev.down |= 1u << k;
+            ev.rk = (int8_t)k;
             ev.ri = 0;
             ev.rstart = 1;
             return;
@@ -474,6 +475,17 @@ static void ev_key(int k, int down, int press)   /* (render: from the command qu
     } else {
         ev.down &= ~(1u << k);
         ev.held &= ~(1u << k);
+        if (ev.rk == k) {              /* its rhythm let go: another black key still held, or the sixteenths */
+            int b;
+            ev.rk = -1;
+            for (b = 26; b >= 0; b--)
+                if (key_black(b) && ev.down >> b & 1u) {
+                    ev.rk = (int8_t)b;
+                    ev.ri = 0;
+                    ev.rstart = 1;
+                    break;
+                }
+        }
     }
 }
 

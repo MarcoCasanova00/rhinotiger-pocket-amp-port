@@ -85,11 +85,11 @@ void ps_out(int part, int on);         /* out while held */
 void ps_fill(void);
 
 /* the keys throw events (events.c): key 0..26 (F3..G5), down 1 (value: velocity), 0 up, 2 pressure (value 0..127). A
- * white key is a sound; a black key chooses a rhythm (again: none) */
+ * white key is a sound; a black key held, a rhythm for the white keys held with it */
 void ps_key(int k, int down, int value);
 int ps_stat(int which);                /* 0 events begun, 1 thrown and remembered (up to 8), 2 the latest thrown's type */
 const char *ps_event_name(int type);
-int ps_rhythm(void);                   /* the black key whose rhythm the white keys throw on (-1: none, the sixteenths) */
+int ps_rhythm(void);                   /* the black key held whose rhythm the white keys throw on (-1: none) */
 const char *ps_rhythm_name(int k);
 
 /* for the screen: the bar now, lane by lane, as it will play (the parts are generated: this is the engine's plan for
