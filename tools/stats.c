@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 hacha */
 /* The structure, counted: each world played on its own (no hands) for a while, bar by bar: how long the grooves run
- * between breaks, how long the breaks are, how often the bass's phrases gallop, roll in triplets or sit on the offbeat
- * (the rest K-B-B-B), how much of the time the line plays, a part sits out, and the events and the line's notes a bar.
- * The engine at its defaults, Drift moved by an argument. Usage: stats [minutes] [drift (-1: its default)] [world (-1:
- * all)]. Built (from the repository's top): cc -O2 -ffp-contract=off -Ibase/include -o build/stats tools/stats.c -lm */
+ * between breaks, how long the breaks are, how often the bass's phrases gallop or sit on the offbeat (the rest
+ * K-B-B-B) or have a bar of triplets, how much of the time the line plays, a part sits out, and the events and the
+ * line's notes a bar. The engine at its defaults, Drift moved by an argument. Usage: stats [minutes] [drift (-1: its
+ * default)] [world (-1: all)]. Built (from the repository's top): cc -O2 -ffp-contract=off -Ibase/include -o
+ * build/stats tools/stats.c -lm */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -66,7 +67,7 @@ int main(int argc, char **argv)
                 if (ps_ui.sec_bar == 0u) {      /* a phrase: its bass shape, its line, who sits out */
                     phr++;
                     gal += s.pat == 1u;
-                    tri += s.pat == 2u;
+                    tri += s.trip_at != 255u;
                     off += s.pat == 3u;
                     ln_on += ln.playing;
                     sit += s.out != 0u;

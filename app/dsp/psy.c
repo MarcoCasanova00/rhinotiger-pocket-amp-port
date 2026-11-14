@@ -43,10 +43,11 @@ typedef struct {
     const char *name;
     float bpm;
     int root;                          /* MIDI note of the bass (and the kick's tuning) */
-    /* the bass: K-B-B-B, and now and then a phrase of another shape (the user: triplets "there may be some, but
-     * rare"; a gallop, K-.-B-B, may sit better, a little more of it; an offbeat, K-.-B-., too). How often each
-     * comes, counted: tools/stats.c */
-    uint8_t trip, gallop, off;         /* % of phrases in sixteenth triplets (K-b-b-b-b-b), a gallop, an offbeat */
+    /* the bass: K-B-B-B, and now and then a phrase of another shape (a gallop, K-.-B-B, may sit better, a little more
+     * of it; an offbeat, K-.-B-., too); triplets one bar only, a touch (the user: "there may be some, but rare"; a
+     * phrase of them, too much). How often each comes, counted: tools/stats.c */
+    uint8_t trip;                      /* % of phrases with a bar of sixteenth triplets (K-b-b-b-b-b): its 4th or 8th */
+    uint8_t gallop, off;               /* % of phrases in a gallop, an offbeat */
     uint8_t skip, jump;                /* % of notes resting (a stutter), jumping (an octave or a fifth up) */
     float ratio;                       /* the bass's modulator to carrier */
     float index, index_ms;             /* the modulation at the note's start, and how fast it falls (ms to 1/e) */
@@ -102,7 +103,7 @@ static const world_t W[PS_NWORLD] = {
      .line = 0.6f, .line_dens = 0.35f, .line_oct = 24, .line_range = 4, .line_chrom = 70, .line_slide = 10,
      .line_ratio = 3.0f, .line_index = 2.5f, .line_ms = 25, .line_gate = 0.45f},
     /* bouncing: the bass jumps now and then, a talking FM line, gurgles; sudden turns */
-    {.name = "RUBBER CIRCUS", .bpm = 156, .root = 31, .trip = 5, .gallop = 25, .off = 10, .jump = 12,
+    {.name = "RUBBER CIRCUS", .bpm = 156, .root = 31, .trip = 25, .gallop = 25, .off = 10, .jump = 12,
      .ratio = 1.0f, .index = 3.0f, .index_ms = 16, .floor = 0.3f, .gate = 0.6f, .drive = 1.4f, .kick_len = 0.9f, .kick_bright = 1.2f,
      .hat_ms = 12, .open_ms = 50, .hat_hp = 0.82f, .clap_hz = 1300,
      .ev_density = 7, .ev_low = 20, .ev_mid = 60, .ev_runs = 20, .atmos = 0.1f, .brk = 8,
@@ -115,8 +116,8 @@ static const world_t W[PS_NWORLD] = {
      .ev_density = 9, .ev_low = 50, .ev_mid = 35, .ev_runs = 15, .atmos = 0.25f, .brk = 16,
      .line = 0.6f, .line_dens = 0.25f, .line_oct = 12, .line_range = 6, .line_chrom = 50, .line_slide = 60,
      .line_ratio = 2.0f, .line_index = 3.5f, .line_ms = 200, .line_gate = 1.0f, .line_wah = 0.1f},
-    /* tight, a short metallic repeat, the staircases begin; now and then a phrase of triplets */
-    {.name = "COPPER NERVE", .bpm = 168, .root = 29, .trip = 15, .gallop = 15, .off = 5,
+    /* tight, a short metallic repeat, the staircases begin; now and then a bar of triplets */
+    {.name = "COPPER NERVE", .bpm = 168, .root = 29, .trip = 40, .gallop = 15, .off = 5,
      .ratio = 2.0f, .index = 2.8f, .index_ms = 11, .floor = 0.3f, .gate = 0.72f, .drive = 1.5f, .kick_len = 0.93f, .kick_bright = 1.1f,
      .hat_ms = 11, .open_ms = 45, .hat_hp = 0.85f, .clap_hz = 1300, .ride = 1,
      .ev_density = 8, .ev_low = 20, .ev_mid = 45, .ev_runs = 30, .atmos = 0.1f, .brk = 8,
@@ -216,8 +217,9 @@ static struct {
     uint32_t p_hc;                     /* its count */
     uint32_t rng;
     uint8_t out;                       /* the part sitting out this phrase: 0 none, 1 hats, 2 open, 3 clap, 4 ride */
-    uint8_t pat;                       /* the bass's shape this phrase: 0 K-B-B-B, 1 a gallop (K-.-B-B), 2 triplets,
-                                        * 3 an offbeat (K-.-B-.) */
+    uint8_t pat;                       /* the bass's shape this phrase: 0 K-B-B-B, 1 a gallop (K-.-B-B), 3 an offbeat
+                                        * (K-.-B-.); 2 triplets (a bar's: bass_pat()) */
+    uint8_t trip_at;                   /* the phrase's bar of triplets (3 or 7; 255: none) */
     /* the echo: ping-pong */
     float e_lp[2];
     float lim;                         /* the master limiter's gain */
@@ -461,6 +463,7 @@ void ps_key(int k, int down, int value)
 }
 
 static int fill_now(uint32_t bar, uint32_t beat);
+static uint32_t bass_pat(uint32_t rb) { return rb % 8u == s.trip_at ? 2u : s.pat; }   /* the shape of bar rb */
 
 /* the bar now as it will play (psy.h): read by the UI while the render moves on (a frame's glance, no lock) */
 int ps_lane(int lane, uint8_t out[24])
@@ -483,13 +486,14 @@ int ps_lane(int lane, uint8_t out[24])
     case LANE_BASS:
         if (!groove)
             break;
-        if (s.pat == 2u) {             /* triplets: six a beat, the kick on the first */
+        if (bass_pat(rb) == 2u) {      /* triplets: six a beat, the kick on the first */
             n = 24;
             for (i = 0; i < 24u; i++)
                 out[i] = i % 6u ? 2 : 0;
         } else
             for (i = 0; i < 16u; i++)
-                out[i] = i % 4u == 0u || (s.pat == 1u && i % 4u == 1u) || (s.pat == 3u && i % 4u != 2u) ? 0 : 2;
+                out[i] = i % 4u == 0u || (bass_pat(rb) == 1u && i % 4u == 1u) || (bass_pat(rb) == 3u && i % 4u != 2u)
+                       ? 0 : 2;
         if (fill_now(rb, 3))
             for (i = (uint32_t)n * 3u / 4u; i < (uint32_t)n; i++)
                 out[i] = 0;
@@ -759,8 +763,9 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     ln_step(w, t, bar, rb, (uint32_t)((s.tick - s.origin * TPBAR) / 6u));
     if (t == 0u && beat == 0u && rb % 8u == 0u && groove) {   /* a phrase: the bass's shape, now and then another */
         uint32_t r = rnd() % 100u;
-        s.pat = (uint8_t)(rb == 0u || r >= (uint32_t)(w->trip + w->gallop + w->off) ? 0 : r < w->trip ? 2
-                          : r < (uint32_t)(w->trip + w->gallop) ? 1 : 3);
+        s.pat = (uint8_t)(rb == 0u || r >= (uint32_t)(w->gallop + w->off) ? 0 : r < w->gallop ? 1 : 3);
+        r = rnd() % 100u;              /* a bar of triplets: the half's end, the 4th bar or the 8th */
+        s.trip_at = (uint8_t)(rb != 0u && r < w->trip ? (r & 1u ? 3u : 7u) : 255u);
     }
     ps_ui.section = (int8_t)s.sec;
     ps_ui.sec_bar = (uint8_t)(groove ? rb % 8u : s.sec_bar);
@@ -778,9 +783,10 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         return;
     }
     {
-        uint32_t roll = s.pat == 2u ? 4u : 6u;   /* triplets: K-b-b-b-b-b; a gallop: K-.-B-B; an offbeat: K-.-B-. */
-        uint32_t span = s.pat == 3u ? 12u : roll;   /* the room a note has (the offbeat's: to the next kick) */
-        bass = t % roll == 0u && !(s.pat == 1u && t == 6u) && !(s.pat == 3u && t != 12u);
+        uint32_t pat = bass_pat(rb), roll = pat == 2u ? 4u : 6u;   /* triplets: K-b-b-b-b-b; a gallop: K-.-B-B; an
+                                                                    * offbeat: K-.-B-. */
+        uint32_t span = pat == 3u ? 12u : roll;   /* the room a note has (the offbeat's: to the next kick) */
+        bass = t % roll == 0u && !(pat == 1u && t == 6u) && !(pat == 3u && t != 12u);
         if (!bass || bass_rests)
             return;
         if (w->skip && rnd() % 100u < w->skip)   /* a stutter: this one rests */
@@ -1143,6 +1149,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.build_seen = build_n;
         s.drops = 0;                   /* (the intro again: the events quiet its first bars) */
         s.out = s.pat = s.fill_beat = 0;
+        s.trip_at = 255;
         ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */
         take.n = 0;                    /* (the keys' loop gone) */
     }
