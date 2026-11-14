@@ -92,7 +92,7 @@ wait 1600
 key b8 up
 wait 1600
 wavstop
-# off ECHO the keys are no grid, REC held or not (it does nothing now)
+# off ECHO the keys are no grid, REC held or not (REC takes the keys into a loop: rec.txt)
 tap HOME
 wait 30
 press REC

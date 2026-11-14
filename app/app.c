@@ -27,7 +27,8 @@
  *                            (off by default); SAVE here keeps it all
  * PRESETS: the world, from the next bar. PLAY: play or rest. ALGORITHM: the type of the page's part (elsewhere the
  * bass's colour; a drop chooses another on its own). OCT- / OCT+: the keys' events an octave down or up (-1..+2; both
- * lit away from 0). ARP and REC: nothing yet.
+ * lit away from 0). REC held: the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the
+ * loop gone; lit while one plays). ARP: nothing yet.
  * SAVE (but on GLOBAL), after HYP-1's: tapped, the next section from the next bar (the groove: a break; a break: its
  * build, then the drop); held, the drop at the next bar. Lit in a break, quick in a build.
  * The keys play no notes: each throws an event into the music on the next sixteenth (dsp/events.c); the screen
@@ -641,6 +642,14 @@ static void input(void)
             }
         }
     }
+    if (down & 1u << B_REC) {                /* the keys' loop: a take anew while held */
+        ps_rec(1);
+        app_say("REC", "TWO BARS");
+    }
+    if (up & 1u << B_REC) {
+        ps_rec(0);
+        app_say("REC", ps_take() ? "LOOPING" : "CLEARED");
+    }
     for (k = 0; k < NB; k++)                 /* the pages' buttons (SEQ's: below) */
         if (k != B_SEQ && down >> k & 1u)
             page_button((int)k);
@@ -689,10 +698,10 @@ static void input(void)
                        : sec == SEC_BREAK || ps_ui.cued ? 1
                        : sec == SEC_BUILD ? tick % PS_TPB < PS_TPB / 2u : 0;   /* a build: on the beats */
         uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (save_lit ? 1u << B_SAVE : 0u) | (ps_playing() ? 1u << B_PLAY : 0u) |
-                       (ui.oct < 0 ? 1u << B_OCTDN : 0u) |
+                       (ui.oct < 0 ? 1u << B_OCTDN : 0u) | (ps_take() ? 1u << B_REC : 0u) |
                        (ui.oct > 0 ? 1u << B_OCTUP : 0u);
         uint32_t dim = 1u << B_HOME | 1u << B_SEL | 1u << B_ENV | 1u << B_LFO | 1u << B_EDIT | 1u << B_FX | 1u << B_GLO |
-                       1u << B_SEQ | 1u << B_SAVE | 1u << B_PLAY | 1u << B_OCTDN | 1u << B_OCTUP, klit = keys, kdim = 0;
+                       1u << B_SEQ | 1u << B_REC | 1u << B_SAVE | 1u << B_PLAY | 1u << B_OCTDN | 1u << B_OCTUP, klit = keys, kdim = 0;
         if (grid_mode())                     /* the grid: each row's first key glows, a muted part's key is lit */
             for (k = 0; k < NKEYS; k++) {
                 int pl = key_place((int)k);
@@ -943,7 +952,9 @@ static void draw_rule(void)
 {
     const char *ctx = 0, *name = PAGE_NAME[ui.page];
     int32_t xd = 231 - NPAGE * 5, xt = xd - 6 - text_w(&FONT_XS, name), xs = 0, i;
-    if (ui.page == PG_GLOBAL && set_dirty)
+    if (ui.btn & 1u << B_REC)
+        ctx = "REC: THE KEYS, TWO BARS";
+    else if (ui.page == PG_GLOBAL && set_dirty)
         ctx = "SAVE: KEEP IT";
     if (ctx)
         xs = cv_text(6, 0, &FONT_XS, ctx, C_AMB) + 6;
@@ -1095,6 +1106,8 @@ int app_expect(const char *what, int *got)
         *got = (int)ps_ui.hits[HIT_THROW];
     else if (!strcmp(what, "auto"))          /* breaks on their own (BREAKS above 0) */
         *got = set.par[P_BREAKS] > 0;
+    else if (!strcmp(what, "take"))          /* the throws in the keys' loop */
+        *got = ps_take();
     else if (!strcmp(what, "lines"))         /* the line's notes so far */
         *got = (int)ps_ui.hits[HIT_LINE];
     else if (!strcmp(what, "muted"))         /* the parts muted, 1 << PART_* (the engine's) */

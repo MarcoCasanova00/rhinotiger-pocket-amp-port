@@ -14,6 +14,10 @@
  * keys held with it throw on its beats instead (alone it is silent); let go, the sixteenths. Pressed harder, a throw
  * bites more. What is thrown is remembered: the generator takes it up later.
  *
+ * The keys' loop (REC): two bars of what the keys threw, each where it fell (its tick, on the sixteenths or a rhythm's
+ * beats), played again each time round. REC pressed begins a take anew (the old one gone: tapped, nothing in it), the
+ * throws while it is held go in, and on the second time round they play under the new ones. Stopped: gone.
+ *
  * Their types (ALGORITHM on the EVENTS page), over every recipe, taken as a voice begins:
  *   ALIVE   the recipes as they are
  *   METAL   the modulator off the harmonics, the glides shorter, ringing longer: struck sheet and wire
@@ -86,6 +90,18 @@ static struct {
     uint32_t fired;                    /* events begun (the host's checks) */
     int last_type;                     /* the latest thrown (the host's checks) */
 } ev;
+
+#define TAKE_TICKS (8u * TPB)          /* the keys' loop: two bars */
+#define TAKE_N 96u
+static struct {
+    struct {
+        recipe_t r;
+        uint8_t pos;                   /* its tick in the two bars */
+        uint8_t bite;                  /* x100 */
+    } e[TAKE_N];
+    uint8_t n;
+    volatile uint8_t rec;              /* REC held: the throws go in */
+} take;
 
 static int key_black(int k) { int pc = (k + 5) % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
 
@@ -399,6 +415,12 @@ static void key_throw(int k, int stepped)   /* key k's sound now (its cycle on; 
     r.note = (int8_t)clampi(r.note + stepped, 24, 108);
     r.cyc = (uint8_t)(1u + ev.kcyc[k]++ % 8u);
     ev_start(&r, bite, 1.0f);
+    if (take.rec && take.n < TAKE_N) {   /* into the keys' loop, where it fell */
+        take.e[take.n].r = r;
+        take.e[take.n].pos = (uint8_t)(s.tick % TAKE_TICKS);
+        take.e[take.n].bite = (uint8_t)(bite * 100.0f);
+        take.n++;
+    }
     ev.last_type = EV_NTYPE + r.snd - 1;   /* (the screen names it: the key's sound) */
     ps_ui.thrown_type = (int8_t)ev.last_type;
     ps_ui.hits[HIT_THROW]++;
@@ -417,6 +439,14 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
             ev.run[k].wait = ev.run[k].step;
             ev.run[k].left--;
         }
+    if (take.n) {                      /* the keys' loop (before the keys: a throw taken now plays next time round) */
+        uint32_t pos = s.tick % TAKE_TICKS, i;
+        for (i = 0; i < take.n; i++)
+            if (take.e[i].pos == pos) {
+                ev_start(&take.e[i].r, (float)take.e[i].bite / 100.0f, 1.0f);
+                ps_ui.hits[HIT_EVENT]++;
+            }
+    }
     if (ev.rk >= 0 && !(ev.rstart && t % KEY_RHYTHM[key_blacki(ev.rk)].grid != KEY_RHYTHM[key_blacki(ev.rk)].phase) &&
         (ev.rstart || --ev.rwait == 0u)) {   /* a rhythm's beat (its first on its grid) */
         int b = key_blacki(ev.rk), stepped = (int)(ev.ri % 8u) * (int)KEY_RHYTHM[b].step;

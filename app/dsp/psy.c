@@ -332,7 +332,7 @@ static hp2_t echo_hp;                  /* the echo's input */
 #include "line.c"
 
 /* the queue's commands: bits 16.. the kind (0 a key, 1 an effect, 2 a mute, 3 out, 4 a fill) */
-enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE };
+enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE, CMD_REC };
 static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; 0: none yet beyond the world's own */
     [PART_KICK] = {"SOLID", "HARD", "KNOCK", "ZIP"},
     [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW"},
@@ -407,6 +407,8 @@ const char *ps_fx_name(int id) { return FX_NAME[(unsigned)id % FX_N]; }
 void ps_mute(int part) { cmd_post((uint32_t)CMD_MUTE << 16 | (uint32_t)(part & 7)); }
 void ps_out(int part, int on) { cmd_post((uint32_t)CMD_OUT << 16 | (uint32_t)(part & 7) | (uint32_t)(on != 0) << 5); }
 void ps_fill(void) { cmd_post((uint32_t)CMD_FILL << 16); }
+void ps_rec(int on) { cmd_post((uint32_t)CMD_REC << 16 | (uint32_t)(on != 0)); }
+int ps_take(void) { return take.n; }
 
 static void cmd_do(uint32_t c)         /* (render, as a block begins) */
 {
@@ -431,6 +433,11 @@ static void cmd_do(uint32_t c)         /* (render, as a block begins) */
     case CMD_TYPE:
         if ((c >> 8 & 7u) < NPART)
             s.type[c >> 8 & 7u] = (uint8_t)(c & 3u);
+        break;
+    case CMD_REC:                      /* pressed: a take anew; let go: it plays on */
+        if (c & 1u)
+            take.n = 0;
+        take.rec = (uint8_t)(c & 1u);
         break;
     }
 }
@@ -1122,6 +1129,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.drops = 0;                   /* (the intro again: the events quiet its first bars) */
         s.out = s.pat = s.fill_beat = 0;
         ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */
+        take.n = 0;                    /* (the keys' loop gone) */
     }
     while (cmd_r != cmd_w) {           /* the keys, the effects, the parts */
         uint32_t c = cmd_q[cmd_r % CMD_N];
