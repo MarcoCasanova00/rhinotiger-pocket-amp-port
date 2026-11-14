@@ -63,9 +63,9 @@ enum { SEC_MAIN, SEC_BREAK, SEC_BUILD };
 enum { PS_CUE_BREAK = 1, PS_CUE_DROP, PS_CUE_BUILD };
 /* a build's kind (ALGORITHM on the PHASE page; AUTO: each build one of the four, by the world's leaning, not the last
  * one again): ROLL (the kick and the bass out, a clap rolling quarters, eighths, sixteenths), KICK (the kick rolling
- * so, rising an octave; the bass out), FILTER (the kick and the bass go on, the rest and the bass thinned from under,
- * the hats harder), TRIPLET (a clap rolling quarters, eighth and sixteenth triplets, rising). Each its riser, its last
- * beat silent. Taken as the build begins. */
+ * so, rising an octave; the bass out), FILTER (the kick on, the perc in from its second quarter, the bass from its
+ * half; the rest and the bass thinned from under, the hats harder), TRIPLET (a clap rolling quarters, eighth and
+ * sixteenth triplets, rising). Each its riser, its last beat silent. Taken as the build begins. */
 enum { PS_BUILD_AUTO, PS_BUILD_ROLL, PS_BUILD_KICK, PS_BUILD_FILTER, PS_BUILD_TRIP, PS_NBUILD };
 void ps_build_kind(int k);
 int ps_build_kind_now(void);           /* the one chosen (AUTO or another) */

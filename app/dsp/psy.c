@@ -474,6 +474,7 @@ void ps_key(int k, int down, int value)
 }
 
 static int fill_now(uint32_t bar, uint32_t beat);
+static int filter_in(int part, uint32_t beat);
 static uint32_t bass_pat(uint32_t rb) { return rb % 8u == s.trip_at ? 2u : s.pat; }   /* the shape of bar rb */
 
 /* a build's roll in a lane: n steps (16, or TRIPLET's 24), quarters, eighths (or eighth triplets), then the finest;
@@ -528,6 +529,10 @@ int ps_lane(int lane, uint8_t out[24])
         if (fill_now(rb, 3) || (flt && breath))
             for (i = (uint32_t)n * 3u / 4u; i < (uint32_t)n; i++)
                 out[i] = 0;
+        if (flt)                       /* (not in yet) */
+            for (i = 0; i < (uint32_t)n; i++)
+                if (!filter_in(PART_BASS, i * 4u / (uint32_t)n))
+                    out[i] = 0;
         break;
     case LANE_PERC:
         if (build && !flt) {           /* the roll (KICK's in the kick's lane) */
@@ -550,6 +555,10 @@ int ps_lane(int lane, uint8_t out[24])
             if (flt && breath)
                 for (i = 12; i < 16u; i++)
                     out[i] = 0;
+            if (flt)                   /* (not in yet) */
+                for (i = 0; i < 16u; i++)
+                    if (!filter_in(PART_PERC, i / 4u))
+                        out[i] = 0;
         }
         break;
     case LANE_LINE:
@@ -644,6 +653,13 @@ static void mods(const world_t *w)     /* the macros and the moved tempo and roo
 }
 
 static int build_breath(uint32_t beat) { return s.sec == SEC_BUILD && s.sec_bar + 1u >= s.sec_len && beat == 3u; }
+/* FILTER's parts come in by turns, not all at once: the kick from its start, the perc from its second quarter, the
+ * bass (thinned by then) from its half */
+static int filter_in(int part, uint32_t beat)
+{
+    uint32_t pb = s.sec_bar * 4u + beat;
+    return part == PART_KICK || pb >= s.sec_len * (part == PART_PERC ? 1u : 2u);
+}
 
 /* the build's roll: quarters for its first quarter, eighths for its second, then sixteenths (TRIPLET: eighth and
  * sixteenth triplets), louder beat by beat; a clap's, or (KICK) the kick's; its last beat silent. FILTER: none (the
@@ -675,8 +691,9 @@ static void perc_step(const world_t *w, uint32_t t, uint32_t beat, uint32_t bar,
         build_step(t, beat);
         return;
     }
-    if (s.sec == SEC_BUILD) {          /* FILTER: the groove's, the hats harder as it rises; its last beat silent */
-        if (build_breath(beat))
+    if (s.sec == SEC_BUILD) {          /* FILTER: the groove's (from its second quarter), the hats harder as it rises;
+                                        * its last beat silent */
+        if (build_breath(beat) || !filter_in(PART_PERC, beat))
             return;
         hats *= 1.0f + 0.6f * ((float)s.sec_bar * 4.0f + (float)beat) / (float)(4u * s.sec_len);
     }
@@ -822,7 +839,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     rb = bar - s.origin;
     groove = s.sec == SEC_MAIN;
     on = groove || (s.sec == SEC_BUILD && s.bk == PS_BUILD_FILTER && !build_breath(beat));   /* the kick and the bass */
-    bass_rests = !on || fill_now(rb, beat) || s.fill_beat;
+    bass_rests = !on || fill_now(rb, beat) || s.fill_beat || (!groove && !filter_in(PART_BASS, beat));
     kick_rests = !on || (par[P_FILLS] && rb % 32u == 31u && beat == 3u);   /* every 32nd bar's: the kick too */
     perc_step(w, t, beat, bar, rb, groove && bass_rests);
     ev_step(w, t, rb, (uint32_t)((s.tick - s.origin * TPBAR) / 6u), (bar < 4u && !s.drops) || s.sec == SEC_BUILD);
