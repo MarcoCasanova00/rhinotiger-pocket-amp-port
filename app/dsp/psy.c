@@ -222,6 +222,7 @@ static struct {
 #define NG 7
     float g[NG];                       /* the levels, gliding: kick, bass, perc, events, line, the events' send, the echo */
     float echo_d;                      /* the echo's delay in frames, gliding (a tempo moved, a time changed) */
+    float dub_ph;                      /* DUB's waver (turns) */
     /* the sections */
     uint8_t sec, drops;
     uint8_t type[NPART];                 /* each part's type (PART_*: the bass's is its colour) */
@@ -266,7 +267,8 @@ static struct {
     float a_inc[3];                    /* the atmos's notes, turns a sample */
 } cf;
 
-#define ECHO_N 16384u                  /* (a dotted eighth at 125 bpm, the slowest a world can be moved to: 15876) */
+#define ECHO_N 20480u                  /* (a dotted eighth at 125 bpm, the slowest a world can be moved to: 15876; DUB
+                                        * stretches it as far as this holds, half again at 145) */
 static PLAT_POOL int16_t echo_buf[2][ECHO_N];
 static uint32_t echo_w;
 
@@ -1146,7 +1148,8 @@ void ps_render(float *outl, float *outr, uint32_t n)
         cmd_do(c);
     }
     tempo(w);
-    if (fx.held >> FX_WASH & 1u) {     /* WASH: the echo longer and darker; FREEZE: it keeps what it holds */
+    if (fx.held >> FX_DUB & 1u) {      /* DUB: the echo longer and darker (its time stretching: below); FREEZE: it
+                                        * keeps what it holds */
         fb = 0.86f;
         tone = 0.14f;
     }
@@ -1204,7 +1207,14 @@ void ps_render(float *outl, float *outr, uint32_t n)
             ar *= pg[PART_ATMOS];
             if (s.echo_d < 1.0f)
                 s.echo_d = dt_e;
-            s.echo_d += (dt_e - s.echo_d) * 0.0002f;   /* ~0.1 s: a new time a short tape-like slide, no jump */
+            if (fx.held >> FX_DUB & 1u) {  /* DUB: half again as long over ~2 s, wavering ~0.3 % at 0.7 Hz */
+                if ((s.dub_ph += 0.7f / PS_SR) >= 1.0f)
+                    s.dub_ph -= 1.0f;
+                dt_e = fm_minf(dt_e * 1.5f * (1.0f + 0.003f * fm_sin_turns(s.dub_ph)), (float)(ECHO_N - 2u));
+                s.echo_d += (dt_e - s.echo_d) * 0.00002f;
+            } else
+                s.echo_d += (dt_e - s.echo_d) * 0.0002f;   /* ~0.1 s: a new time a short tape-like slide, no jump (DUB
+                                                            * let go: springing back) */
             d = (uint32_t)s.echo_d;
             ef = s.echo_d - (float)d;
             {   /* between two samples */
@@ -1221,7 +1231,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
             echo_buf[0][echo_w % ECHO_N] = (int16_t)(soft(s.e_lp[0]) * 32767.0f);   /* (a throw rounded, not cut) */
             echo_buf[1][echo_w % ECHO_N] = (int16_t)(soft(s.e_lp[1]) * 32767.0f);
             echo_w++;
-            ml = perc_g * l + ev_g * el + ll + al;     /* above the kick and the bass: THROW and WASH take it */
+            ml = perc_g * l + ev_g * el + ll + al;     /* above the kick and the bass: THROW and DUB take it */
             mr = perc_g * r + ev_g * er + lr + ar;
             outl[i] = c + ml + ret_g * xl;
             outr[i] = c + mr + ret_g * xr;

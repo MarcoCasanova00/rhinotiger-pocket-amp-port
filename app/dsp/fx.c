@@ -6,7 +6,8 @@
  *   REPEAT   1/2, 1/4, an eighth triplet, 1/8: that much of the music, again and again (1/2 and 1/4 from the next beat,
  *            the others from the next sixteenth)
  *   FILTER   LOW and HIGH (the cutoff glides down, up), FLANGE (a short swept delay), BAND (a telephone's)
- *   SPACE    THROW (the music, but the kick and the bass, into the echo), WASH (the same, darker, longer), FREEZE (the
+ *   SPACE    THROW (the music, but the kick and the bass, into the echo), DUB (the same, the echo darker, longer, its
+ *            time stretching slowly, wavering like a tape's: its pitch sinking; let go, it springs back), FREEZE (the
  *            echo keeps what it holds, no more in), REVERSE (the last beat, backwards)
  *   MOTION   TAPE (the music slows to a stop over a beat), RISER (a band of noise rising over two bars), STAIRS (a
  *            sixteenth again and again, a whole tone higher each time), GATE (what is above the kick and the bass cut
@@ -19,9 +20,9 @@
  * buffer keeps it (no more is written, and its count stands: what is behind it stays the music as it went). */
 
 enum { FX_R2, FX_R4, FX_R8T, FX_R8, FX_LOW, FX_HIGH, FX_FLANGE, FX_BAND,
-       FX_THROW, FX_WASH, FX_FREEZE, FX_REVERSE, FX_TAPE, FX_RISER, FX_STAIRS, FX_GATE, FX_N };
+       FX_THROW, FX_DUB, FX_FREEZE, FX_REVERSE, FX_TAPE, FX_RISER, FX_STAIRS, FX_GATE, FX_N };
 static const char *const FX_NAME[FX_N] = {"1/2", "1/4", "1/8T", "1/8", "LOW", "HIGH", "FLANGE", "BAND",
-                                          "THROW", "WASH", "FREEZE", "REVERSE", "TAPE", "RISER", "STAIRS", "GATE"};
+                                          "THROW", "DUB", "FREEZE", "REVERSE", "TAPE", "RISER", "STAIRS", "GATE"};
 
 #define CAP_N 45056u                   /* frames: 1.02 s (two beats at 125 bpm are 42336) */
 static PLAT_POOL int16_t cap_buf[2][CAP_N];
@@ -173,7 +174,7 @@ static void svf(float st[2], float x, float f, float q)   /* Chamberlin: st[0] l
     st[0] += f * st[1];
 }
 
-/* the effects over the mix, a frame: l and r in place; what goes to the echo returned (THROW, WASH); n a noise */
+/* the effects over the mix, a frame: l and r in place; what goes to the echo returned (THROW, DUB); n a noise */
 static float fx_render(float tick_len, float *l, float *r, float upper_l, float upper_r, float n)
 {
     float dl = *l, dr = *r, bl = 0.0f, br = 0.0f, send = 0.0f, g;
@@ -261,10 +262,10 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         dl *= 1.0f - 0.3f * fx.fl_g;
         dr *= 1.0f - 0.3f * fx.fl_g;
     }
-    /* THROW and WASH: what is above the kick and the bass, into the echo */
+    /* THROW and DUB: what is above the kick and the bass, into the echo */
     if (fx.held >> FX_THROW & 1u)
         send += 0.6f * (upper_l + upper_r);
-    if (fx.held >> FX_WASH & 1u)
+    if (fx.held >> FX_DUB & 1u)
         send += 0.5f * (upper_l + upper_r);
     /* RISER: a band of noise, rising over two bars while held */
     fx.riser_g += ((fx.held >> FX_RISER & 1u ? 1.0f : 0.0f) - fx.riser_g) * 0.003f;
