@@ -28,7 +28,7 @@ void ps_render(float *l, float *r, uint32_t n);   /* stereo, about -1..1 */
 /* the parameters, four to a page */
 enum { P_ENERGY, P_DETAIL, P_DARK, P_DRIFT,                  /* MAIN: the macros */
        P_TEMPO, P_ROOT, P_FILLS, P_SITOUT,                   /* GROOVE: the world's tempo and root moved; fills; parts sitting out */
-       P_KICK_LEVEL, P_KICK_TUNE, P_KICK_FALL, P_KICK_PUNCH, /* KICK (FALL: how fast its pitch falls) */
+       P_KICK_LEVEL, P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, /* KICK */
        P_BASS_LEVEL, P_BASS_BITE, P_BASS_LEN, P_BASS_DRIVE,  /* BASS */
        P_PERC_LEVEL, P_HATS, P_HAT_TONE, P_CLAP,             /* PERC */
        P_EV_LEVEL, P_EV_DENSITY, P_EV_RUNS, P_EV_ECHO,       /* EVENTS */
