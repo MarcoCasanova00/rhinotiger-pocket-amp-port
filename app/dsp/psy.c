@@ -971,7 +971,7 @@ static float riser(float n, float *l, float *r)
 /* the atmos, a sample: l and r added to; returns what goes to the echo (Wash) */
 static float atmos(const world_t *w, float n, float *l, float *r)
 {
-    float lvl = (float)par[P_ATMOS_LEVEL] / 70.0f, target = (s.sec == SEC_MAIN ? w->atmos : 1.0f) * lvl;
+    float lvl = (float)par[P_ATMOS_LEVEL] / 70.0f, target = playing ? (s.sec == SEC_MAIN ? w->atmos : 1.0f) * lvl : 0.0f; /* (resting: it fades away) */
     float colour = (float)par[P_ATMOS_COLOUR] / 100.0f, air = (float)par[P_ATMOS_AIR] / 100.0f, wob, al = 0.0f, ar = 0.0f, k, x;
     int i;
     s.a_lvl += (target - s.a_lvl) * (target > s.a_lvl ? 1.0f / (2.5f * PS_SR) : 1.0f / (1.5f * PS_SR));
