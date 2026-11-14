@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The PHASE page's K3 (BUILD) at its lowest, 2 bars: a break cued with SAVE, SAVE again for its build, which lasts 2 bars (not
+# the 4 of sections.txt), then the drop. COLD SIGNAL, 152: a bar is about 1.58 s.
+jack in
+wait 1500
+tap HOME
+wait 30
+tap HOME
+wait 30
+expect page 2
+spin K3 -5
+wait 30
+expect param38 0
+wait 3936
+tap SAVE
+wait 30
+wait 1549
+expect section 1
+wait 3158
+expect section 1
+tap SAVE
+wait 30
+wait 1549
+expect section 2
+wait 1579
+expect section 2
+wait 1579
+expect section 0
+expect drops 1

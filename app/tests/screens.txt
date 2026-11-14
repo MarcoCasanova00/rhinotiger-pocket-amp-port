@@ -7,13 +7,16 @@ shot screen-main.png
 tapkey w7
 wait 120
 shot screen-thrown.png
-tap SEQ
-tap SEQ
+tap ENV
 wait 40
 turn K2 3
 wait 100
 shot screen-perc.png
-press SEL
+tap HOME
+tap HOME
+tap HOME
 wait 40
-shot screen-sel.png
-release SEL
+shot screen-phase.png
+turn K1 -30
+wait 100
+shot screen-phase-cued.png

@@ -97,7 +97,7 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
             ln.playing = bar >= 16u && ((bar < 24u && w->line >= 0.5f) || (float)(rnd() % 100u) < 100.0f * p);
         }
     }
-    if (!ln.playing || !ln.on[i] || (s.sec == SEC_BUILD && s.sec_bar >= 3u && s.tick / TPB % 4u == 3u))
+    if (!ln.playing || !ln.on[i] || (s.sec == SEC_BUILD && s.sec_bar + 1u >= s.sec_len && s.tick / TPB % 4u == 3u))
         return;
     {
         float f = note_hz(m.root + w->line_oct + ln.note[i]) / PS_SR;

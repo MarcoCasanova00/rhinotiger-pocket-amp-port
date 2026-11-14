@@ -25,7 +25,8 @@ int ps_playing(void);
 int ps_bar(void);                      /* bars since PLAY (the screen, the host's checks) */
 void ps_render(float *l, float *r, uint32_t n);   /* stereo, about -1..1 */
 
-/* the parameters, four to a page */
+/* the parameters (the pages show them four at a time; app.c lays them out). New ones go at the end: a test's
+ * "param N" keeps its meaning */
 enum { P_ENERGY, P_DETAIL, P_DARK, P_DRIFT,                  /* MAIN: the macros */
        P_TEMPO, P_ROOT, P_FILLS, P_SITOUT,                   /* GROOVE: the world's tempo and root moved; fills; parts sitting out */
        P_KICK_LEVEL, P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, /* KICK */
@@ -35,6 +36,8 @@ enum { P_ENERGY, P_DETAIL, P_DARK, P_DRIFT,                  /* MAIN: the macros
        P_ECHO_LEVEL, P_ECHO_FB, P_ECHO_TONE, P_ECHO_TIME,    /* ECHO */
        P_ATMOS_LEVEL, P_ATMOS_COLOUR, P_ATMOS_AIR, P_ATMOS_WASH,   /* ATMOS */
        P_LINE_LEVEL, P_LINE_DENSITY, P_LINE_LEN, P_LINE_MUTATE,   /* LINE */
+       P_BREAKS, P_BREAK_LEN, P_BUILD_LEN, P_GAP,            /* PHASE: how often a break comes on its own (0: only
+                                                              * cued), its bars, its build's, the bars after a drop */
        P_NPARAMS };
 typedef struct {
     const char *name;
@@ -46,18 +49,19 @@ int ps_get(int p);
 int ps_bpm(void);                      /* the tempo now (the world's, moved) */
 int ps_root(void);                     /* the root now, MIDI note of the bass */
 const char *ps_echo_time_name(int v);  /* P_ECHO_TIME's values */
+const char *ps_phase_name(int p, int v);   /* P_BREAKS .. P_GAP's values as the screen says them */
 
-/* the sections: the groove (MAIN), a break (the kick and the bass out, the atmos up), its build (4 bars: a roll and a
- * rising noise), then the drop: everything back on a bar's first beat, a crash, and the bass a shade other than before.
+/* the sections: the groove (MAIN), a break (the kick and the bass out, the atmos up), its build (BUILD's bars: a roll
+ * and a rising noise), then the drop: everything back on a bar's first beat, a crash, and the bass a shade other than before.
  * A cue acts as the next bar begins: 1 (SAVE tapped) the next section (the groove: a break; a break: its build),
- * 2 (SAVE held) the drop now. On their own, now and then (Drift), a break comes as a 32-bar block begins. */
+ * 2 (SAVE held) the drop now. On their own, now and then (Drift and BREAKS), a break comes as a 32-bar block begins,
+ * GAP bars after the last drop at least; it lasts BREAK bars (or the world's), its build BUILD. */
 enum { SEC_MAIN, SEC_BREAK, SEC_BUILD };
 void ps_cue(int how);
 int ps_section(void);
-void ps_auto(int on);
 void ps_shed(int on);                  /* lighter (the render near its time): the atmos one note, the events half their
                                         * voices, no FLANGE */
-int ps_shedding(void);                  /* breaks on their own (1, the default) or only when cued (0) */
+int ps_shedding(void);
 
 /* the bass's colour (one of four: its ratio and bite), chosen now (each drop chooses another on its own) */
 #define PS_NCOLOUR 4
@@ -109,6 +113,7 @@ typedef struct {
     volatile int8_t section;           /* SEC_* */
     volatile int8_t cued;              /* a cue waiting for the next bar: 0 none, 1 next, 2 drop */
     volatile uint8_t sec_bar;          /* bars into the section (the groove: into its phrase, 0..7) */
+    volatile uint8_t sec_len;          /* a build's bars (else 0) */
     volatile uint8_t drops;            /* drops so far (wraps) */
     volatile uint8_t muted;            /* the parts muted (1 << PART_*) */
 } ps_ui_t;

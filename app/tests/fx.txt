@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The performance on ECHO (FX): the white keys' grid while held, the black keys' parts. Recorded (build/host/fx.wav)
+# The performance on ECHO (the FX button; the keys are the grid only there): the white keys' grid while held, the black keys' parts. Recorded (build/host/fx.wav)
 # to listen to: four bars of each, more or less. COLD SIGNAL, 152: a bar is about 1.58 s.
 jack in
 wait 600
 tap FX
 wait 30
-expect page 8
+expect page 9
 key b0 down 90
 key w11 down 90
 wait 50
@@ -92,14 +92,22 @@ wait 1600
 key b8 up
 wait 1600
 wavstop
-# REC held on MAIN: the keys are the grid there too
+# off ECHO the keys are no grid, REC held or not (it does nothing now)
 tap HOME
 wait 30
 press REC
 key w4 down 90
 wait 100
-expect fx 16
+expect fx 0
 key w4 up
 release REC
+wait 100
+# back on ECHO (FX): the grid again
+tap FX
+wait 30
+key w4 down 90
+wait 100
+expect fx 16
+key w4 up
 wait 100
 expect fx 0

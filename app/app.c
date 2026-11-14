@@ -7,27 +7,29 @@
  * announce.c are in scope), the glue to the engine (dsp/psy.c, its own -O2 unit) and the screen.
  *
  * Pages, as HYP-1's: SELECT turns through all of them, a button jumps to its own (again: the next of its own) and is
- * lit while one of its pages shows; the rule over the knobs says which page, and where it is among them.
+ * lit while one of its pages shows; the rule over the knobs says which page, and where it is among them. HOME holds
+ * the whole; the top row's middle four (SEL, ENV, LFO, EDIT) the sounds, whatever their names.
  *   1 MAIN (HOME)            the macros: K1..K4 Energy, Detail, Dark, Drift
  *   2 GROOVE (HOME again)    K1..K4 Tempo (the world's, moved), Root, Fills (how often), Sit out (how often a part
  *                            rests a phrase)
- *   3 KICK (SEQ)             K1..K4 Level, Tune, Length, Punch
- *   4 PERC (SEQ again)       K1..K4 Level, Hats, Tone, Clap
- *   5 BASS (LFO)             K1..K4 Level, Bite, Length, Drive
- *   6 ATMOS (LFO again)      K1..K4 Level, Colour, Air, Wash (the send)
- *   7 EVENTS (ARP)           K1..K4 Level, Density, Runs, Echo (the send)
- *   8 LINE (ARP again)       K1..K4 Level, Density, Length, Mutate
- *   9 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
- *  10 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
+ *   3 PHASE (HOME again)     K1..K4 Breaks (how often one comes on its own; 0: only when cued), Break (its bars: the
+ *                            world's, 4..32), Build (2, 4, 8 bars), Gap (bars after a drop before one comes on its own)
+ *   4 KICK (SEL)             K1..K4 Level, Tune, Drive, Punch
+ *   5 BASS (SEL again)       K1..K4 Level, Bite, Length, Drive
+ *   6 PERC (ENV)             K1..K4 Level, Hats, Tone, Clap
+ *   7 LINE (LFO)             K1..K4 Level, Density, Length, Mutate
+ *   8 EVENTS (EDIT)          K1..K4 Level, Density, Runs, Echo (the send)
+ *   9 ATMOS (EDIT again)     K1..K4 Level, Colour, Air, Wash (the send)
+ *  10 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
+ *  11 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
  *                            (off by default); SAVE here keeps it all
- * SEL held: the knobs are MAIN's four on any page. PRESETS: the world, from the next bar. PLAY: play or rest.
- * ALGORITHM: the bass's colour (one of four; a drop chooses another on its own). EDIT: the line drawn anew from the
- * next bar. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). ENV: breaks on their
- * own, or only when cued (lit: on their own; kept by SAVE on GLOBAL).
+ * PRESETS: the world, from the next bar. PLAY: play or rest. ALGORITHM: the type of the page's part (elsewhere the
+ * bass's colour; a drop chooses another on its own). OCT- / OCT+: the keys' events an octave down or up (-1..+2; both
+ * lit away from 0). ARP and REC: nothing yet.
  * SAVE (but on GLOBAL), after HYP-1's: tapped, the next section from the next bar (the groove: a break; a break: its
  * build, then the drop); held, the drop at the next bar. Lit in a break, quick in a build.
  * The keys play no notes: each throws an event into the music on the next sixteenth (dsp/events.c); the screen
- * names it at once. On ECHO (FX), or while REC is held, they are the performance instead (dsp/fx.c), and the screen
+ * names it at once. On ECHO (FX) they are the performance instead (dsp/fx.c), and the screen
  * shows them: the white keys a grid of sixteen effects, four rows of four (REPEAT, FILTER, SPACE, MOTION; each row's
  * first key glows), each while held; the black keys the parts, F#3 G#3 A#3 C#4 D#4 F#4 muted (tapped, again: back:
  * KICK, BASS, PERC, LINE, EVENTS, ATMOS), G#4 a fill on the next beat, A#4 and C#5 the kick and the bass out while
@@ -36,17 +38,17 @@
 #include "psy.h"
 #include "logo.h"
 
-#define SET_MAGIC 0x33544852u            /* "RHT3": the settings record (2: the atmos's four; 3: the line's, 8 worlds) */
+#define SET_MAGIC 0x34544852u            /* "RHT4": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
+                                          * 4: PHASE's four, the breaks' switch gone into BREAKS) */
 typedef struct {
     uint32_t magic;
     uint8_t world;
     uint8_t lights;                      /* the buttons' glow: 0 off, 1 low, 2 high */
     uint8_t theme;                       /* gfx.c PALETTES */
-    uint8_t flags;                       /* SET_NOAUTO: breaks only when cued */
+    uint8_t flags;                       /* SET_MIDI */
     int16_t par[P_NPARAMS];
 } settings_t;
 static settings_t set;
-#define SET_NOAUTO 1u
 #define SET_MIDI 2u                      /* MIDI in: notes throw events, start / stop / clock followed */
 static void midi_off(void);
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
@@ -97,7 +99,6 @@ static void settings_apply(void)
     for (p = 0; p < P_NPARAMS; p++)
         ps_set(p, set.par[p]);
     ps_world(set.world);
-    ps_auto(!(set.flags & SET_NOAUTO));
     palette_set(set.theme);
 }
 
@@ -107,7 +108,7 @@ void app_init(void)
     ps_init();
     ok = plat_store_load(OBJ_SETTINGS, &set, sizeof set) == (int)sizeof set && set.magic == SET_MAGIC &&
          set.world < PS_NWORLD && set.lights <= 2u && set.theme < NPALETTES &&
-         set.flags <= (SET_NOAUTO | SET_MIDI);
+         (set.flags & ~SET_MIDI) == 0u;
     for (p = 0; ok && p < P_NPARAMS; p++)
         ok = set.par[p] >= ps_param(p)->lo && set.par[p] <= ps_param(p)->hi;
     if (!ok)
@@ -116,16 +117,30 @@ void app_init(void)
 }
 
 /* ------------------------------------------------------------------ pages --- */
-enum { PG_MAIN, PG_GROOVE, PG_KICK, PG_PERC, PG_BASS, PG_ATMOS, PG_EVENTS, PG_LINE, PG_ECHO, PG_GLOBAL, NPAGE };
-static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "KICK", "PERC", "BASS", "ATMOS", "EVENTS", "LINE", "ECHO",
-                                             "GLOBAL"};
-static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEQ, B_LFO, B_LFO, B_ARP, B_ARP, B_FX, B_GLO};
-/* a page's first parameter (P_*), or -1 */
-static int page_par(int p)
+/* the pages in the panel's order: HOME the whole (MAIN, GROOVE, PHASE); the top row's middle four the sounds (SEL the
+ * kick and the bass, ENV the percussion, LFO the line, EDIT the events and the atmos); FX the echo; GLO the global.
+ * A button with two or three pages steps through them */
+enum { PG_MAIN, PG_GROOVE, PG_PHASE, PG_KICK, PG_BASS, PG_PERC, PG_LINE, PG_EVENTS, PG_ATMOS, PG_ECHO, PG_GLOBAL, NPAGE };
+static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "PHASE", "KICK", "BASS", "PERC", "LINE", "EVENTS", "ATMOS",
+                                             "ECHO", "GLOBAL"};
+static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_HOME, B_SEL, B_SEL, B_ENV, B_LFO, B_EDIT, B_EDIT, B_FX, B_GLO};
+/* a page's knobs: K1..K4's parameters (P_*; -1 none) */
+static int page_par(int p, int k)
 {
-    static const int8_t FIRST[NPAGE] = {P_ENERGY, P_TEMPO, P_KICK_LEVEL, P_PERC_LEVEL, P_BASS_LEVEL, P_ATMOS_LEVEL,
-                                        P_EV_LEVEL, P_LINE_LEVEL, P_ECHO_LEVEL, -1};
-    return FIRST[clamp(p, 0, NPAGE - 1)];
+    static const int8_t PAR[NPAGE][4] = {
+        {P_ENERGY, P_DETAIL, P_DARK, P_DRIFT},
+        {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
+        {P_BREAKS, P_BREAK_LEN, P_BUILD_LEN, P_GAP},
+        {P_KICK_LEVEL, P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH},
+        {P_BASS_LEVEL, P_BASS_BITE, P_BASS_LEN, P_BASS_DRIVE},
+        {P_PERC_LEVEL, P_HATS, P_HAT_TONE, P_CLAP},
+        {P_LINE_LEVEL, P_LINE_DENSITY, P_LINE_LEN, P_LINE_MUTATE},
+        {P_EV_LEVEL, P_EV_DENSITY, P_EV_RUNS, P_EV_ECHO},
+        {P_ATMOS_LEVEL, P_ATMOS_COLOUR, P_ATMOS_AIR, P_ATMOS_WASH},
+        {P_ECHO_LEVEL, P_ECHO_FB, P_ECHO_TONE, P_ECHO_TIME},
+        {-1, -1, -1, -1},
+    };
+    return PAR[clamp(p, 0, NPAGE - 1)][k & 3];
 }
 static const char *const LANE_NAME[NLANE] = {"KICK", "BASS", "PERC", "LINE", "EVENTS"};
 static int page_lane(int p)              /* the lane a page acts on (the screen brightens it), or -1 */
@@ -148,12 +163,10 @@ static struct {
     int8_t thrown_type;
     uint8_t page;
     uint8_t redraw;
-    uint8_t shift;                       /* SEL held: the knobs are MAIN's */
-    uint8_t rec;                         /* REC held: the keys are the performance */
     int8_t oct;                          /* the keys' events' octave (OCT- / OCT+) */
     uint32_t logo_until;                 /* the logo stays until (the keys and knobs already work) */
 } ui;
-static int algo_part(void)               /* ALGORITHM's part: the page's (MAIN, GROOVE, ECHO, GLOBAL: the bass, for now) */
+static int algo_part(void)               /* ALGORITHM's part: the page's (MAIN, GROOVE, PHASE, ECHO, GLOBAL: the bass, for now) */
 {
     switch (ui.page) {
     case PG_KICK: return PART_KICK;
@@ -165,7 +178,7 @@ static int algo_part(void)               /* ALGORITHM's part: the page's (MAIN, 
     }
 }
 
-static int grid_mode(void) { return ui.page == PG_ECHO || ui.rec; }
+static int grid_mode(void) { return ui.page == PG_ECHO; }
 
 /* s copied into d (cap bytes with the terminator); returns the length written */
 static uint32_t str_put(char *d, uint32_t cap, const char *s)
@@ -241,12 +254,24 @@ static void page_go(int p)
     ann_say(t, 0, ANN_NOW);
 }
 
-/* the knobs of a page, or (SEL held) MAIN's: K1..K4's names, values and positions */
+static void page_button(int b)           /* a page's button: its first page, or (on one of its pages) the next */
+{
+    int p, first = -1;
+    for (p = 0; p < NPAGE; p++)
+        if (PAGE_BTN[p] == b && first < 0)
+            first = p;
+    if (first < 0)
+        return;
+    p = ui.page + 1;
+    page_go(PAGE_BTN[ui.page] == b && p < NPAGE && PAGE_BTN[p] == b ? p : first);
+}
+
+/* the knobs of a page: K1..K4's names, values and positions ("": none) */
 static const char *knob_name(int page, int k)
 {
     if (page == PG_GLOBAL)
         return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "MIDI IN";
-    return ps_param(page_par(page) + k)->name;
+    return page_par(page, k) < 0 ? "" : ps_param(page_par(page, k))->name;
 }
 
 static void par_text(int p, int v, char *t)   /* a parameter's value as the screen says it */
@@ -260,6 +285,8 @@ static void par_text(int p, int v, char *t)   /* a parameter's value as the scre
         str_put(t, 12, FILLS[clamp(v, 0, 4)]);
     else if (p == P_ECHO_TIME)
         str_put(t, 12, ps_echo_time_name(v));
+    else if (p >= P_BREAKS && p <= P_GAP && ps_phase_name(p, v))
+        str_put(t, 12, ps_phase_name(p, v));
     else if (p == P_KICK_TUNE && v > 0) {
         t[0] = '+';
         int_text(v, t + 1);
@@ -299,8 +326,14 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
         return;
     }
     {
-        int p = page_par(page) + k;
-        const ps_param_t *d = ps_param(p);
+        int p = page_par(page, k);
+        const ps_param_t *d;
+        if (p < 0) {
+            *t = 0;
+            *pos = *span = 0;
+            return;
+        }
+        d = ps_param(p);
         par_text(p, set.par[p], t);
         *pos = set.par[p] - d->lo;
         *span = d->hi - d->lo;
@@ -309,7 +342,7 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
 
 static void knob_turn(int k, int32_t d)
 {
-    int page = ui.shift ? PG_MAIN : ui.page;
+    int page = ui.page;
     char t[16];
     int32_t pos, span;
     ui.turned_at[k] = plat_ms();
@@ -327,10 +360,13 @@ static void knob_turn(int k, int32_t d)
         } else
             return;
     } else {
-        int p = page_par(page) + k;
-        const ps_param_t *pi = ps_param(p);
+        int p = page_par(page, k);
+        const ps_param_t *pi = ps_param(p < 0 ? 0 : p);
         int step = pi->hi - pi->lo >= 100 ? 2 : 1;   /* 0..100 two a detent, the rest (tempo, root, ...) one */
-        int32_t v = clamp(set.par[p] + step * d, pi->lo, pi->hi);
+        int32_t v;
+        if (p < 0)
+            return;
+        v = clamp(set.par[p] + step * d, pi->lo, pi->hi);
         if (v == set.par[p])
             return;
         set.par[p] = (int16_t)v;
@@ -527,9 +563,6 @@ static void input(void)
     keys = touch_keys();
     down = btn & ~ui.btn;
     up = ui.btn & ~btn;
-    ui.rec = (uint8_t)((btn >> B_REC) & 1u);
-    if ((down | up) & 1u << B_REC)
-        ui.redraw = 1;
     for (k = 0; k < NKEYS; k++) {            /* the keys throw events, or play the performance (key 0 is F3) */
         uint32_t bit = 1u << k;
         if ((keys & bit) && !(ui.keys & bit))
@@ -564,21 +597,9 @@ static void input(void)
             }
         }
     }
-    if (down & 1u << B_HOME)
-        page_go(ui.page == PG_MAIN ? PG_GROOVE : PG_MAIN);
-    if (down & 1u << B_SEQ)
-        page_go(ui.page == PG_KICK ? PG_PERC : PG_KICK);
-    if (down & 1u << B_LFO)
-        page_go(ui.page == PG_BASS ? PG_ATMOS : PG_BASS);
-    if (down & 1u << B_ARP)
-        page_go(ui.page == PG_EVENTS ? PG_LINE : PG_EVENTS);
-    if (down & 1u << B_FX)
-        page_go(PG_ECHO);
-    if (down & 1u << B_GLO)
-        page_go(PG_GLOBAL);
-    ui.shift = (uint8_t)((btn >> B_SEL) & 1u);
-    if ((down | up) & 1u << B_SEL)
-        ui.redraw = 1;
+    for (k = 0; k < NB; k++)                 /* the pages' buttons */
+        if (down >> k & 1u)
+            page_button((int)k);
     if ((e = plat_enc(EN_SELECT)) != 0)
         page_go((int)ui.page + (int)e);
     if ((e = plat_enc(EN_PRESET)) != 0)
@@ -593,10 +614,6 @@ static void input(void)
         } else
             app_say(PNAME[part], "ONE TYPE");
     }
-    if (down & 1u << B_EDIT) {
-        ps_line_new();
-        app_say("LINE", "NEW");
-    }
     if (down & (1u << B_OCTDN | 1u << B_OCTUP)) {
         char t[4];
         ui.oct = (int8_t)clamp(ui.oct + (down & 1u << B_OCTUP ? 1 : 0) - (down & 1u << B_OCTDN ? 1 : 0), -1, 2);
@@ -605,12 +622,6 @@ static void input(void)
         t[1] = (char)('0' + (ui.oct < 0 ? -ui.oct : ui.oct));
         t[2] = 0;
         app_say("OCTAVE", ui.oct ? t : "0");
-    }
-    if (down & 1u << B_ENV) {
-        set.flags ^= SET_NOAUTO;
-        set_dirty = 1;
-        ps_auto(!(set.flags & SET_NOAUTO));
-        app_say("BREAKS", set.flags & SET_NOAUTO ? "WHEN CUED" : "ON THEIR OWN");
     }
     for (k = 0; k < 4; k++)
         if ((e = plat_enc((int)(EN_K1 + k))) != 0)
@@ -625,11 +636,10 @@ static void input(void)
                        : sec == SEC_BREAK || ps_ui.cued ? 1
                        : sec == SEC_BUILD ? tick % PS_TPB < PS_TPB / 2u : 0;   /* a build: on the beats */
         uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (save_lit ? 1u << B_SAVE : 0u) | (ps_playing() ? 1u << B_PLAY : 0u) |
-                       (set.flags & SET_NOAUTO ? 0u : 1u << B_ENV) | (ui.oct < 0 ? 1u << B_OCTDN : 0u) |
+                       (ui.oct < 0 ? 1u << B_OCTDN : 0u) |
                        (ui.oct > 0 ? 1u << B_OCTUP : 0u);
-        uint32_t dim = 1u << B_HOME | 1u << B_SEQ | 1u << B_LFO | 1u << B_ARP | 1u << B_FX | 1u << B_GLO | 1u << B_SAVE |
-                       1u << B_PLAY | 1u << B_SEL | 1u << B_REC | 1u << B_ENV | 1u << B_EDIT | 1u << B_OCTDN |
-                       1u << B_OCTUP, klit = keys, kdim = 0;
+        uint32_t dim = 1u << B_HOME | 1u << B_SEL | 1u << B_ENV | 1u << B_LFO | 1u << B_EDIT | 1u << B_FX | 1u << B_GLO |
+                       1u << B_SAVE | 1u << B_PLAY | 1u << B_OCTDN | 1u << B_OCTUP, klit = keys, kdim = 0;
         if (grid_mode())                     /* the grid: each row's first key glows, a muted part's key is lit */
             for (k = 0; k < NKEYS; k++) {
                 int pl = key_place((int)k);
@@ -704,7 +714,7 @@ static void hue_update(void)             /* once a frame: the sway, the section'
         hue.drop_tick = tick;
     }
     if (ps_ui.section == SEC_BUILD) {    /* turning, faster and faster */
-        float p = ((float)ps_ui.sec_bar + (float)(tick % bar) / (float)bar) / 4.0f;
+        float p = ((float)ps_ui.sec_bar + (float)(tick % bar) / (float)bar) / (float)(ps_ui.sec_len ? ps_ui.sec_len : 4u);
         sh += (int32_t)(2.0f * HUE_FULL * p * p);
     }
     if (hue.drops_seen && tick - hue.drop_tick < 2u * bar) {   /* the drop: half way round, back over two bars */
@@ -841,8 +851,9 @@ static void draw_lanes(uint32_t now)
             }
         }
     }
-    {   /* the phrase's eight bars; in a break, its bars (eight shown, then counting on); in a build, its four */
-        int sec = ps_ui.section, sb = ps_ui.sec_bar, nb = sec == SEC_BUILD ? 4 : 8, inph = sec == SEC_BREAK ? sb % 8 : sb;
+    {   /* the phrase's eight bars; in a break, its bars (eight shown, then counting on); in a build, its bars */
+        int sec = ps_ui.section, sb = ps_ui.sec_bar, nb = sec == SEC_BUILD && ps_ui.sec_len ? ps_ui.sec_len : 8,
+            inph = sec == SEC_BREAK ? sb % 8 : sb;
         static const char *const SEC_NAME[3] = {"PHRASE", "BREAK", "BUILD"};
         cv_text(8, 112, &FONT_XS, SEC_NAME[clamp(sec, 0, 2)], sec == SEC_MAIN ? C_GRAY : C_WHITE);
         for (i = 0; i < nb; i++) {           /* a bar a hue round the circle; the one playing lit, the rest faint */
@@ -872,22 +883,18 @@ static void draw_lanes(uint32_t now)
     cv_blit(0, 32);
 }
 
-/* the rule over the knobs (after HYP-1's): at its left what the knobs act on if it needs saying (SEL held: MAIN's
- * four; GLOBAL with something unsaved: SAVE keeps it), else on a part's page its type (ALGORITHM chooses it); at its right the page's name, then a short bar a page, the one
- * shown lit, its button's other page a little brighter */
+/* the rule over the knobs (after HYP-1's): at its left what needs saying (GLOBAL with something unsaved: SAVE keeps
+ * it), else on a part's page its type (ALGORITHM chooses it); at its right the page's name, then a short bar a page,
+ * the one shown lit, its button's other pages a little brighter */
 static void draw_rule(void)
 {
-    const char *ctx = 0, *name = ui.shift ? "MAIN" : PAGE_NAME[ui.page];
+    const char *ctx = 0, *name = PAGE_NAME[ui.page];
     int32_t xd = 231 - NPAGE * 5, xt = xd - 6 - text_w(&FONT_XS, name), xs = 0, i;
-    if (ui.shift)
-        ctx = "SEL: MAIN";
-    else if (ui.rec)
-        ctx = "REC: KEYS PLAY FX";
-    else if (ui.page == PG_GLOBAL && set_dirty)
+    if (ui.page == PG_GLOBAL && set_dirty)
         ctx = "SAVE: KEEP IT";
     if (ctx)
         xs = cv_text(6, 0, &FONT_XS, ctx, C_AMB) + 6;
-    else if (ui.page >= PG_KICK && ui.page <= PG_LINE && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
+    else if (ui.page >= PG_KICK && ui.page <= PG_ATMOS && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
         int part = algo_part();
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
         xs = cv_text(xs, 0, &FONT_XS, ps_type_name(part, ps_type_now(part)), part_txt(PART_HUE[part], 255)) + 6;
@@ -905,7 +912,7 @@ static void draw_knobs(uint32_t now)
 {
     char t[16];
     int32_t i;
-    int page = ui.shift ? PG_MAIN : ui.page;
+    int page = ui.page;
     cv_begin(240, 60, C_BLACK);
     draw_rule();
     for (i = 0; i < 4; i++) {
@@ -1004,7 +1011,7 @@ int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "world"))
         *got = set.world;
-    else if (!strcmp(what, "page"))          /* 0 MAIN .. 8 GLOBAL */
+    else if (!strcmp(what, "page"))          /* 0 MAIN .. 10 GLOBAL (PG_*) */
         *got = ui.page;
     else if (!strcmp(what, "bar"))           /* bars since PLAY */
         *got = ps_bar();
@@ -1032,8 +1039,8 @@ int app_expect(const char *what, int *got)
         *got = ps_rhythm();
     else if (!strcmp(what, "throws"))        /* the keys' throws so far */
         *got = (int)ps_ui.hits[HIT_THROW];
-    else if (!strcmp(what, "auto"))          /* breaks on their own */
-        *got = !(set.flags & SET_NOAUTO);
+    else if (!strcmp(what, "auto"))          /* breaks on their own (BREAKS above 0) */
+        *got = set.par[P_BREAKS] > 0;
     else if (!strcmp(what, "lines"))         /* the line's notes so far */
         *got = (int)ps_ui.hits[HIT_LINE];
     else if (!strcmp(what, "muted"))         /* the parts muted, 1 << PART_* (the engine's) */

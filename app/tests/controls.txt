@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The buttons beyond the pages: ALGORITHM the type of the page's part (MAIN: the bass's colour), EDIT the line anew, OCT the keys' octave, ENV the breaks
-# on their own or only when cued (kept by SAVE on GLOBAL).
+# The buttons beyond the pages: ALGORITHM the type of the page's part (MAIN: the bass's colour), OCT the keys' octave,
+# and the PHASE page's K1 (BREAKS): 0 the breaks only when cued, above 0 on their own (kept by SAVE on GLOBAL).
+# Pages: HOME (MAIN, GROOVE, PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE), EDIT (EVENTS, ATMOS), FX (ECHO), GLO.
 listen
 wait 1500
 expect colour 0
@@ -13,8 +14,7 @@ turn ALGO -3
 wait 100
 expect colour 3
 # on the LINE page: the line's type (the bass's colour stays)
-tap ARP
-tap ARP
+tap LFO
 wait 30
 expect line_type 0
 turn ALGO 1
@@ -26,7 +26,7 @@ wait 100
 expect line_type 3
 expect colour 3
 # on the EVENTS page: the events' type
-tap ARP
+tap EDIT
 wait 30
 turn ALGO 3
 wait 100
@@ -34,16 +34,14 @@ expect events_type 3
 said EVENTS
 expect line_type 3
 # on the ATMOS page: the atmos's type
-tap LFO
-tap LFO
+tap EDIT
 wait 30
 turn ALGO 2
 wait 100
 expect atmos_type 2
 said ATMOS
 # on the PERC page: the percussion's type
-tap SEQ
-tap SEQ
+tap ENV
 wait 30
 turn ALGO 1
 wait 100
@@ -51,7 +49,7 @@ expect perc_type 1
 said PERC
 shot algo-perc.png
 # on the KICK page: the kick's type
-tap SEQ
+tap SEL
 wait 30
 turn ALGO 1
 wait 100
@@ -59,9 +57,6 @@ expect kick_type 1
 said KICK
 tap HOME
 wait 30
-tap EDIT
-wait 30
-said LINE
 tap OCT+
 wait 30
 said OCTAVE
@@ -80,9 +75,16 @@ tap OCT-
 wait 30
 said OCTAVE
 expect auto 1
-tap ENV
+# PHASE: BREAKS at 0 shows CUED and means breaks only when cued
+tap HOME
+tap HOME
 wait 30
+expect page 2
+turn K1 -30
+wait 30
+expect param36 0
 expect auto 0
+said BREAKS CUED
 expect dirty 1
 tap GLO
 tap SAVE
@@ -91,6 +93,11 @@ reboot
 listen
 wait 1500
 expect auto 0
-tap ENV
+tap HOME
+tap HOME
+tap HOME
+wait 30
+expect page 2
+turn K1 5
 wait 30
 expect auto 1
