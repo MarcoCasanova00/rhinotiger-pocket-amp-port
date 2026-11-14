@@ -6,8 +6,9 @@
  * The phrase: 32 steps, each on or not (leaning to the beat's offbeat sixteenths, Density), its note (a walk in the
  * Phrygian scale over the world's register, as far up as Range lets it, or a semitone's creep: the world's, and Dark
  * more), an accent, a slide to the next (Slide: how many). Every 4 bars Mutate (and Drift) rewrites a few steps; a drop
- * draws it anew, and LFO held on a LINE page (from the next bar). What Density, Range and Slide change is heard as steps are drawn. It comes in after the intro,
- * and as each phrase (8 bars) begins it plays or rests by the world's presence. In a break it stays, softer.
+ * draws it anew, and LFO held on a LINE page (from the next bar). Density, Range and Slide are heard at once: a step
+ * keeps its draws and is read against them as it plays. It comes in after the intro, and as each phrase (8 bars)
+ * begins it plays or rests by the world's presence. In a break it stays, softer.
  *
  * The voice: the modulation falls from the accent's height to the world's floor (Bite: both higher or lower; Decay:
  * the fall slower or quicker; a wah in some worlds: it swings with the note); the pitch glides on a slide; the note's length is Length's share of its step. Over 150 Hz only: a low
@@ -24,8 +25,10 @@
 #define LN_GAIN_GROWL 1.0f
 #define LN_GAIN_REED 0.87f
 static struct {
-    int8_t note[LN_STEPS];             /* semitones over the register */
-    uint8_t on[LN_STEPS], acc[LN_STEPS], slide[LN_STEPS];
+    int8_t note[LN_STEPS];             /* semitones over the register, as drawn (ln_note: as heard) */
+    uint16_t r_on[LN_STEPS];           /* 0..999: on while under Density's share (ln_on) */
+    uint8_t r_slide[LN_STEPS];         /* 0..99: a slide while under Slide's share (ln_slide) */
+    uint8_t acc[LN_STEPS];
     uint8_t playing;                   /* this phrase it plays */
     uint32_t drawn;                    /* phrases drawn whole (the host's checks) */
     /* the voice */
@@ -54,13 +57,40 @@ static int ln_range(const world_t *w)  /* how far the notes go up (Range: none .
     return (int)w->line_range * par[P_LINE_RANGE] / 50;
 }
 
-static void ln_draw_step(const world_t *w, uint32_t i)   /* step i anew */
+/* Density, Range and Slide (and Energy and Dark's share) act at once: a step keeps its draws, and whether it sounds,
+ * how high, whether it slides is read against them as it plays */
+static int ln_top(const world_t *w)    /* the highest note now: Range, Dark over it */
+{
+    return ln_range(w) + (m.dark > 0.0f ? (int)(6.0f * m.dark) : 0);
+}
+
+static int ln_on(const world_t *w, uint32_t i)   /* step i sounds (more Density: the steps nearest it come in) */
 {
     static const float WEIGHT[4] = {0.25f, 0.85f, 1.0f, 0.8f};   /* in the beat: on the kick, then the offbeats */
     float dens = w->line_dens * (float)par[P_LINE_DENSITY] / 50.0f * (1.0f + 0.4f * m.energy);
-    int prev = ln.note[(i + LN_STEPS - 1u) % LN_STEPS], range = ln_range(w) + (m.dark > 0.0f ? (int)(6.0f * m.dark) : 0);
+    return (float)ln.r_on[i] < 1000.0f * dens * WEIGHT[i % 4u];
+}
+
+static int ln_note(const world_t *w, uint32_t i)   /* step i's note under the top now: over it an octave down (or
+                                                    * more) where that stays in, else the top */
+{
+    int n = ln.note[i], top = ln_top(w);
+    while (n > top && n - 12 >= -2)
+        n -= 12;
+    return n > top ? top : n;
+}
+
+static int ln_slide(const world_t *w, uint32_t i)
+{
+    return (int)ln.r_slide[i] < (int)w->line_slide * par[P_LINE_SLIDE] / 50;
+}
+
+static void ln_draw_step(const world_t *w, uint32_t i)   /* step i anew (its note as high as Range and Dark could
+                                                          * let it: ln_note brings it under them as they are) */
+{
+    int prev = ln.note[(i + LN_STEPS - 1u) % LN_STEPS], range = 2 * (int)w->line_range + 6;
     int chrom = clampi((int)w->line_chrom + (int)(40.0f * m.dark), 0, 100), n;
-    ln.on[i] = (float)(rnd() % 1000u) < 1000.0f * dens * WEIGHT[i % 4u];
+    ln.r_on[i] = (uint16_t)(rnd() % 1000u);
     if ((int)(rnd() % 100u) < chrom)   /* a semitone's creep from the step before */
         n = prev + ((rnd() & 1u) ? 1 : -1);
     else {                             /* a step or two along the scale, or back to the root */
@@ -71,7 +101,7 @@ static void ln_draw_step(const world_t *w, uint32_t i)   /* step i anew */
     }
     ln.note[i] = (int8_t)clampi(n, -2, range);
     ln.acc[i] = rnd() % 100u < 25u;
-    ln.slide[i] = (int)(rnd() % 100u) < (int)w->line_slide * par[P_LINE_SLIDE] / 50;
+    ln.r_slide[i] = (uint8_t)(rnd() % 100u);
 }
 
 static void ln_draw(const world_t *w)
@@ -105,11 +135,11 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
             ln.playing = bar >= 16u && ((bar < 24u && w->line >= 0.5f) || (float)(rnd() % 100u) < 100.0f * p);
         }
     }
-    if (!ln.playing || !ln.on[i] || build_breath(s.tick / TPB % 4u))
+    if (!ln.playing || !ln_on(w, i) || build_breath(s.tick / TPB % 4u))
         return;
     {
-        float f = note_hz(m.root + w->line_oct + ln.note[i]) / PS_SR;
-        int sounding = ln.t >= 0.0f, glide = ln.slide[(i + LN_STEPS - 1u) % LN_STEPS] && sounding;
+        float f = note_hz(m.root + w->line_oct + ln_note(w, i)) / PS_SR;
+        int sounding = ln.t >= 0.0f, glide = ln_slide(w, (i + LN_STEPS - 1u) % LN_STEPS) && sounding;
         float bite = (float)par[P_LINE_BITE] / 50.0f, d = (float)par[P_LINE_DECAY],   /* (50: the world's, as it was) */
               ms = w->line_ms * (d >= 50.0f ? 1.0f + (d - 50.0f) / 12.5f : 0.25f + 0.75f * d / 50.0f);   /* x0.25 .. x5 */
         ln.inc_to = f;
@@ -119,7 +149,7 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
                 ln.cph = ln.mph = 0.0f;
         }
         ln.t = 0.0f;
-        ln.gate = step_s * (ln.slide[i] ? 1.05f : w->line_gate * (0.4f + 1.2f * (float)par[P_LINE_LEN] / 100.0f));
+        ln.gate = step_s * (ln_slide(w, i) ? 1.05f : w->line_gate * (0.4f + 1.2f * (float)par[P_LINE_LEN] / 100.0f));
         ln.idx = w->line_index * (ln.acc[i] ? 1.5f : 1.0f) * (1.0f + 0.4f * m.dark) * bite;
         ln.idx_floor = w->line_index * 0.15f * bite;
         ln.idx_k = fm_expf(-1000.0f / (ms * PS_SR));

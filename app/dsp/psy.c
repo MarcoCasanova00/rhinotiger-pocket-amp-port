@@ -660,10 +660,9 @@ int ps_lane(int lane, uint8_t out[24])
         if (ln.playing)
             for (i = 0; i < 16u; i++) {
                 uint32_t k = (rb % 2u) * 16u + i;
-                if (ln.on[k])
-                    out[i] = (uint8_t)(1 + clampi(ln.note[k] + 2, 0, 30));
+                if (ln_on(w, k))
+                    out[i] = (uint8_t)(1 + clampi(ln_note(w, k) + 2, 0, 30));
             }
-        (void)w;
         break;
     case LANE_EVENTS:
         if ((bar >= 4u || s.drops) && s.sec != SEC_BUILD)
@@ -726,7 +725,15 @@ void ps_cue(int how)
 int ps_section(void) { return s.sec; }
 int ps_stat(int which)
 {
-    return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : which == 2 ? ev.last_type : (int)ln.drawn;
+    const world_t *w = &W[world];
+    int r = 0;
+    uint32_t i;
+    if (which <= 3)
+        return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : which == 2 ? ev.last_type : (int)ln.drawn;
+    for (i = 0; i < LN_STEPS; i++)     /* the line's steps as heard now: 4 on, 5 the highest note, 6 sliding */
+        r = which == 4 ? r + ln_on(w, i) : which == 5 ? (i && r > ln_note(w, i) ? r : ln_note(w, i))
+                                                     : r + ln_slide(w, i);
+    return r;
 }
 const char *ps_event_name(int type)
 {

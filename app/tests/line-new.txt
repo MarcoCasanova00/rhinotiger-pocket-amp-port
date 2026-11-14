@@ -56,3 +56,52 @@ expect page 6
 unsaid NEW PHRASE
 wait 1700
 expect phrases 3
+# LINE SEQ's Density, Range and Slide act at once on the same phrase (no phrase drawn anew): fewer steps, lower notes,
+# fewer slides; back where they were, the phrase as it was. (The values: COLD SIGNAL's phrase as drawn here.)
+tap LFO
+wait 50
+expect page 7
+# Mutate (K2) 0 first: nothing rewritten meanwhile
+turn K2 -25
+wait 30
+expect param35 0
+expect line_on 11
+expect line_top 4
+expect line_slides 4
+# Density (K1): 0, none; back, the same eleven; 100, more
+turn K1 -25
+wait 30
+expect param33 0
+expect line_on 0
+turn K1 25
+wait 30
+expect line_on 11
+turn K1 25
+wait 30
+expect param33 100
+expect line_on >11
+turn K1 -25
+wait 30
+expect line_on 11
+# Range (K3): 0, nothing over the register; back, as it was; 100, no lower (this phrase has none over 4 drawn)
+turn K3 -25
+wait 30
+expect param40 0
+expect line_top 0
+turn K3 25
+wait 30
+expect line_top 4
+turn K3 25
+wait 30
+expect line_top >3
+turn K3 -25
+wait 30
+expect line_top 4
+# Slide (K4): 0, none; back, as it was
+turn K4 -25
+wait 30
+expect line_slides 0
+turn K4 25
+wait 30
+expect line_slides 4
+expect phrases 3

@@ -1153,6 +1153,12 @@ int app_expect(const char *what, int *got)
         *got = ps_stat(2);
     else if (!strcmp(what, "phrases"))       /* the line's phrases drawn whole */
         *got = ps_stat(3);
+    else if (!strcmp(what, "line_on"))       /* the line's steps on now, of 32 */
+        *got = ps_stat(4);
+    else if (!strcmp(what, "line_top"))      /* its highest note now, over the register */
+        *got = ps_stat(5);
+    else if (!strcmp(what, "line_slides"))   /* its steps sliding now */
+        *got = ps_stat(6);
     else if (!strncmp(what, "param", 5))     /* paramN: parameter N (psy.h P_*) as the app keeps it */
         *got = set.par[atoi(what + 5) % P_NPARAMS];
     else if (!strncmp(what, "engine", 6))    /* engineN: as the engine has it */
