@@ -25,7 +25,7 @@
  * it, the events' loop drawn anew, and the bass a shade other (another of four colours: its ratio and its bite). A cue
  * (SAVE) acts as the next bar begins; a break on its own comes as a 32-bar block begins (how likely: Drift and
  * BREAKS), GAP bars after the last drop at least, and lasts BREAK's bars or the world's (then builds and drops on its
- * own); a cued one waits for the next cue.
+ * own); a cued one waits for a build's cue.
  *
  * The atmos: a held chord of three notes over the root (fifths and the octave; at high Dark a second and a tritone),
  * each a little apart left and right and lightly frequency-modulated, and a band of noise wandering (Air). Quiet under
@@ -228,7 +228,7 @@ static struct {
     uint32_t origin;                   /* the bar the phrases count from: the last drop's */
     uint32_t last_drop;
     uint32_t sec_bar, sec_len;         /* bars into the section; a break's length (0: until cued), a build's */
-    uint32_t cue_seen, drop_seen;
+    uint32_t cue_seen, drop_seen, build_seen;
     uint8_t fill_beat;                 /* this beat a fill (cued by a black key) */
     float part_g[NPART];               /* the parts' gains, gliding to their mutes */
     float x_t;                         /* the crash's age (s, < 0 silent) */
@@ -243,7 +243,8 @@ static struct {
     float a_lfo, a_lp[2];              /* the slow wander; the chord's low-pass */
     float a_low, a_band;               /* the air's band-pass */
 } s;
-static volatile uint32_t cue_n, drop_n;   /* the UI's cues, counted: the render acts on a change */
+static volatile uint32_t cue_n, drop_n, build_n;   /* the UI's cues (a break, the drop, a build), counted: the render
+                                                    * acts on a change */
 static volatile uint8_t shed;          /* lighter: the render near its time (APP_OVERLOAD) */
 static volatile int key_oct;           /* the keys' events: octaves up or down */
 static volatile uint8_t line_new;      /* the line drawn anew at the next bar */
@@ -575,8 +576,10 @@ int ps_bpm(void) { return ext_bpm > 0.0f ? (int)(ext_bpm + 0.5f) : (int)(W[want_
 int ps_root(void) { return W[want_world].root + par[P_ROOT]; }
 void ps_cue(int how)
 {
-    if (how == 2)
+    if (how == PS_CUE_DROP)
         drop_n++;
+    else if (how == PS_CUE_BUILD)
+        build_n++;
     else
         cue_n++;
 }
@@ -702,10 +705,11 @@ static void drop(uint32_t bar)         /* on this bar's first tick: the groove a
 
 static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the cues, and what comes on its own */
 {
-    uint32_t cue = cue_n, dn = drop_n;
-    int next = cue != s.cue_seen, now = dn != s.drop_seen;
+    uint32_t cue = cue_n, dn = drop_n, bn = build_n;
+    int brk = cue != s.cue_seen, now = dn != s.drop_seen, build = bn != s.build_seen;
     s.cue_seen = cue;
     s.drop_seen = dn;
+    s.build_seen = bn;
     s.sec_bar++;
     if (now) {
         drop(bar);
@@ -713,7 +717,9 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
     }
     if (s.sec == SEC_MAIN) {
         uint32_t rb = bar - s.origin;
-        if (next)
+        if (build)                     /* a build straight from the groove */
+            enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN], 0, 2)]);
+        else if (brk)
             enter(SEC_BREAK, 0);
         else if (par[P_BREAKS] > 0 && rb && rb % 32u == 0u && bar - s.last_drop >= GAP_BARS[clampi(par[P_GAP], 0, 3)] &&
                  (float)(rnd() % 100u) < 70.0f * m.drift * ((float)par[P_BREAKS] / 50.0f)) {
@@ -721,7 +727,7 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
             enter(SEC_BREAK, len ? len : w->brk);
         }
     } else if (s.sec == SEC_BREAK) {
-        if (next || (s.sec_len && s.sec_bar >= s.sec_len))
+        if (build || (s.sec_len && s.sec_bar >= s.sec_len))   /* (a break cued in a break: nothing) */
             enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN], 0, 2)]);
     } else if (s.sec_bar >= s.sec_len) {
         drop(bar);
@@ -755,7 +761,9 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     ps_ui.sec_bar = (uint8_t)(groove ? rb % 8u : s.sec_bar);
     ps_ui.sec_len = (uint8_t)(s.sec == SEC_BUILD ? s.sec_len : 0u);
     ps_ui.drops = s.drops;
-    ps_ui.cued = (int8_t)(drop_n != s.drop_seen ? 2 : cue_n != s.cue_seen ? 1 : 0);
+    ps_ui.cued = (int8_t)(drop_n != s.drop_seen     ? PS_CUE_DROP
+                          : build_n != s.build_seen ? PS_CUE_BUILD
+                          : cue_n != s.cue_seen && s.sec == SEC_MAIN ? PS_CUE_BREAK : 0);
     if (t == 0u) {
         if (!kick_rests) {
             s.k_t = 0.0f;
@@ -1126,6 +1134,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.origin = s.last_drop = 0;
         s.cue_seen = cue_n;
         s.drop_seen = drop_n;
+        s.build_seen = build_n;
         s.drops = 0;                   /* (the intro again: the events quiet its first bars) */
         s.out = s.pat = s.fill_beat = 0;
         ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */

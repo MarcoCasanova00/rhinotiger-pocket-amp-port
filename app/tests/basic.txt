@@ -109,7 +109,7 @@ wait 1800
 expect world 3
 expect bpm 160
 shot world.png
-# SAVE keeps it all, on GLOBAL only (elsewhere it cues a break)
+# SAVE keeps it all, on GLOBAL only (elsewhere it cues a break; ARP, a build)
 tap SAVE
 wait 30
 expect dirty 1

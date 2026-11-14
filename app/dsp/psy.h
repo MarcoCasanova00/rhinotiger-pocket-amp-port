@@ -54,11 +54,13 @@ const char *ps_echo_time_name(int v);  /* P_ECHO_TIME's values */
 const char *ps_phase_name(int p, int v);   /* P_BREAKS .. P_GAP's values as the screen says them */
 
 /* the sections: the groove (MAIN), a break (the kick and the bass out, the atmos up), its build (BUILD's bars: a roll
- * and a rising noise), then the drop: everything back on a bar's first beat, a crash, and the bass a shade other than before.
- * A cue acts as the next bar begins: 1 (SAVE tapped) the next section (the groove: a break; a break: its build),
- * 2 (SAVE held) the drop now. On their own, now and then (Drift and BREAKS), a break comes as a 32-bar block begins,
- * GAP bars after the last drop at least; it lasts BREAK bars (or the world's), its build BUILD. */
+ * and a rising noise), then the drop: everything back on a bar's first beat, a crash, and the bass a shade other than
+ * before. A cue acts as the next bar begins: PS_CUE_BREAK (from the groove), PS_CUE_BUILD (from the groove or a break:
+ * the build, then the drop), PS_CUE_DROP (the drop now). On their own, now and then (Drift and BREAKS), a break comes
+ * as a 32-bar block begins, GAP bars after the last drop at least; it lasts BREAK bars (or the world's), its build
+ * BUILD. */
 enum { SEC_MAIN, SEC_BREAK, SEC_BUILD };
+enum { PS_CUE_BREAK = 1, PS_CUE_DROP, PS_CUE_BUILD };
 void ps_cue(int how);
 int ps_section(void);
 void ps_shed(int on);                  /* lighter (the render near its time): the atmos one note, the events half their
@@ -115,7 +117,7 @@ typedef struct {
     volatile int8_t thrown_type;       /* the latest thrown event's type (-1 none) */
     volatile int8_t sitting_out;       /* the part sitting out this phrase: 0 none, 1 hats, 2 open hat, 3 clap, 4 ride */
     volatile int8_t section;           /* SEC_* */
-    volatile int8_t cued;              /* a cue waiting for the next bar: 0 none, 1 next, 2 drop */
+    volatile int8_t cued;              /* a cue waiting for the next bar: 0 none, else PS_CUE_* */
     volatile uint8_t sec_bar;          /* bars into the section (the groove: into its phrase, 0..7) */
     volatile uint8_t sec_len;          /* a build's bars (else 0) */
     volatile uint8_t drops;            /* drops so far (wraps) */

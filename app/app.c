@@ -28,9 +28,11 @@
  * PRESETS: the world, from the next bar. PLAY: play or rest. ALGORITHM: the type of the page's part (elsewhere the
  * bass's colour; a drop chooses another on its own). OCT- / OCT+: the keys' events an octave down or up (-1..+2; both
  * lit away from 0). REC held: the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the
- * loop gone; lit while one plays). ARP: nothing yet.
- * SAVE (but on GLOBAL), after HYP-1's: tapped, the next section from the next bar (the groove: a break; a break: its
- * build, then the drop); held, the drop at the next bar. Lit in a break, quick in a build.
+ * loop gone; lit while one plays).
+ * SAVE and ARP, side by side, the sections (but on GLOBAL, where SAVE keeps the settings): SAVE down, a break from
+ * the next bar (in a break or a build: nothing); ARP up, a build from the next bar (from the groove or a break), the
+ * drop after it (in a build: the drop at the next bar); ARP held, the drop at the next bar. SAVE lit in a break, ARP
+ * quick in a build; either lit while its cue waits.
  * The keys play no notes: each throws an event into the music on the next sixteenth (dsp/events.c); the screen
  * names it at once. On ECHO (FX) they are the performance instead (dsp/fx.c), and the screen
  * shows them: the white keys a grid of sixteen effects, four rows of four (REPEAT, FILTER, SPACE, MOTION; each row's
@@ -164,8 +166,8 @@ static struct {
     uint32_t seen[NHIT];                 /* the engine's counts as last drawn */
     uint32_t struck_at[NLANE];           /* each lane's last note (the playhead's step flares) */
     uint32_t thrown_at;                  /* a key's event named on the screen since (0: none) */
-    uint32_t save_at;                    /* SAVE pressed at (a cue: tapped or held) */
-    uint8_t save_held;                   /* SAVE held long enough: the drop cued */
+    uint32_t arp_at;                     /* ARP pressed at (tapped: a build, or in one the drop; held: the drop) */
+    uint8_t arp_held;                    /* ARP held long enough: the drop cued */
     int8_t thrown_type;
     uint8_t page;
     uint8_t redraw;
@@ -589,25 +591,29 @@ static void input(void)
         ps_play(!ps_playing());
         app_say(ps_playing() ? "RESTING" : "PLAYING", "");   /* (it changes as the next block starts) */
     }
-    if (down & 1u << B_SAVE) {
-        ui.save_at = plat_ms();
-        ui.save_held = 0;
-        if (ui.page == PG_GLOBAL)
-            save();
+    if ((down & 1u << B_SAVE) && ui.page == PG_GLOBAL)
+        save();
+    else if ((down & 1u << B_SAVE) && ps_playing()) {   /* SAVE elsewhere: down, a break */
+        int sec = ps_section();
+        if (sec == SEC_MAIN) {
+            ps_cue(PS_CUE_BREAK);
+            app_say("BREAK", "NEXT BAR");
+        } else
+            app_say(sec == SEC_BREAK ? "IN A BREAK" : "BUILDING", "ARP: UP");
     }
-    if (ui.page != PG_GLOBAL && ps_playing()) {   /* SAVE elsewhere: the sections (after HYP-1's) */
-        if ((btn & 1u << B_SAVE) && !ui.save_held && plat_ms() - ui.save_at >= 500u) {
-            ui.save_held = 1;
-            ps_cue(2);
+    if (down & 1u << B_ARP) {                /* ARP: up, a build and the drop */
+        ui.arp_at = plat_ms();
+        ui.arp_held = 0;
+    }
+    if (ps_playing()) {
+        if ((btn & 1u << B_ARP) && !ui.arp_held && plat_ms() - ui.arp_at >= 500u) {
+            ui.arp_held = 1;
+            ps_cue(PS_CUE_DROP);
             app_say("DROP", "NEXT BAR");
-        } else if ((up & 1u << B_SAVE) && !ui.save_held) {
-            int sec = ps_section();
-            if (sec == SEC_BUILD)
-                app_say("BUILDING", "HOLD: DROP");
-            else {
-                ps_cue(1);
-                app_say(sec == SEC_MAIN ? "BREAK" : "BUILD", "NEXT BAR");
-            }
+        } else if ((up & 1u << B_ARP) && !ui.arp_held) {
+            int build = ps_section() != SEC_BUILD;
+            ps_cue(build ? PS_CUE_BUILD : PS_CUE_DROP);
+            app_say(build ? "BUILD" : "DROP", "NEXT BAR");
         }
     }
     if (down & 1u << B_REC) {                /* the keys' loop: a take anew while held */
@@ -653,14 +659,15 @@ static void input(void)
     ui.btn = btn;
     {   /* lit: the page's button, PLAY playing, SAVE unsaved; dim: the buttons that have a page or a use */
         uint32_t tick = ps_ui.tick, sec = (uint32_t)ps_ui.section;
-        int save_lit = ui.page == PG_GLOBAL ? set_dirty
-                       : sec == SEC_BREAK || ps_ui.cued ? 1
-                       : sec == SEC_BUILD ? tick % PS_TPB < PS_TPB / 2u : 0;   /* a build: on the beats */
-        uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (save_lit ? 1u << B_SAVE : 0u) | (ps_playing() ? 1u << B_PLAY : 0u) |
+        int cued = ps_ui.cued, save_lit = ui.page == PG_GLOBAL ? set_dirty : sec == SEC_BREAK || cued == PS_CUE_BREAK,
+            arp_lit = cued == PS_CUE_BUILD || cued == PS_CUE_DROP ? 1
+                      : sec == SEC_BUILD ? tick % PS_TPB < PS_TPB / 2u : 0;   /* a build: on the beats */
+        uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (save_lit ? 1u << B_SAVE : 0u) | (arp_lit ? 1u << B_ARP : 0u) |
+                       (ps_playing() ? 1u << B_PLAY : 0u) |
                        (ui.oct < 0 ? 1u << B_OCTDN : 0u) | (ps_take() ? 1u << B_REC : 0u) |
                        (ui.oct > 0 ? 1u << B_OCTUP : 0u);
         uint32_t dim = 1u << B_HOME | 1u << B_SEL | 1u << B_ENV | 1u << B_LFO | 1u << B_EDIT | 1u << B_FX | 1u << B_GLO |
-                       1u << B_SEQ | 1u << B_REC | 1u << B_SAVE | 1u << B_PLAY | 1u << B_OCTDN | 1u << B_OCTUP, klit = keys, kdim = 0;
+                       1u << B_SEQ | 1u << B_REC | 1u << B_SAVE | 1u << B_ARP | 1u << B_PLAY | 1u << B_OCTDN | 1u << B_OCTUP, klit = keys, kdim = 0;
         if (grid_mode())                     /* the grid: each row's first key glows, a muted part's key is lit */
             for (k = 0; k < NKEYS; k++) {
                 int pl = key_place((int)k);
@@ -883,7 +890,8 @@ static void draw_lanes(uint32_t now)
                     hsv(HUE_MAGENTA + hue.shift - i * HUE_FULL / nb, hue.sat, now_bar ? 255 : 70));
         }
         if (ps_ui.cued)                      /* a cue waiting for the next bar */
-            cv_text(8, 126, &FONT_XS, ps_ui.cued == 2 ? "DROP >" : sec == SEC_MAIN ? "BREAK >" : "BUILD >", C_WHITE);
+            cv_text(8, 126, &FONT_XS, ps_ui.cued == PS_CUE_DROP ? "DROP >" : ps_ui.cued == PS_CUE_BUILD ? "BUILD >" : "BREAK >",
+                    C_WHITE);
     }
     {   /* a key's event, named at the right; the rhythm a black key holds, named left of it */
         int32_t xr = 236;
