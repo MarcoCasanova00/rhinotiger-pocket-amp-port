@@ -40,6 +40,8 @@ enum { P_ENERGY, P_DETAIL, P_DARK, P_DRIFT,                  /* MAIN: the macros
                                                               * cued), its bars, its build's, the bars after a drop */
        P_LINE_RANGE, P_LINE_SLIDE, P_LINE_BITE, P_LINE_DECAY,  /* LINE: how far its notes go, how many slide (its
                                                               * pattern page); its modulation's height, its fall */
+       P_TOP,                                                /* MIX: the line, the events and the atmos together, over
+                                                              * their own levels (80: as they are) */
        P_NPARAMS };
 typedef struct {
     const char *name;
@@ -161,6 +163,8 @@ typedef struct {
     volatile uint8_t kit_parts;        /* the parts the latest changed (1 << PART_*) */
     volatile uint8_t kit_depth;        /* kits to go back to */
     volatile int8_t kit_shape;         /* the kit's shape over GROOVE's now (PS_SHAPE_*; AUTO: none) */
+    volatile uint8_t meter[NPART];     /* each part's peak as heard (its level, TOP; muted: none), held and falling
+                                        * back ~20 dB in 0.3 s; 255 full scale */
 } ps_ui_t;
 extern ps_ui_t ps_ui;
 #define PS_TPB 24u

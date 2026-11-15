@@ -125,7 +125,7 @@ wait 50
 expect page 2
 tap GLO
 wait 30
-expect page 11
+expect page 12
 tap SEQ
 wait 50
 expect page 2

@@ -12,7 +12,7 @@ shot logo.png
 # the logo for a moment, then the pages
 wait 700
 shot main.png
-# SELECT turns through every page (MAIN GROOVE PHASE KICK BASS PERC LINE, LINE SEQ, EVENTS ATMOS ECHO GLOBAL); the buttons jump
+# SELECT turns through every page (MAIN GROOVE PHASE KICK BASS PERC LINE, LINE SEQ, EVENTS ATMOS ECHO MIX GLOBAL); the buttons jump
 # (HOME again: GROOVE, again MAIN; SEQ: PHASE; SEL: KICK, BASS; ENV: PERC; LFO: LINE, LINE SEQ; EDIT: EVENTS, ATMOS; FX: ECHO; GLO: GLOBAL)
 turn SELECT 1
 wait 30
@@ -32,6 +32,9 @@ expect page 10
 turn SELECT 1
 wait 30
 expect page 11
+turn SELECT 1
+wait 30
+expect page 12
 tap HOME
 wait 30
 expect page 0
@@ -76,7 +79,7 @@ wait 30
 expect page 10
 tap GLO
 wait 30
-expect page 11
+expect page 12
 # the macros on MAIN, reaching the engine
 tap HOME
 wait 30

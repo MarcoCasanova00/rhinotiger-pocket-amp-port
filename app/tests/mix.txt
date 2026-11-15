@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# MIX (FX again, page 11): K1..K4 the kick's, the bass's, the percussion's level (the same as on their own pages) and
+# TOP (param44: the line, the events, the atmos together, over their own levels, which stay); a strip a part, its meter
+# (meterN: the part's peak) and its level. The keys as on ECHO: a black key mutes. COLD SIGNAL, 152.
+listen
+wait 600
+tap FX
+wait 30
+expect page 10
+tap FX
+wait 30
+expect page 11
+said MIX
+# into the line's sure phrase (bars 16..23): every part sounding
+wait 26000
+expect meter0 >0
+expect meter1 >0
+expect meter2 >0
+expect meter3 >0
+expect meter5 >0
+shot mix.png
+# K1: the kick's level, the KICK page's
+expect param8 80
+turn K1 -10
+wait 30
+expect param8 60
+said KICK
+turn K1 -30
+wait 1000
+expect param8 0
+expect meter0 0
+expect meter1 >0
+# TOP to 0: the line, the events, the atmos silent, their own levels as they were; the bass and the percussion on
+expect param44 80
+turn K4 -40
+wait 1000
+expect param44 0
+said TOP
+expect meter3 0
+expect meter4 0
+expect meter5 0
+expect meter1 >0
+expect meter2 >0
+expect param32 70
+expect param20 80
+expect param28 70
+shot mix-top.png
+# back: as they were
+turn K4 40
+turn K1 40
+wait 3000
+expect param44 80
+expect meter0 >0
+expect meter3 >0
+# a black key mutes, its strip dark and its meter still
+tapkey b1
+wait 1000
+expect muted 2
+expect meter1 0
+shot mix-mute.png

@@ -25,7 +25,10 @@
  *   9 EVENTS (EDIT)          K1..K4 Level, Density, Runs, Echo (the send)
  *  10 ATMOS (EDIT again)    K1..K4 Level, Colour, Air, Wash (the send)
  *  11 ECHO (FX)              K1..K4 Level, Feedback, Tone, Time
- *  12 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
+ *  12 MIX (FX again)         K1..K4 the kick's, the bass's, the percussion's level; Top (the line, the events, the
+ *                            atmos together over their own); a strip a part, its meter and its level; the keys as on
+ *                            ECHO
+ *  13 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
  *                            (off by default); SAVE here keeps it all
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
  * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on PHASE the
@@ -48,8 +51,8 @@
 #include "psy.h"
 #include "logo.h"
 
-#define SET_MAGIC 0x34544852u            /* "RHT4": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
-                                          * 4: PHASE's four, the breaks' switch gone into BREAKS) */
+#define SET_MAGIC 0x35544852u            /* "RHT5": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
+                                          * 4: PHASE's four, the breaks' switch gone into BREAKS; 5: MIX's TOP) */
 typedef struct {
     uint32_t magic;
     uint8_t world;
@@ -131,11 +134,11 @@ void app_init(void)
  * kick and the bass, ENV the percussion, LFO the line, EDIT the events and the atmos); FX the echo; GLO the global.
  * A button with two or three pages steps through them */
 enum { PG_MAIN, PG_GROOVE, PG_PHASE, PG_KICK, PG_BASS, PG_PERC, PG_LINE, PG_LINE_SEQ, PG_EVENTS, PG_ATMOS, PG_ECHO,
-       PG_GLOBAL, NPAGE };
+       PG_MIX, PG_GLOBAL, NPAGE };
 static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "PHASE", "KICK", "BASS", "PERC", "LINE", "LINE SEQ",
-                                             "EVENTS", "ATMOS", "ECHO", "GLOBAL"};
+                                             "EVENTS", "ATMOS", "ECHO", "MIX", "GLOBAL"};
 static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEL, B_SEL, B_ENV, B_LFO, B_LFO, B_EDIT, B_EDIT, B_FX,
-                                        B_GLO};
+                                        B_FX, B_GLO};
 /* a page's knobs: K1..K4's parameters (P_*; -1 none) */
 static int page_par(int p, int k)
 {
@@ -151,6 +154,7 @@ static int page_par(int p, int k)
         {P_EV_LEVEL, P_EV_DENSITY, P_EV_RUNS, P_EV_ECHO},
         {P_ATMOS_LEVEL, P_ATMOS_COLOUR, P_ATMOS_AIR, P_ATMOS_WASH},
         {P_ECHO_LEVEL, P_ECHO_FB, P_ECHO_TONE, P_ECHO_TIME},
+        {P_KICK_LEVEL, P_BASS_LEVEL, P_PERC_LEVEL, P_TOP},
         {-1, -1, -1, -1},
     };
     return PAR[clamp(p, 0, NPAGE - 1)][k & 3];
@@ -177,6 +181,7 @@ static struct {
     uint32_t lfo_at;                     /* LFO pressed on a LINE page at (tapped: the next page; held: a phrase anew) */
     uint8_t lfo_wait;                    /* LFO down on a LINE page, neither yet */
     uint8_t kits_seen;                   /* the engine's kits as last said */
+    float meter_s[NPART];                /* the mix's meters as drawn (falling back) */
     uint8_t msg_kit;                     /* the message a kit's: its words its parts' types, in their hues (the parts) */
     int8_t thrown_type;
     uint8_t page;
@@ -199,7 +204,7 @@ static int page_part(int p)              /* the part a page shows (PART_*), or -
 }
 static int algo_part(void) { return page_part(ui.page); }   /* ALGORITHM's part: the page's (-1: none) */
 
-static int grid_mode(void) { return ui.page == PG_ECHO; }
+static int grid_mode(void) { return ui.page == PG_ECHO || ui.page == PG_MIX; }   /* the keys the performance's */
 
 /* s copied into d (cap bytes with the terminator); returns the length written */
 static uint32_t str_put(char *d, uint32_t cap, const char *s)
@@ -293,6 +298,8 @@ static const char *knob_name(int page, int k)
 {
     if (page == PG_GLOBAL)
         return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "MIDI IN";
+    if (page == PG_MIX)                  /* the levels: the parts' names (TOP's its own) */
+        return k == 0 ? "KICK" : k == 1 ? "BASS" : k == 2 ? "PERC" : "TOP";
     return page_par(page, k) < 0 ? "" : ps_param(page_par(page, k))->name;
 }
 
@@ -935,6 +942,51 @@ static void draw_grid(void)
     cv_blit(0, 32);
 }
 
+/* the mix: a strip a part (the black keys' order), its meter lit in segments up its hue as it sounds (its peak, -36..0
+ * dB) and beside it its level's slot, the cap where the level is (the line's, the events', the atmos's with TOP over
+ * them: the three bracketed, TOP); a muted part dark. K1..K4: KICK, BASS, PERC, TOP */
+static void draw_mix(uint32_t now)
+{
+    static const uint8_t LEVEL[NPART] = {P_KICK_LEVEL, P_BASS_LEVEL, P_PERC_LEVEL, P_LINE_LEVEL, P_EV_LEVEL, P_ATMOS_LEVEL};
+    static const int8_t KNOB[NPART] = {0, 1, 2, 3, 3, 3};   /* the knob over each strip */
+    int32_t i, j, top = set.par[P_TOP];
+    cv_begin(240, 148, C_BLACK);
+    for (i = 0; i < NPART; i++) {
+        int32_t x = 10 + i * 38, y0 = 16, h = 92, mu = ps_ui.muted >> i & 1u;
+        int32_t lvl = set.par[LEVEL[i]] * (i >= PART_LINE ? top : 80) / 80, cap, lit_n;
+        int lit = ui.turned_at[KNOB[i]] && now - ui.turned_at[KNOB[i]] < 600u;
+        float m = (float)ps_ui.meter[i] / 255.0f, db;
+        ui.meter_s[i] = fm_maxf(m, ui.meter_s[i] * 0.9f);   /* (the engine's held; a little more here) */
+        db = ui.meter_s[i] > 0.0001f ? 6.0206f * fm_log2f(ui.meter_s[i]) : -99.0f;
+        lit_n = mu ? 0 : clamp((int32_t)((db + 36.0f) / 36.0f * 23.0f + 0.5f), 0, 23);
+        for (j = 0; j < 23; j++)             /* the meter: 23 segments, the hue turning up them */
+            cv_rect(x, y0 + h - 4 - j * 4, 14, 3,
+                    j < lit_n ? part_col(PART_HUE[i] + j * 10, j >= 21 ? 255 : 230)
+                              : mu ? C_BLACK : part_col(PART_HUE[i] + j * 10, 34));
+        cv_rect(x + 20, y0, 2, h, mu ? C_LINE : part_col(PART_HUE[i], 70));   /* the level's slot */
+        cap = y0 + h - 2 - clamp(lvl, 0, 125) * (h - 4) / 125;
+        cv_rect(x + 16, cap, 10, 3, lit ? C_WHITE : mu ? C_GRAY : part_txt(PART_HUE[i], 255));
+        {
+            int32_t tw = text_w(&FONT_XS, PART_NAME[i]);
+            cv_text(x + 13 - tw / 2, 114, &FONT_XS, PART_NAME[i], mu ? C_LINE : part_txt(PART_HUE[i], lit ? 255 : 200));
+            if (mu)
+                cv_rect(x + 13 - tw / 2, 118, tw, 1, C_GRAY);
+        }
+    }
+    {   /* TOP: the line, the events, the atmos bracketed */
+        int lit = ui.turned_at[3] && now - ui.turned_at[3] < 600u;
+        int32_t x0 = 10 + PART_LINE * 38, x1 = 10 + PART_ATMOS * 38 + 26, tw = text_w(&FONT_XS, "TOP");
+        uint16_t c = lit ? C_WHITE : C_GRAY;
+        cv_rect(x0, 5, (x1 - x0 - tw) / 2 - 4, 1, c);
+        cv_rect(x0 + (x1 - x0 + tw) / 2 + 4, 5, (x1 - x0 - tw) / 2 - 4, 1, c);
+        cv_rect(x0, 5, 1, 5, c);
+        cv_rect(x1 - 1, 5, 1, 5, c);
+        cv_text(x0 + (x1 - x0 - tw) / 2, 0, &FONT_XS, "TOP", c);
+    }
+    cv_text(8, 132, &FONT_XS, "BLACK: MUTE  WHITE: THE GRID", C_DIM);
+    cv_blit(0, 32);
+}
+
 /* the lanes: the bar now as the engine will play it (ps_lane), a step a cell in fours (the beats): a note a block,
  * its height its weight (the line: its pitch, a bar of a piano roll), a rest a dot on the line. The step playing is
  * white, a moment brighter as it sounds; the rest of the bar stays as it is (no trail). The page's lane amber, the
@@ -1073,7 +1125,9 @@ static void draw(void)
 {
     uint32_t now = plat_ms();
     draw_header(now);
-    if (grid_mode())
+    if (ui.page == PG_MIX)
+        draw_mix(now);
+    else if (grid_mode())
         draw_grid();
     else
         draw_lanes(now);
@@ -1149,7 +1203,7 @@ int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "world"))
         *got = set.world;
-    else if (!strcmp(what, "page"))          /* 0 MAIN .. 11 GLOBAL (PG_*) */
+    else if (!strcmp(what, "page"))          /* 0 MAIN .. 11 MIX, 12 GLOBAL (PG_*) */
         *got = ui.page;
     else if (!strcmp(what, "bar"))           /* bars since PLAY */
         *got = ps_bar();
@@ -1205,6 +1259,8 @@ int app_expect(const char *what, int *got)
         *got = ps_stat(1);
     else if (!strcmp(what, "thrown_type"))
         *got = ps_stat(2);
+    else if (!strncmp(what, "meter", 5))     /* meterN: part N's peak, held (psy.h), 0..255 */
+        *got = ps_ui.meter[atoi(what + 5) % NPART];
     else if (!strcmp(what, "kits"))          /* kits taken (MAIN's ALGORITHM) */
         *got = ps_ui.kits;
     else if (!strcmp(what, "kit_parts"))     /* the parts the latest changed, 1 << PART_* */
