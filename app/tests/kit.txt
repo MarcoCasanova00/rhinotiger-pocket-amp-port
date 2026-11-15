@@ -11,6 +11,7 @@ turn ALGO 1
 wait 50
 said KIT
 expect kits 0
+shot kit-turn.png
 wait 1700
 expect kits 1
 expect kit_n >0
@@ -28,6 +29,7 @@ expect kit_n 3
 turn ALGO -2
 wait 50
 said KIT BACK
+shot kit-back.png
 wait 1700
 expect kits 3
 expect kick_type 0
@@ -40,6 +42,7 @@ expect atmos_type 0
 turn ALGO -1
 wait 50
 said NONE BEFORE
+shot kit-none.png
 wait 1700
 expect kits 3
 # only the percussion heard (the rest muted on ECHO's black keys): the kit changes it, however many turns

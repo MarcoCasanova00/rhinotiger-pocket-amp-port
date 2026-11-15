@@ -973,7 +973,8 @@ static void draw_lanes(uint32_t now)
 }
 
 /* the rule over the knobs (after HYP-1's): at its left what needs saying (GLOBAL with something unsaved: SAVE keeps
- * it), else on a part's page its type (ALGORITHM chooses it); at its right the page's name, then a short bar a page,
+ * it), else on a part's page its type (ALGORITHM chooses it; MAIN's kit: nothing here, what it changed a moment
+ * over the header as it lands); at its right the page's name, then a short bar a page,
  * the one shown lit, its button's other pages a little brighter */
 static void draw_rule(void)
 {
@@ -991,9 +992,6 @@ static void draw_rule(void)
         xs = cv_text(xs, 0, &FONT_XS, ps_build_name(k), C_HI) + 6;
         if (k == PS_BUILD_AUTO && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0)
             xs = cv_text(xs - 2, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_GRAY) + 6;
-    } else if (ui.page == PG_MAIN) {   /* the kit (what it changed: a moment over the header, as it lands) */
-        xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
-        xs = cv_text(xs, 0, &FONT_XS, "KIT", C_HI) + 6;
     } else if (ui.page == PG_GROOVE || ui.page == PG_ECHO) {   /* the bass's shape; the echo's kind */
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
         xs = cv_text(xs, 0, &FONT_XS, ui.page == PG_GROOVE ? ps_bass_shape_name(ps_bass_shape_now())
