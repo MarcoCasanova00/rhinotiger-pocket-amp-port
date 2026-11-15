@@ -177,6 +177,7 @@ static struct {
     uint32_t lfo_at;                     /* LFO pressed on a LINE page at (tapped: the next page; held: a phrase anew) */
     uint8_t lfo_wait;                    /* LFO down on a LINE page, neither yet */
     uint8_t kits_seen;                   /* the engine's kits as last said */
+    uint8_t msg_kit;                     /* the message a kit's: its words its parts' types, in their hues (the parts) */
     int8_t thrown_type;
     uint8_t page;
     uint8_t redraw;
@@ -241,6 +242,7 @@ void app_say(const char *a, const char *b)
     uint32_t k;
     str_put(ui.msg[0], sizeof ui.msg[0], a);
     str_put(ui.msg[1], sizeof ui.msg[1], b);
+    ui.msg_kit = 0;
     ui.msg_until = plat_ms() + 1300u;
     ui.redraw = 1;
     if (!ann_on())
@@ -821,8 +823,27 @@ static void draw_header(uint32_t now)
     if (now < ui.msg_until) {                /* a message over the header */
         int big = 18 + text_w(&FONT_B, ui.msg[0]) + text_w(&FONT_B, ui.msg[1]) <= 230;
         int32_t y = big ? 6 : 9;
-        x = cv_text(10, y, big ? &FONT_B : &FONT_XS, ui.msg[0], C_WHITE);
-        cv_text(x + 8, y, big ? &FONT_B : &FONT_XS, ui.msg[1], C_HI);
+        const felucca_font_t *f = big ? &FONT_B : &FONT_XS;
+        x = cv_text(10, y, f, ui.msg[0], C_WHITE);
+        if (ui.msg_kit) {                    /* a kit's: each word in its part's hue (the groove's the bass's) */
+            char wd[32];
+            const char *c = ui.msg[1];
+            uint32_t p = 0, k;
+            x += 8;
+            while (*c) {
+                for (k = 0; c[k] && c[k] != ' ' && k + 1 < sizeof wd; k++)
+                    wd[k] = c[k];
+                wd[k] = 0;
+                while (p <= PS_KIT_GROOVE && !(ui.msg_kit >> p & 1u))
+                    p++;
+                x = cv_text(x, y, f, wd, part_txt(PART_HUE[p < NPART ? p : PART_BASS], 255)) + text_w(f, " ");
+                p++;
+                c += k;
+                while (*c == ' ')
+                    c++;
+            }
+        } else
+            cv_text(x + 8, y, f, ui.msg[1], C_HI);
     } else {
         uint32_t tick = ps_ui.tick, beat = tick / PS_TPB % 4u;
         if (now < ui.world_until)            /* just turned to */
@@ -846,22 +867,33 @@ static void marks_update(void)
 {
     static const uint8_t LANE_OF[NHIT] = {LANE_KICK, LANE_BASS, LANE_PERC, LANE_EVENTS, LANE_EVENTS, LANE_LINE};
     uint32_t h, now = plat_ms();
-    if (ps_ui.kits != ui.kits_seen) {       /* a kit taken: the parts it changed, and their types */
-        char t[32];
-        uint32_t k = 0, p, mask = ps_ui.kit_parts;
+    if (ps_ui.kits != ui.kits_seen) {       /* a kit taken: the types it changed to, each in its part's hue (a
+                                             * reader hears the parts too) */
+        char t[32], said[64];
+        uint32_t k = 0, n = 0, p, mask = ps_ui.kit_parts;
         ui.kits_seen = ps_ui.kits;
+        n = str_put(said, sizeof said, "KIT");
         for (p = 0; p <= PS_KIT_GROOVE; p++)
             if (mask >> p & 1u) {
+                const char *nm = p == PS_KIT_GROOVE ? ps_bass_shape_name(ps_ui.kit_shape != PS_SHAPE_AUTO
+                                                                         ? ps_ui.kit_shape : ps_bass_shape_now())
+                                                    : ps_type_name((int)p, ps_type_now((int)p));
                 if (k && k + 1 < sizeof t)
                     t[k++] = ' ';
-                k += str_put(t + k, sizeof t - k, p == PS_KIT_GROOVE ? "GROOVE" : PART_NAME[p]);
-                if (k + 1 < sizeof t)
-                    t[k++] = ' ';
-                k += str_put(t + k, sizeof t - k, p == PS_KIT_GROOVE ? ps_bass_shape_name(ps_ui.kit_shape)
-                                                                     : ps_type_name((int)p, ps_type_now((int)p)));
+                k += str_put(t + k, sizeof t - k, nm);
+                n += str_put(said + n, sizeof said - n, " ");
+                n += str_put(said + n, sizeof said - n, p == PS_KIT_GROOVE ? "GROOVE" : PART_NAME[p]);
+                n += str_put(said + n, sizeof said - n, " ");
+                n += str_put(said + n, sizeof said - n, nm);
             }
         t[k < sizeof t ? k : sizeof t - 1] = 0;
-        app_say("KIT", t);
+        str_put(ui.msg[0], sizeof ui.msg[0], "KIT");
+        str_put(ui.msg[1], sizeof ui.msg[1], t);
+        ui.msg_kit = (uint8_t)mask;
+        ui.msg_until = plat_ms() + 1300u;
+        ui.redraw = 1;
+        if (ann_on())
+            ann_say(said, 0, ANN_NOW);
     }
     if (ps_ui.hits[HIT_THROW] != ui.seen[HIT_THROW]) {
         ui.thrown_type = ps_ui.thrown_type;
