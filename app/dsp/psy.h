@@ -163,8 +163,8 @@ typedef struct {
     volatile uint8_t kit_parts;        /* the parts the latest changed (1 << PART_*) */
     volatile uint8_t kit_depth;        /* kits to go back to */
     volatile int8_t kit_shape;         /* the kit's shape over GROOVE's now (PS_SHAPE_*; AUTO: none) */
-    volatile uint8_t meter[NPART + 1]; /* each part's peak as heard (its level; muted: none), then the echo's return,
-                                        * held and falling back ~20 dB in 0.3 s; 255 full scale */
+    volatile uint8_t meter[NPART];     /* each part's peak as heard (its level; muted: none), held and falling back
+                                        * ~20 dB in 0.3 s; 255 full scale */
 } ps_ui_t;
 extern ps_ui_t ps_ui;
 #define PS_TPB 24u

@@ -1526,7 +1526,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
                     (float)par[P_PERC_LEVEL] / 80.0f, (float)par[P_EV_LEVEL] / 80.0f, (float)par[P_LINE_LEVEL] / 70.0f,
                     (float)par[P_EV_ECHO] / 50.0f, 0.7f * (float)par[P_ECHO_LEVEL] / 50.0f};
     float *g = s.g, kick_g, bass_g, perc_g, ev_g, line_g, send_g, ret_g;
-    float pk[NPART + 1] = {0};         /* the parts' peaks this block, the echo's return's (the meters) */
+    float pk[NPART] = {0};             /* the parts' peaks this block (the meters) */
     float perc_send = 0.4f * (float)par[P_PERC_SEND] / 100.0f, line_send = (float)par[P_LINE_SEND] / 50.0f;
     float fb = (float)par[P_ECHO_FB] / 100.0f, tone = 0.12f + 0.46f * (float)par[P_ECHO_TONE] / 100.0f;
     uint32_t i;
@@ -1725,7 +1725,6 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 mr += (s.lp_u[1][0] - mr) * s.lp_g;
             } else
                 s.lp_u[0][0] = s.lp_u[0][1] = s.lp_u[1][0] = s.lp_u[1][1] = 0.0f;
-            pk[NPART] = fm_maxf(pk[NPART], ret_g * fm_maxf(fm_fabsf(xl), fm_fabsf(xr)));
             outl[i] = c + ml + ret_g * xl;
             outr[i] = c + mr + ret_g * xr;
             fx_send = fx_render(s.tick_len, &outl[i], &outr[i], ml, mr, n);
@@ -1742,10 +1741,10 @@ void ps_render(float *outl, float *outr, uint32_t n)
         }
     }
     {   /* the meters (the UI reads them): a peak held, falling back ~20 dB in 0.3 s */
-        static float held[NPART + 1];
+        static float held[NPART];
         float fall = fm_expf(-(float)n / (0.13f * PS_SR));
         int k;
-        for (k = 0; k <= NPART; k++) {
+        for (k = 0; k < NPART; k++) {
             held[k] = fm_maxf(pk[k], held[k] * fall);
             if (held[k] < 0.0005f)
                 held[k] = 0.0f;

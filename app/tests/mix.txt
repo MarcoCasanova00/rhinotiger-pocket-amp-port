@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# MIX (EDIT, page 10): K1 the track (0..5 the parts, 6 the echo's return), K2 its level, K3 its send into the echo (the
-# kick, the bass and the echo: none). The levels and the sends are MIX's only: param8 KICK, 12 BASS, 16 PERC, 32 LINE,
-# 20 EVENTS, 28 ATMOS, 24 ECHO; sends 44 PERC, 45 LINE, 23 EVENTS, 31 ATMOS. A strip a track, its meter (meterN). The
-# keys throw events as on the other pages. COLD SIGNAL, 152.
+# MIX (EDIT, page 10): K1 the track (0..5 the parts), K2 its level, K3 its send into the echo (the kick and the bass:
+# none, not shown), K4 its mute (right on, left off; ECHO's black keys the same). The levels and the sends are MIX's
+# only: param8 KICK, 12 BASS, 16 PERC, 32 LINE, 20 EVENTS, 28 ATMOS; sends 44 PERC, 45 LINE, 23 EVENTS, 31 ATMOS. The
+# echo's level (param24) is ECHO's K4. A strip a track, its meter (meterN). The keys throw events as on the other
+# pages. COLD SIGNAL, 152.
 listen
 wait 600
 tap EDIT
@@ -18,7 +19,6 @@ expect meter1 >0
 expect meter2 >0
 expect meter3 >0
 expect meter5 >0
-expect meter6 >0
 shot mix.png
 # K2 on KICK: the kick's level
 expect param8 80
@@ -31,10 +31,11 @@ wait 1000
 expect param8 0
 expect meter0 0
 expect meter1 >0
-# K3 on KICK: no send, nothing changes
+# K3 on KICK: no send, nothing said
+said KICK
 turn K3 10
 wait 30
-said NO SEND
+said_none
 # K1 to LINE (3): K2 its level, K3 its send
 turn K1 3
 wait 30
@@ -51,19 +52,27 @@ wait 30
 expect param45 70
 said LINE
 shot mix-line.png
-# K1 past the end: the echo (6), then no further
+# K1 past the end: ATMOS (5), no further
 turn K1 10
 wait 30
-expect track 6
-said ECHO
-expect param24 50
-turn K2 -25
+expect track 5
+said ATMOS
+# K4: ATMOS muted (right), again right: still; left: back
+turn K4 1
 wait 1000
-expect param24 0
-expect meter6 0
+expect muted 32
+expect meter5 0
+said MUTED
+turn K4 1
+wait 30
+expect muted 32
+turn K4 -1
+wait 30
+expect muted 0
+said BACK
+shot mix-mute.png
 # back, and the kick and the line again
-turn K2 25
-turn K1 -3
+turn K1 -2
 wait 30
 expect track 3
 turn K2 35
@@ -78,3 +87,12 @@ expect meter0 >0
 tapkey b1
 wait 300
 expect muted 0
+# the echo's level: ECHO's K4
+tap FX
+wait 30
+expect page 11
+expect param24 50
+turn K4 -5
+wait 30
+expect param24 40
+said LEVEL
