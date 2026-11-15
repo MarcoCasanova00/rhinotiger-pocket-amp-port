@@ -42,6 +42,11 @@ enum { P_ENERGY, P_DETAIL, P_DARK, P_DRIFT,                  /* MAIN: the macros
                                                               * pattern page); its modulation's height, its fall */
        P_PERC_SEND, P_LINE_SEND,                             /* MIX: the percussion's, the line's into the echo (the
                                                               * events' is P_EV_ECHO, the atmos's P_ATMOS_WASH) */
+       P_KICK_DECAY, P_BASS_TONE, P_PERC_OPEN, P_LINE_DRIVE, /* the sounds' pages, where their levels were: the kick's
+                                                              * body, the bass's brightness, the open hat's length, the
+                                                              * line driven (0: clean) */
+       P_EV_PITCH, P_EV_SPREAD, P_ATMOS_MOTION, P_ATMOS_DEPTH,   /* the events' semitones (-12..12) and how far apart
+                                                              * left and right; the atmos's sway, how fast and how deep */
        P_NPARAMS };
 typedef struct {
     const char *name;

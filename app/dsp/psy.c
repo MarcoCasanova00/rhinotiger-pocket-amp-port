@@ -157,6 +157,8 @@ static const ps_param_t PAR[P_NPARAMS] = {
     {"BREAKS", 0, 100, 50}, {"BREAK", 0, 4, 0}, {"BUILD", 0, 2, 1}, {"GAP", 0, 3, 1},
     {"RANGE", 0, 100, 50}, {"SLIDE", 0, 100, 50}, {"BITE", 0, 100, 50}, {"DECAY", 0, 100, 50},
     {"SEND", 0, 100, 0}, {"SEND", 0, 100, 50},
+    {"DECAY", 0, 100, 50}, {"TONE", 0, 100, 50}, {"OPEN", 0, 100, 50}, {"DRIVE", 0, 100, 0},
+    {"PITCH", -12, 12, 0}, {"SPREAD", 0, 100, 50}, {"MOTION", 0, 100, 50}, {"DEPTH", 0, 100, 50},
 };
 static const uint8_t BREAK_BARS[5] = {0, 4, 8, 16, 32};   /* P_BREAK_LEN (0: the world's) */
 static const uint8_t BUILD_BARS[3] = {2, 4, 8};           /* P_BUILD_LEN */
@@ -283,6 +285,11 @@ static struct {
     float lp_f;                        /* SINK's low-pass */
     float k_drive;                     /* DRIVE: the kick's, of its type's */          /* the clap's, the riser's and the atmos's air's band-passes */
     float a_inc[3];                    /* the atmos's notes, turns a sample */
+    float k_body;                      /* DECAY: the kick's body, of its type's (50: 1) */
+    float b_lp;                        /* the bass's low-pass (TONE, Dark) */
+    float o_len;                       /* OPEN: the open hat's length, of its type's (50: 1) */
+    float l_drive, l_cmp;              /* the line's DRIVE (0: none), its loudness kept */
+    float a_rate;                      /* MOTION: the atmos's sway, turns a sample */
 } cf;
 
 #define ECHO_N 20480u                  /* (a dotted eighth at 125 bpm, the slowest a world can be moved to: 15876; DUB
@@ -1218,7 +1225,7 @@ static float kick(float dt)
     s.k_ph += f * dt;
     if (s.k_ph >= 1.0f)
         s.k_ph -= 1.0f;
-    env = fm_expf(-t / (s.k_len * ty[KT_BODY]));
+    env = fm_expf(-t / (s.k_len * ty[KT_BODY] * cf.k_body));   /* (DECAY: the body; its end stays the bass's) */
     env *= 1.0f - t / s.k_len;                      /* to nothing by its end: the bass's place stays clear */
     if (t < 0.0002f)                                /* its first 0.2 ms a slope, not a step (the click too) */
         env *= t / 0.0002f;
@@ -1265,7 +1272,7 @@ static float bass(const world_t *w, float dt)
     if (s.b_t >= 0.0f)
         s.b_t = t + dt;
     x = fm_tanhf(x * w->drive * (0.5f + (float)par[P_BASS_DRIVE] / 100.0f));
-    s.lp += (x - s.lp) * fm_clampf(0.45f - 0.2f * m.dark, 0.2f, 0.7f);   /* Dark: darker */
+    s.lp += (x - s.lp) * cf.b_lp;      /* TONE: brighter or darker (Dark: darker) */
     return s.lp;
 }
 
@@ -1317,7 +1324,7 @@ static void perc(const world_t *w, float dt, float *l, float *r)
     if (s.h_t == 0.0f)                 /* (each takes its type's decay as it strikes) */
         s.h_k = pt[PT_HAT];
     if (s.o_t == 0.0f)
-        s.o_k = pt[PT_OPEN];
+        s.o_k = pt[PT_OPEN] * cf.o_len;  /* (OPEN: longer or shorter) */
     if (s.c_t == 0.0f)
         s.c_k = pt[PT_CLAP];
     if (s.r_t == 0.0f)
@@ -1418,9 +1425,9 @@ static float atmos(const world_t *w, float n, float *l, float *r)
     if (s.a_lvl < 0.0005f)
         return 0.0f;
     colour += 0.4f * build_progress(); /* it opens as the build rises */
-    if ((s.a_lfo += 0.05f / PS_SR) >= 1.0f)
+    if ((s.a_lfo += cf.a_rate) >= 1.0f)   /* MOTION: how fast it sways (50: 0.05 Hz) */
         s.a_lfo -= 1.0f;
-    wob = fm_sin_turns(s.a_lfo);
+    wob = fm_sin_turns(s.a_lfo) * (float)par[P_ATMOS_DEPTH] / 50.0f;   /* DEPTH: how far (0..2, 50: 1) */
     {   /* the type: each of its values moving to the type's over ~45 ms (a held chord: no step) */
         const float *tt = ATMOS_TYPE[s.type[PART_ATMOS]];
         for (i = 0; i < AM_N; i++)
@@ -1463,8 +1470,8 @@ static float atmos(const world_t *w, float n, float *l, float *r)
             s.a_genv += (s.a_gtar - s.a_genv) * 0.01f;
         }
         gate = 1.0f - g + g * s.a_genv;
-        al = s.a_lp[0] * 0.10f * gate + x * (0.6f + 0.35f * wob);
-        ar = s.a_lp[1] * 0.10f * gate + x * (0.6f - 0.35f * wob);
+        al = s.a_lp[0] * 0.10f * gate + x * (0.6f + fm_clampf(0.35f * wob, -0.6f, 0.6f));
+        ar = s.a_lp[1] * 0.10f * gate + x * (0.6f - fm_clampf(0.35f * wob, -0.6f, 0.6f));
     }
     *l += al * s.a_lvl;
     *r += ar * s.a_lvl;
@@ -1500,6 +1507,12 @@ static void coefs(const world_t *w)    /* as a block begins: what changes slowly
     cf.air_f = 2.0f * fm_sinf(3.14159265f * (1200.0f + 900.0f * fm_sin_turns(s.a_lfo) + 1500.0f * colour) / PS_SR);
     for (i = 0; i < 3; i++)
         cf.a_inc[i] = note_hz(m.root + IV[m.dark > 0.3f][i]) / PS_SR;
+    cf.k_body = fm_exp2f((float)(par[P_KICK_DECAY] - 50) / 50.0f * 1.3f);   /* x0.4 .. x2.5 */
+    cf.b_lp = fm_clampf((0.45f - 0.2f * m.dark) * fm_exp2f((float)(par[P_BASS_TONE] - 50) / 50.0f * 1.3f), 0.06f, 0.95f);
+    cf.o_len = fm_exp2f((float)(par[P_PERC_OPEN] - 50) / 25.0f);   /* x0.25 .. x4 */
+    cf.l_drive = par[P_LINE_DRIVE] ? 1.0f + 0.08f * (float)par[P_LINE_DRIVE] : 0.0f;   /* x1 .. x9 into a tanh */
+    cf.l_cmp = cf.l_drive > 0.0f ? fm_powf(cf.l_drive, -0.3f) / fm_tanhf(cf.l_drive) : 1.0f;
+    cf.a_rate = 0.05f * fm_exp2f((float)(par[P_ATMOS_MOTION] - 50) / 25.0f) / PS_SR;   /* 0.0125 .. 0.2 Hz */
     fx_block(s.tick_len);
 }
 

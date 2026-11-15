@@ -186,7 +186,7 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
 {
     evoice_t *v = 0;
     int k;
-    float f = note_hz(r->note), a = fvar(r->var, 0), b = fvar(r->var, 1);
+    float f = note_hz(r->note + par[P_EV_PITCH]), a = fvar(r->var, 0), b = fvar(r->var, 1);   /* (PITCH: semitones) */
     int nv = shed ? EV_NVOICE / 2 : EV_NVOICE;   /* (lighter: half of them) */
     for (k = 0; k < nv; k++)
         if (ev.v[k].t < 0.0f) {
@@ -541,7 +541,7 @@ static float ev_highpass(int ch, float x)   /* ~180 Hz, 12 dB an octave: the eve
 
 static float ev_render(float dt, float *l, float *r)
 {
-    float send = 0.0f, el = 0.0f, er = 0.0f;
+    float send = 0.0f, el = 0.0f, er = 0.0f, spread = (float)par[P_EV_SPREAD] / 50.0f;   /* (0..2, 50: 1) */
     int k;
     for (k = 0; k < EV_NVOICE; k++) {
         evoice_t *v = &ev.v[k];
@@ -580,7 +580,7 @@ static float ev_render(float dt, float *l, float *r)
             x = v->hx;
         }
         x = fm_tanhf(1.4f * x) * amp * v->level * 0.28f;
-        pan = v->pan0 + (v->pan1 - v->pan0) * u;
+        pan = fm_clampf((v->pan0 + (v->pan1 - v->pan0) * u) * spread, -1.6f, 1.6f);   /* (SPREAD) */
         el += x * (1.0f - 0.5f * pan);
         er += x * (1.0f + 0.5f * pan);
         v->t += dt;

@@ -16,15 +16,15 @@
  *                            rests a phrase)
  *   3 PHASE (SEQ)            K1..K4 Breaks (how often one comes on its own; 0: only when cued), Break (its bars: the
  *                            world's, 4..32), Build (2, 4, 8 bars), Gap (bars after a drop before one comes on its own)
- *   4 KICK (SEL)             K1..K3 Tune, Drive, Punch
- *   5 BASS (SEL again)       K1..K3 Bite, Length, Drive
- *   6 PERC (ENV)             K1..K3 Hats, Tone, Clap
- *   7 EVENTS (ENV again)     K1..K2 Density, Runs
- *   8 LINE (LFO)             K1..K3 Bite (the modulation's height), Decay (its fall), Length
+ *   4 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body)
+ *   5 BASS (SEL again)       K1..K4 Bite, Length, Drive, Tone (brighter, darker)
+ *   6 PERC (ENV)             K1..K4 Hats, Tone, Clap, Open (the open hat's length)
+ *   7 EVENTS (ENV again)     K1..K4 Density, Runs, Pitch (semitones), Spread (left and right)
+ *   8 LINE (LFO)             K1..K4 Bite (the modulation's height), Decay (its fall), Length, Drive
  *   9 LINE SEQ (LFO again)   K1..K4 Density, Mutate, Range (how far the notes go up), Slide (how many)
  *                            On either LINE page LFO acts as it is let go (tapped: the next); held, the line's
  *                            phrase drawn anew from the next bar
- *  10 ATMOS (LFO, a third)   K1..K2 Colour, Air
+ *  10 ATMOS (LFO, a third)   K1..K4 Colour, Air, Motion (its sway's speed), Depth (how far)
  *  11 MIX (EDIT)             K1 the track (the six parts), K2 its level, K3 its send into the echo (the kick and the
  *                            bass: none, not shown), K4 its mute (right on, left off); a strip a track, its meter,
  *                            its level and its send
@@ -52,9 +52,9 @@
 #include "psy.h"
 #include "logo.h"
 
-#define SET_MAGIC 0x36544852u            /* "RHT6": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
+#define SET_MAGIC 0x37544852u            /* "RHT7": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
                                           * 4: PHASE's four, the breaks' switch gone into BREAKS; 5: MIX's TOP; 6: the
-                                          * percussion's and the line's sends, TOP gone) */
+                                          * percussion's and the line's sends, TOP gone; 7: the sounds' new eight) */
 typedef struct {
     uint32_t magic;
     uint8_t world;
@@ -163,13 +163,13 @@ static int page_par(int p, int k)
         {P_ENERGY, P_DETAIL, P_DARK, P_DRIFT},
         {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
         {P_BREAKS, P_BREAK_LEN, P_BUILD_LEN, P_GAP},
-        {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, -1},   /* (the levels and the sends: MIX's) */
-        {P_BASS_BITE, P_BASS_LEN, P_BASS_DRIVE, -1},
-        {P_HATS, P_HAT_TONE, P_CLAP, -1},
-        {P_EV_DENSITY, P_EV_RUNS, -1, -1},
-        {P_LINE_BITE, P_LINE_DECAY, P_LINE_LEN, -1},
+        {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, P_KICK_DECAY},   /* (the levels and the sends: MIX's) */
+        {P_BASS_BITE, P_BASS_LEN, P_BASS_DRIVE, P_BASS_TONE},
+        {P_HATS, P_HAT_TONE, P_CLAP, P_PERC_OPEN},
+        {P_EV_DENSITY, P_EV_RUNS, P_EV_PITCH, P_EV_SPREAD},
+        {P_LINE_BITE, P_LINE_DECAY, P_LINE_LEN, P_LINE_DRIVE},
         {P_LINE_DENSITY, P_LINE_MUTATE, P_LINE_RANGE, P_LINE_SLIDE},
-        {P_ATMOS_COLOUR, P_ATMOS_AIR, -1, -1},
+        {P_ATMOS_COLOUR, P_ATMOS_AIR, P_ATMOS_MOTION, P_ATMOS_DEPTH},
         {-1, -1, -1, -1},                                /* MIX: K1 the track, K2 its level, K3 its send, K4 its mute */
         {P_ECHO_FB, P_ECHO_TONE, P_ECHO_TIME, P_ECHO_LEVEL},
         {-1, -1, -1, -1},
@@ -336,7 +336,7 @@ static void par_text(int p, int v, char *t)   /* a parameter's value as the scre
         str_put(t, 12, ps_echo_time_name(v));
     else if (p >= P_BREAKS && p <= P_GAP && ps_phase_name(p, v))
         str_put(t, 12, ps_phase_name(p, v));
-    else if (p == P_KICK_TUNE && v > 0) {
+    else if ((p == P_KICK_TUNE || p == P_EV_PITCH) && v > 0) {
         t[0] = '+';
         int_text(v, t + 1);
     } else

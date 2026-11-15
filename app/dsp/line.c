@@ -226,6 +226,8 @@ static float ln_render(const world_t *w, float dt, float *l, float *r)   /* retu
         ln.mph -= 1.0f;
     if (ln.drive > 0.0f)               /* (GROWL) */
         x = fm_tanhf(x * ln.drive) * (1.0f / 0.987f);
+    if (cf.l_drive > 0.0f)             /* DRIVE: over the type's, the peaks kept and a little under (denser) */
+        x = fm_tanhf(x * cf.l_drive) * cf.l_cmp;
     ln.t += dt;
     ln.lp += (x - ln.lp) * 0.6f;
     x = hp2(&ln.hp[1], hp2(&ln.hp[0], ln.lp, HP150), HP150) * 0.22f * ln.gain;
