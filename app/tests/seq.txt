@@ -1,25 +1,28 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# LFO and SEQ. LFO cycles LINE (page 6) and LINE SEQ (7); SEQ goes to PHASE (2), and tapped again stays there: SEQ is
+# LFO and SEQ. LFO cycles LINE (page 7), LINE SEQ (8) and ATMOS (9); SEQ goes to PHASE (2), and tapped again stays there: SEQ is
 # not held-sensitive and draws no phrase (LFO held on a LINE page does: line-new). LINE SEQ's knobs: K1..K4 Density
 # (param33), Mutate (param35), Range (param40), Slide (param41), each changing its own parameter only; ALGO there is
 # the line's type.
 listen
 wait 600
 expect page 0
-# LFO: LINE, again LINE SEQ, again LINE
-tap LFO
-wait 50
-expect page 6
+# LFO: LINE, LINE SEQ, ATMOS, again LINE, LINE SEQ
 tap LFO
 wait 50
 expect page 7
 tap LFO
 wait 50
-expect page 6
+expect page 8
+tap LFO
+wait 50
+expect page 9
 tap LFO
 wait 50
 expect page 7
+tap LFO
+wait 50
+expect page 8
 # LINE SEQ's knobs: K3 is Range (param40) and nothing else
 expect param33 50
 expect param35 50
@@ -63,7 +66,7 @@ expect page 2
 # LFO from PHASE: the first of its own, LINE
 tap LFO
 wait 50
-expect page 6
+expect page 7
 # SEQ from LINE: PHASE
 tap SEQ
 wait 50
@@ -103,23 +106,23 @@ expect page 5
 tap SEQ
 wait 50
 expect page 2
-tap EDIT
+tap ENV
 wait 30
-expect page 8
+tap ENV
+wait 30
+expect page 6
 tap SEQ
 wait 50
 expect page 2
 tap EDIT
 wait 30
-tap EDIT
-wait 30
-expect page 9
+expect page 10
 tap SEQ
 wait 50
 expect page 2
 tap FX
 wait 30
-expect page 10
+expect page 11
 tap SEQ
 wait 50
 expect page 2
@@ -132,10 +135,10 @@ expect page 2
 # held for 700 ms: only the page, nothing said but PHASE, nothing else changed
 tap LFO
 wait 50
-expect page 6
+expect page 7
 tap LFO
 wait 50
-expect page 7
+expect page 8
 said LINE SEQ
 said_none
 press SEQ

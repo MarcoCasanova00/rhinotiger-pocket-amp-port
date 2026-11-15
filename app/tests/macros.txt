@@ -1,18 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
 # The knobs are heard at once: the events' density turned to nothing stops them within a sixteenth, turned up it
-# fills the loop within two bars (not at the next phrase), on the EVENTS page (EDIT). COLD SIGNAL, 152: a bar is 1.58 s.
+# fills the loop within two bars (not at the next phrase), on the EVENTS page (ENV, tapped twice). COLD SIGNAL, 152: a bar is 1.58 s.
 wait 14200
 expect events >3
-tap EDIT
+tap ENV
 wait 30
-turn K2 -30
+tap ENV
+wait 30
+turn K1 -30
 wait 30
 expect param21 0
 expect events <9
 wait 3160
 expect events <9
-turn K2 50
+turn K1 50
 wait 30
 expect param21 100
 wait 3160

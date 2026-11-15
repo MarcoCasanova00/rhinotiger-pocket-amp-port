@@ -2,7 +2,7 @@
 # Copyright (C) 2026 hacha
 # RhinoTiger in the host simulator: ./test.sh basic
 # It plays from the start, on MAIN. Buttons: HOME (MAIN, GROOVE), SEQ (PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ),
-# EDIT (EVENTS, ATMOS), FX (ECHO), GLO (GLOBAL); SELECT steps through the pages in that order.
+# EDIT (MIX), FX (ECHO), GLO (GLOBAL); ENV also reaches EVENTS and LFO also ATMOS; SELECT steps through the pages in that order.
 wait 600
 expect playing 1
 expect page 0
@@ -12,8 +12,8 @@ shot logo.png
 # the logo for a moment, then the pages
 wait 700
 shot main.png
-# SELECT turns through every page (MAIN GROOVE PHASE KICK BASS PERC LINE, LINE SEQ, EVENTS ATMOS ECHO MIX GLOBAL); the buttons jump
-# (HOME again: GROOVE, again MAIN; SEQ: PHASE; SEL: KICK, BASS; ENV: PERC; LFO: LINE, LINE SEQ; EDIT: EVENTS, ATMOS; FX: ECHO; GLO: GLOBAL)
+# SELECT turns through every page (MAIN GROOVE PHASE KICK BASS PERC EVENTS LINE LINE-SEQ ATMOS MIX ECHO GLOBAL); the buttons jump
+# (HOME again: GROOVE, again MAIN; SEQ: PHASE; SEL: KICK, BASS; ENV: PERC, EVENTS; LFO: LINE, LINE SEQ, ATMOS; EDIT: MIX; FX: ECHO; GLO: GLOBAL)
 turn SELECT 1
 wait 30
 expect page 1
@@ -59,24 +59,33 @@ expect page 4
 tap ENV
 wait 30
 expect page 5
-tap LFO
+tap ENV
 wait 30
 expect page 6
+tap ENV
+wait 30
+expect page 5
 tap LFO
 wait 30
 expect page 7
 tap LFO
 wait 30
-expect page 6
-tap EDIT
-wait 30
 expect page 8
-tap EDIT
+tap LFO
 wait 30
 expect page 9
-tap FX
+tap LFO
+wait 30
+expect page 7
+tap EDIT
 wait 30
 expect page 10
+tap EDIT
+wait 30
+expect page 10
+tap FX
+wait 30
+expect page 11
 tap GLO
 wait 30
 expect page 12
@@ -89,10 +98,10 @@ wait 30
 expect param0 60
 expect engine0 60
 expect dirty 1
-# a knob is its page's: LINE's K4 is the line's length (param34), the rest stay
+# a knob is its page's: LINE's K3 is the line's length (param34), the rest stay
 tap LFO
 wait 30
-turn K4 -10
+turn K3 -10
 wait 30
 expect param2 50
 expect param34 30

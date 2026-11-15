@@ -1,61 +1,80 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# MIX (FX again, page 11): K1..K4 the kick's, the bass's, the percussion's level (the same as on their own pages) and
-# TOP (param44: the line, the events, the atmos together, over their own levels, which stay); a strip a part, its meter
-# (meterN: the part's peak) and its level. The keys as on ECHO: a black key mutes. COLD SIGNAL, 152.
+# MIX (EDIT, page 10): K1 the track (0..5 the parts, 6 the echo's return), K2 its level, K3 its send into the echo (the
+# kick, the bass and the echo: none). The levels and the sends are MIX's only: param8 KICK, 12 BASS, 16 PERC, 32 LINE,
+# 20 EVENTS, 28 ATMOS, 24 ECHO; sends 44 PERC, 45 LINE, 23 EVENTS, 31 ATMOS. A strip a track, its meter (meterN). The
+# keys throw events as on the other pages. COLD SIGNAL, 152.
 listen
 wait 600
-tap FX
+tap EDIT
 wait 30
 expect page 10
-tap FX
-wait 30
-expect page 11
 said MIX
-# into the line's sure phrase (bars 16..23): every part sounding
+expect track 0
+# into the line's sure phrase (bars 16..23): every part sounding, the echo too
 wait 26000
 expect meter0 >0
 expect meter1 >0
 expect meter2 >0
 expect meter3 >0
 expect meter5 >0
+expect meter6 >0
 shot mix.png
-# K1: the kick's level, the KICK page's
+# K2 on KICK: the kick's level
 expect param8 80
-turn K1 -10
+turn K2 -10
 wait 30
 expect param8 60
 said KICK
-turn K1 -30
+turn K2 -30
 wait 1000
 expect param8 0
 expect meter0 0
 expect meter1 >0
-# TOP to 0: the line, the events, the atmos silent, their own levels as they were; the bass and the percussion on
-expect param44 80
-turn K4 -40
-wait 1000
-expect param44 0
-said TOP
-expect meter3 0
-expect meter4 0
-expect meter5 0
-expect meter1 >0
-expect meter2 >0
+# K3 on KICK: no send, nothing changes
+turn K3 10
+wait 30
+said NO SEND
+# K1 to LINE (3): K2 its level, K3 its send
+turn K1 3
+wait 30
+expect track 3
+said LINE
 expect param32 70
-expect param20 80
-expect param28 70
-shot mix-top.png
-# back: as they were
-turn K4 40
-turn K1 40
-wait 3000
-expect param44 80
-expect meter0 >0
-expect meter3 >0
-# a black key mutes, its strip dark and its meter still
-tapkey b1
+turn K2 -35
 wait 1000
-expect muted 2
-expect meter1 0
-shot mix-mute.png
+expect param32 0
+expect meter3 0
+expect param45 50
+turn K3 10
+wait 30
+expect param45 70
+said LINE
+shot mix-line.png
+# K1 past the end: the echo (6), then no further
+turn K1 10
+wait 30
+expect track 6
+said ECHO
+expect param24 50
+turn K2 -25
+wait 1000
+expect param24 0
+expect meter6 0
+# back, and the kick and the line again
+turn K2 25
+turn K1 -3
+wait 30
+expect track 3
+turn K2 35
+turn K1 -10
+wait 30
+expect track 0
+turn K2 40
+wait 2000
+expect param8 80
+expect meter0 >0
+# a black key here throws (not a mute)
+tapkey b1
+wait 300
+expect muted 0

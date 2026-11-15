@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
 # LFO held on either LINE page: the line's phrase drawn anew as the next bar begins, the page stays; tapped there it
-# turns to the other LINE page as it is let go. From any other page LFO goes to LINE as it is pressed, held or not.
+# goes on to the next page (LINE, LINE SEQ, ATMOS, LINE) as it is let go. From any other page LFO goes to LINE as it is pressed, held or not.
 # COLD SIGNAL, 152: a bar is 1.58 s. "phrases": the line's phrases drawn whole (the start draws the first).
 listen
 wait 600
@@ -9,15 +9,15 @@ expect playing 1
 expect phrases 1
 tap LFO
 wait 50
-expect page 6
+expect page 7
 # held on LINE: the page stays, and from the next bar a new phrase
 said LINE
 press LFO
 wait 700
-expect page 6
+expect page 7
 release LFO
 wait 50
-expect page 6
+expect page 7
 said NEW PHRASE
 expect phrases 1
 wait 1700
@@ -25,7 +25,7 @@ expect phrases 2
 # tapped: LINE SEQ, no new phrase
 tap LFO
 wait 50
-expect page 7
+expect page 8
 wait 1700
 expect phrases 2
 # held on LINE SEQ: the same
@@ -33,14 +33,17 @@ press LFO
 wait 700
 release LFO
 wait 50
-expect page 7
+expect page 8
 said NEW PHRASE
 wait 1700
 expect phrases 3
-# tapped again: LINE
+# tapped again: ATMOS, and once more LINE
 tap LFO
 wait 50
-expect page 6
+expect page 9
+tap LFO
+wait 50
+expect page 7
 # from MAIN, held: LINE at once, no new phrase
 tap HOME
 wait 50
@@ -48,11 +51,11 @@ expect page 0
 said MAIN
 press LFO
 wait 50
-expect page 6
+expect page 7
 wait 650
 release LFO
 wait 50
-expect page 6
+expect page 7
 unsaid NEW PHRASE
 wait 1700
 expect phrases 3
@@ -60,7 +63,7 @@ expect phrases 3
 # fewer slides; back where they were, the phrase as it was. (The values: COLD SIGNAL's phrase as drawn here.)
 tap LFO
 wait 50
-expect page 7
+expect page 8
 # Mutate (K2) 0 first: nothing rewritten meanwhile
 turn K2 -25
 wait 30

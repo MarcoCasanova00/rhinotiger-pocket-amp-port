@@ -6,9 +6,11 @@ jack in
 listen
 wait 3000
 # the generator's events quiet (EVENTS density 0), so what sounds after is the loop's
-tap EDIT
+tap ENV
 wait 30
-turn K2 -30
+tap ENV
+wait 30
+turn K1 -30
 wait 30
 expect param21 0
 wait 400

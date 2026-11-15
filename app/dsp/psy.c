@@ -156,7 +156,7 @@ static const ps_param_t PAR[P_NPARAMS] = {
     {"LEVEL", 0, 100, 70}, {"DENSITY", 0, 100, 50}, {"LENGTH", 0, 100, 50}, {"MUTATE", 0, 100, 50},
     {"BREAKS", 0, 100, 50}, {"BREAK", 0, 4, 0}, {"BUILD", 0, 2, 1}, {"GAP", 0, 3, 1},
     {"RANGE", 0, 100, 50}, {"SLIDE", 0, 100, 50}, {"BITE", 0, 100, 50}, {"DECAY", 0, 100, 50},
-    {"TOP", 0, 100, 80},
+    {"SEND", 0, 100, 0}, {"SEND", 0, 100, 50},
 };
 static const uint8_t BREAK_BARS[5] = {0, 4, 8, 16, 32};   /* P_BREAK_LEN (0: the world's) */
 static const uint8_t BUILD_BARS[3] = {2, 4, 8};           /* P_BUILD_LEN */
@@ -231,9 +231,8 @@ static struct {
     float e_route, e_smear, e_tape;    /* the echo's kind, by degrees: STRAIGHT's share, SMEAR's, TAPE's */
     float e_wow, e_flut;               /* TAPE's waver (turns) */
     float lim;                         /* the master limiter's gain */
-#define NG 8
-    float g[NG];                       /* the levels, gliding: kick, bass, perc, events, line, the events' send, the echo,
-                                        * TOP */
+#define NG 7
+    float g[NG];                       /* the levels, gliding: kick, bass, perc, events, line, the events' send, the echo */
     float echo_d;                      /* the echo's delay in frames, gliding (a tempo moved, a time changed) */
     float dub_ph;                      /* DUB's waver (turns) */
     /* the sections */
@@ -1525,9 +1524,10 @@ void ps_render(float *outl, float *outr, uint32_t n)
     /* the levels: targets, the gains gliding to them sample by sample (a knob turned quickly does not zip) */
     float tg[NG] = {0.85f * (float)par[P_KICK_LEVEL] / 80.0f, 0.55f * (float)par[P_BASS_LEVEL] / 80.0f,
                     (float)par[P_PERC_LEVEL] / 80.0f, (float)par[P_EV_LEVEL] / 80.0f, (float)par[P_LINE_LEVEL] / 70.0f,
-                    (float)par[P_EV_ECHO] / 50.0f, 0.7f * (float)par[P_ECHO_LEVEL] / 50.0f, (float)par[P_TOP] / 80.0f};
-    float *g = s.g, kick_g, bass_g, perc_g, ev_g, line_g, send_g, ret_g, top_g;
-    float pk[NPART] = {0};             /* the parts' peaks this block (the meters) */
+                    (float)par[P_EV_ECHO] / 50.0f, 0.7f * (float)par[P_ECHO_LEVEL] / 50.0f};
+    float *g = s.g, kick_g, bass_g, perc_g, ev_g, line_g, send_g, ret_g;
+    float pk[NPART + 1] = {0};         /* the parts' peaks this block, the echo's return's (the meters) */
+    float perc_send = 0.4f * (float)par[P_PERC_SEND] / 100.0f, line_send = (float)par[P_LINE_SEND] / 50.0f;
     float fb = (float)par[P_ECHO_FB] / 100.0f, tone = 0.12f + 0.46f * (float)par[P_ECHO_TONE] / 100.0f;
     uint32_t i;
     static float fx_send;              /* what the effects sent to the echo (the next frame takes it) */
@@ -1585,8 +1585,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
             int k;
             for (k = 0; k < NG; k++)
                 g[k] += (tg[k] - g[k]) * 0.002f;
-            kick_g = g[0], bass_g = g[1], perc_g = g[2], ev_g = g[3] * g[7], line_g = g[4] * g[7], send_g = g[5],
-            ret_g = g[6], top_g = g[7];   /* (TOP over the events', the line's; the atmos's below) */
+            kick_g = g[0], bass_g = g[1], perc_g = g[2], ev_g = g[3], line_g = g[4], send_g = g[5], ret_g = g[6];
         }
         if (playing) {
             if (s.next <= 0.0f) {                  /* a tick begins on this sample */
@@ -1626,17 +1625,17 @@ void ps_render(float *outl, float *outr, uint32_t n)
             perc(w, dt, &l, &r);
             l *= pg[PART_PERC];
             r *= pg[PART_PERC];
-            send = ev_render(dt, &el, &er) * ev_g * send_g * pg[PART_EVENTS];
+            send = ev_render(dt, &el, &er) * ev_g * send_g * pg[PART_EVENTS] + perc_g * (l + r) * perc_send;
             el *= pg[PART_EVENTS];
             er *= pg[PART_EVENTS];
             {   /* the line: softer in a break, and more of it into the echo */
                 float lg = line_g * pg[PART_LINE] * (s.sec == SEC_BREAK ? 0.6f : 1.0f);
-                send += ln_render(w, dt, &ll, &lr) * lg * (s.sec == SEC_MAIN ? 0.5f : 1.2f);
+                send += ln_render(w, dt, &ll, &lr) * lg * (s.sec == SEC_MAIN ? 0.5f : 1.2f) * line_send;
                 ll *= lg;
                 lr *= lg;
             }
             {   /* the meters: each part's peak as heard (the percussion's before the riser joins it) */
-                float a = top_g * pg[PART_ATMOS];
+                float a = pg[PART_ATMOS];
                 pk[PART_KICK] = fm_maxf(pk[PART_KICK], fm_fabsf(kick_g * pg[PART_KICK] * s_kick));
                 pk[PART_BASS] = fm_maxf(pk[PART_BASS], fm_fabsf(bass_g * pg[PART_BASS] * s_bass));
                 pk[PART_PERC] = fm_maxf(pk[PART_PERC], perc_g * fm_maxf(fm_fabsf(l), fm_fabsf(r)));
@@ -1726,6 +1725,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 mr += (s.lp_u[1][0] - mr) * s.lp_g;
             } else
                 s.lp_u[0][0] = s.lp_u[0][1] = s.lp_u[1][0] = s.lp_u[1][1] = 0.0f;
+            pk[NPART] = fm_maxf(pk[NPART], ret_g * fm_maxf(fm_fabsf(xl), fm_fabsf(xr)));
             outl[i] = c + ml + ret_g * xl;
             outr[i] = c + mr + ret_g * xr;
             fx_send = fx_render(s.tick_len, &outl[i], &outr[i], ml, mr, n);
@@ -1742,10 +1742,10 @@ void ps_render(float *outl, float *outr, uint32_t n)
         }
     }
     {   /* the meters (the UI reads them): a peak held, falling back ~20 dB in 0.3 s */
-        static float held[NPART];
+        static float held[NPART + 1];
         float fall = fm_expf(-(float)n / (0.13f * PS_SR));
         int k;
-        for (k = 0; k < NPART; k++) {
+        for (k = 0; k <= NPART; k++) {
             held[k] = fm_maxf(pk[k], held[k] * fall);
             if (held[k] < 0.0005f)
                 held[k] = 0.0f;

@@ -3,7 +3,7 @@
 # The buttons beyond the pages: ALGORITHM the type of the page's part (MAIN: the kit, kit.txt; GROOVE: the bass's
 # shape; ECHO: the echo's kind), OCT the keys' octave,
 # and the PHASE page's K1 (BREAKS): 0 the breaks only when cued, above 0 on their own (kept by SAVE on GLOBAL).
-# Pages: HOME (MAIN, GROOVE), SEQ (PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ), EDIT (EVENTS, ATMOS), FX (ECHO), GLO.
+# Pages: HOME (MAIN, GROOVE), SEQ (PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ, ATMOS), ENV (PERC, EVENTS), EDIT (MIX), FX (ECHO), GLO.
 listen
 wait 1500
 expect colour 0
@@ -56,16 +56,24 @@ wait 100
 expect line_type 3
 expect colour 3
 # on the EVENTS page: the events' type
-tap EDIT
+tap ENV
 wait 30
+tap ENV
+wait 30
+expect page 6
 turn ALGO 3
 wait 100
 expect events_type 3
 said EVENTS
 expect line_type 3
 # on the ATMOS page: the atmos's type
-tap EDIT
+tap LFO
 wait 30
+tap LFO
+wait 30
+tap LFO
+wait 30
+expect page 9
 turn ALGO 2
 wait 100
 expect atmos_type 2
