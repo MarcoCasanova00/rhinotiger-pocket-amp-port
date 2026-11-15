@@ -991,22 +991,13 @@ static void draw_rule(void)
         xs = cv_text(xs, 0, &FONT_XS, ps_build_name(k), C_HI) + 6;
         if (k == PS_BUILD_AUTO && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0)
             xs = cv_text(xs - 2, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_GRAY) + 6;
-    } else if (ui.page == PG_MAIN) {   /* the kit: the parts the latest changed, each in its hue, as many as fit */
-        uint32_t p, mask = ps_ui.kit_parts;
-        xs = cv_text(6, 0, &FONT_XS, "ALGO: KIT", C_AMB) + 6;
-        for (p = 0; p <= PS_KIT_GROOVE; p++) {
-            const char *nm = p == PS_KIT_GROOVE ? (ps_ui.kit_shape != PS_SHAPE_AUTO ? ps_bass_shape_name(ps_ui.kit_shape) : 0)
-                           : ps_ui.kits && (mask >> p & 1u) ? ps_type_name((int)p, ps_type_now((int)p)) : 0;
-            if (nm && xs + text_w(&FONT_XS, nm) <= xt - 8)   /* (the groove's: while it lasts) */
-                xs = cv_text(xs, 0, &FONT_XS, nm, part_txt(PART_HUE[p == PS_KIT_GROOVE ? PART_BASS : p], 255)) + 4;
-        }
-        xs += 2;
+    } else if (ui.page == PG_MAIN) {   /* the kit (what it changed: a moment over the header, as it lands) */
+        xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
+        xs = cv_text(xs, 0, &FONT_XS, "KIT", C_HI) + 6;
     } else if (ui.page == PG_GROOVE || ui.page == PG_ECHO) {   /* the bass's shape; the echo's kind */
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
         xs = cv_text(xs, 0, &FONT_XS, ui.page == PG_GROOVE ? ps_bass_shape_name(ps_bass_shape_now())
                                                            : ps_echo_kind_name(ps_echo_kind_now()), C_HI) + 6;
-        if (ui.page == PG_GROOVE && ps_ui.kit_shape != PS_SHAPE_AUTO)   /* GROOVE's, the kit's shape over it a while */
-            xs = cv_text(xs - 2, 0, &FONT_XS, ps_bass_shape_name(ps_ui.kit_shape), C_GRAY) + 6;
     } else if (ui.page >= PG_KICK && ui.page <= PG_ATMOS && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
         int part = algo_part();
         xs = cv_text(6, 0, &FONT_XS, "ALGO: ", C_AMB);
