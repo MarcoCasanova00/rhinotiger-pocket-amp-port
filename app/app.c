@@ -1298,8 +1298,8 @@ static void draw(void)
 #define LOGO_Y(ch) ((240 - 2 * LOGO_PX - 4) / 2 + (ch) * (LOGO_PX + 4))
 #define LOGO_BAND 106                    /* the band's top; 28 rows */
 enum { LOGO_FACE = 1, LOGO_CHARS = 2, LOGO_NAME = 4, LOGO_ALL = 7 };
-#define LOGO_STEP 300u
-#define LOGO_HOLD 900u
+#define LOGO_STEP 500u
+#define LOGO_HOLD 1200u
 static void cv_mix(int32_t x, int32_t y, uint16_t c, uint32_t a)   /* c over what is there, a of 15 */
 {
     uint32_t i, o, r, g, b;
