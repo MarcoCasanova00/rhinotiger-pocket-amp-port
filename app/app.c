@@ -1381,14 +1381,26 @@ static void draw_logo(uint32_t layers)
 }
 
 #ifdef APP_SPLASH
-void app_splash(void) { draw_logo(LOGO_FACE); }
+static uint8_t splashed;                 /* the device's splash showed the face already (through the boot's waits) */
+void app_splash(void)
+{
+    draw_logo(LOGO_FACE);
+    splashed = 1;
+}
 #endif
 
 void app_ui_init(void)
 {
-    draw_logo(LOGO_FACE);                    /* (the device's splash already; the host's first sight of it) */
-    ui.logo_layers = LOGO_FACE;
-    ui.logo_at = plat_ms();
+    uint32_t skip = 0;
+#ifdef APP_SPLASH
+    if (splashed) {                          /* the face stood through the boot (half a second or more): on with the next */
+        splashed = 0;
+        skip = LOGO_STEP;
+    }
+#endif
+    ui.logo_layers = skip ? LOGO_FACE | LOGO_CHARS : LOGO_FACE;
+    draw_logo(ui.logo_layers);               /* (the host: no splash, the face first here) */
+    ui.logo_at = plat_ms() - skip;
     ui.logo_until = ui.logo_at + 2u * LOGO_STEP + LOGO_HOLD;
     ui.thrown_type = -1;
     ui.redraw = 1;
