@@ -84,11 +84,18 @@ static const char *theme_name(int t);
 static float eng_l[APP_BLOCK], eng_r[APP_BLOCK];
 static float gain_now;                   /* glides to MASTER: no step at a block's edge */
 
+static volatile uint8_t boot_hold;       /* at boot, till the logo goes (or PLAY or MIDI's start, stop or continue):
+                                         * the engine held, silent, so the play begins whole as the logo leaves */
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
     uint32_t i;
     float gain = (float)master_q12 / 4096.0f * 8388000.0f;   /* MASTER, read once a block: the engine's 1.0 (its
                                                                 * limit) is full scale at the top */
+    if (boot_hold) {                         /* the logo: silence, the engine not yet begun (it starts as it went) */
+        for (i = 0; i < 2u * n; i++)
+            lr[i] = 0;
+        return;
+    }
     ps_render(eng_l, eng_r, n);
     for (i = 0; i < n; i++) {
         gain_now += (gain - gain_now) * 0.004f;                  /* ~5 ms: turning MASTER does not click */
@@ -140,6 +147,7 @@ void app_init(void)
     if (!ok)
         settings_defaults();
     settings_apply();
+    boot_hold = 1;                           /* (the boot's waits and the logo in silence: app_frame lets it go) */
 }
 
 /* ------------------------------------------------------------------ pages --- */
@@ -652,12 +660,15 @@ static void midi_poll(void)
             md.last_t24 = t;
             md.last_ms = plat_ms();
         } else if (st == 0xFAu) {        /* start: from the top */
+            boot_hold = 0;
             if (ps_playing())
                 ps_restart();
             ps_play(1);
         } else if (st == 0xFBu) {        /* continue */
+            boot_hold = 0;
             ps_play(1);
         } else if (st == 0xFCu) {        /* stop */
+            boot_hold = 0;
             ps_play(0);
         } else if ((st & 0xE0u) == 0x80u) {   /* a note on or off, any channel */
             int k = (int)d1 - 53;
@@ -701,7 +712,10 @@ static void input(void)
         else if ((keys & bit) && pf.role[k] == ROLE_EVENT)
             ps_key((int)k, 2, touch_pressure(k));
     }
-    if (down & 1u << B_PLAY) {
+    if ((down & 1u << B_PLAY) && boot_hold) {   /* the logo still up: PLAY begins it now */
+        boot_hold = 0;
+        app_say("PLAYING", "");
+    } else if (down & 1u << B_PLAY) {
         ps_play(!ps_playing());
         app_say(ps_playing() ? "RESTING" : "PLAYING", "");   /* (it changes as the next block starts) */
     }
@@ -1299,7 +1313,7 @@ static void draw(void)
 #define LOGO_BAND 106                    /* the band's top; 28 rows */
 enum { LOGO_FACE = 1, LOGO_CHARS = 2, LOGO_NAME = 4, LOGO_ALL = 7 };
 #define LOGO_STEP 500u
-#define LOGO_HOLD 1200u
+#define LOGO_HOLD 1400u
 static void cv_mix(int32_t x, int32_t y, uint16_t c, uint32_t a)   /* c over what is there, a of 15 */
 {
     uint32_t i, o, r, g, b;
@@ -1436,6 +1450,7 @@ void app_frame(void)
             return;
         }
         ui.logo_until = 0;
+        boot_hold = 0;                       /* the logo whole and gone: the play begins */
         lcd_fill(0, 0, 240, 240, C_BLACK);
         ui.redraw = 1;
     }
@@ -1457,6 +1472,8 @@ int app_expect(const char *what, int *got)
         *got = ps_bar();
     else if (!strcmp(what, "playing"))
         *got = ps_playing();
+    else if (!strcmp(what, "held"))          /* the boot's logo: the engine held, silent */
+        *got = boot_hold;
     else if (!strcmp(what, "dirty"))
         *got = set_dirty;
     else if (!strcmp(what, "section"))       /* 0 the groove, 1 a break, 2 a build */

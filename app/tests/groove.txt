@@ -1,4 +1,5 @@
 # The first sketch: the kick and the rolling bass, a world each, recorded (build/host/*.wav) to listen to.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 jack in
 # COLD SIGNAL, 152: sixteenths (K-B-B-B); 33 bars at 152 are about 52 s (the fills: bar 8, 16, 24, 32)
 wav cold-signal.wav

@@ -1,5 +1,6 @@
 # The keys throw events: each white key its own sound (thrown_type 6 + the white key's index); a black key held is a
 # rhythm the white keys held with it throw on. Recorded (build/host/throw-*.wav) to listen to.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 jack in
 listen
 wav throw-cold-signal.wav

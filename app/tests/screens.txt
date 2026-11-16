@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
 # The screens, for a look (build/host/*.png): ./test.sh screens
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 jack in
 wait 9000
 shot screen-main.png

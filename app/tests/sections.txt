@@ -4,6 +4,7 @@
 # ARP tapped, a build from the next bar (from the groove or a break), then the drop (4 bars); ARP tapped in a build, the
 # drop at the next bar; ARP held, the drop at the next bar. Recorded (build/host/sections.wav) to listen to.
 # COLD SIGNAL, 152: a bar is about 1.58 s.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 jack in
 listen
 wait 600

@@ -5,6 +5,7 @@
 # only: param8 KICK, 12 BASS, 16 PERC, 32 LINE, 20 EVENTS, 28 ATMOS; sends 44 PERC, 45 LINE, 23 EVENTS, 31 ATMOS. The
 # echo's level (param24) is ECHO's K4. A strip a track, its meter (meterN). The keys throw events as on the other
 # pages. COLD SIGNAL, 152.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 listen
 wait 600
 tap EDIT

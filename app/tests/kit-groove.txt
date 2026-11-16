@@ -3,6 +3,7 @@
 # The kit and the groove: the kit may give the bass another shape for four bars, GROOVE's ALGORITHM staying (AUTO or
 # a shape held); GROOVE's ALGORITHM turned meanwhile, the kit's shape is gone. Everything muted but the bass, so the kit's choice is the bass's
 # type and the groove. COLD SIGNAL, 152: a bar is 1.58 s.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 listen
 wait 600
 tap FX

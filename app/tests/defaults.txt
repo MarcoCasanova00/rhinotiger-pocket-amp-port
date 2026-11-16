@@ -2,6 +2,7 @@
 # Copyright (C) 2026 hacha
 # SAVE held 1.5 s on GLOBAL: every knob of every page back where it began (the world's own sound), not kept until SAVE
 # (SAVE lit); the world stays. Tapped there it saves, as before.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 listen
 jack in
 wait 600

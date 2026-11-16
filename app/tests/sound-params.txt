@@ -4,6 +4,7 @@
 # closes), PERC Open (K2, 48), EVENTS Pitch (50, semitones -12..12, one a detent) and Spread (51), LINE Drive (49, 0: clean), ATMOS
 # Motion (52) and Depth (53); each reaching the engine. At their defaults the sound is as it was. Recorded
 # (build/host/sound-params.wav): two bars of each pushed to an end, after two as they are. COLD SIGNAL, 152.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 listen
 jack in
 wait 600

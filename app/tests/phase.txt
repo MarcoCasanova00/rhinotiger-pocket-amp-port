@@ -5,6 +5,7 @@
 # grows with Drift and BREAKS. Part 1: BREAKS at 0, Drift and all the rest as high as they go for it: no break in 90 bars.
 # Part 2: BREAKS up, BREAK at 4 bars: the break at bar 96 lasts 4 bars (the world's would be 16), then its build, the drop.
 # (phase-build.txt: BUILD at 2 bars.)
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 jack in
 wait 1500
 expect page 0

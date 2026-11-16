@@ -4,6 +4,7 @@
 # not held-sensitive and draws no phrase (LFO held on a LINE page does: line-new). LINE SEQ's knobs: K1..K4 Density
 # (param33), Mutate (param35), Range (param40), Slide (param41), each changing its own parameter only; ALGO there is
 # the line's type.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 listen
 wait 600
 expect page 0

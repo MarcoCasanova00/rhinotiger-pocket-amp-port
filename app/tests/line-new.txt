@@ -3,6 +3,7 @@
 # LFO held on either LINE page: the line's phrase drawn anew as the next bar begins, the page stays; tapped there it
 # goes on to the next page (LINE, LINE SEQ, ATMOS, LINE) as it is let go. From any other page LFO goes to LINE as it is pressed, held or not.
 # COLD SIGNAL, 152: a bar is 1.58 s. "phrases": the line's phrases drawn whole (the start draws the first).
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 listen
 wait 600
 expect playing 1

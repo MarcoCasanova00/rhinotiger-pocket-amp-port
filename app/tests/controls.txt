@@ -4,6 +4,7 @@
 # shape; ECHO: the echo's kind), OCT the keys' octave,
 # and the PHASE page's K1 (BREAKS): 0 the breaks only when cued, above 0 on their own (kept by SAVE on GLOBAL).
 # Pages: HOME (MAIN, GROOVE), SEQ (PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ, ATMOS), ENV (PERC, EVENTS), EDIT (MIX), FX (ECHO), GLO.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 listen
 wait 1500
 expect colour 0

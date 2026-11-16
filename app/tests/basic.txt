@@ -1,15 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
 # RhinoTiger in the host simulator: ./test.sh basic
-# It plays from the start, on MAIN. Buttons: HOME (MAIN, GROOVE), SEQ (PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ),
+# It plays as the boot's logo goes (silent till then), on MAIN. Buttons: HOME (MAIN, GROOVE), SEQ (PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ),
 # EDIT (MIX), FX (ECHO), GLO (GLOBAL); ENV also reaches EVENTS and LFO also ATMOS; SELECT steps through the pages in that order.
+# the logo (the face, the characters on it, the band: 0.5 s, 0.5 s, 1.4 s), silent, the engine held
 wait 600
-expect playing 1
+expect held 1
 expect page 0
 expect world 2
 expect bpm 152
 shot logo.png
-# the logo for a moment, then the pages
+# as it goes, the play begins
+wait 1810
+expect held 0
+expect playing 1
 wait 700
 shot main.png
 # SELECT turns through every page (MAIN GROOVE PHASE KICK BASS PERC EVENTS LINE LINE-SEQ ATMOS MIX ECHO GLOBAL); the buttons jump
@@ -138,7 +142,12 @@ expect param0 60
 expect param34 30
 expect engine4 4
 expect bpm 160
-# PLAY rests it
+# PLAY in the logo begins it at once; again, rests it
+expect held 1
+tap PLAY
+wait 50
+expect held 0
+expect playing 1
 tap PLAY
 wait 50
 expect playing 0

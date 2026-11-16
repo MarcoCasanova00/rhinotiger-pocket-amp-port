@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
 # Every world, 30 s each from PLAY, recorded (build/host/world-*.wav) to listen to.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 jack in
 tap PLAY
 wait 100

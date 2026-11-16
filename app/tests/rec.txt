@@ -2,6 +2,7 @@
 # Copyright (C) 2026 hacha
 # REC is the keys' loop: held, the keys' throws are taken (each at its tick of two bars); let go, they play again each
 # time round. A tap of REC, or PLAY, clears it. COLD SIGNAL, 152: a bar is 1.58 s, the loop 3.16 s.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 jack in
 listen
 wait 3000
