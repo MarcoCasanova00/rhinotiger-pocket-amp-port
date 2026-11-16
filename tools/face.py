@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The boot's face (app/face.h): a rhino-tiger, front on, angular as a mask (a scowl, slit eyes, the rhino's horns and
-# armour, a tiger's blades of fur and fangs), drawn as an SVG here (its left half, mirrored), rendered with
-# rsvg-convert at 240 x 240, its greys taken to 16 levels and run-length coded. The app tints the levels.
+# The boot's face (app/face.h): a rhino-tiger, front on, angular as a mask (a rhino's head, ears, horns and snout, its
+# eyes turned to the sides; a tiger's stripes, gold slit eyes and fangs), drawn as an SVG here (its left half,
+# mirrored), rendered with rsvg-convert at 240 x 240, its greys taken to 16 levels and run-length coded. The app tints the levels.
 # Usage: tools/face.py            (writes app/face.h; tools/face.svg and face.png beside it for a look)
 import os, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -18,52 +18,39 @@ def W(pts, **a):          # a shape across the middle (given whole)
     at=' '.join(f'{k.replace("_","-")}="{v}"' for k,v in a.items())
     out.append(f'<path d="{poly(pts)}" {at}/>')
 DARK=g(.04)
-if False:  # (rays behind the head: hidden by it, not drawn)
-    import math
-    for k in range(36):
-        a0=math.radians(k*10+2); a1=math.radians(k*10+7)
-        r0,r1=60,128 if k%2 else 112
-        pts=[(120+r0*math.cos(a0),118+r0*math.sin(a0)),(120+r1*math.cos((a0+a1)/2),118+r1*math.sin((a0+a1)/2)),(120+r0*math.cos(a1),118+r0*math.sin(a1))]
-        W([(round(x,1),round(y,1)) for x,y in pts], fill=g(.22))
-# the head: ears swept out, a ruff of blades, a heavy jaw
-L=[(120,30),(90,30),(66,34),(26,2),(30,34),(22,58),(4,80),(20,90),(0,114),(18,122),(4,148),(26,150),(18,176),(46,174),(46,200),(72,206),(90,224),(120,236)]
+import math
+# the ears: a rhino's, tall tubes cupped forward, tilted out, a fringe at the tips (drawn first: the head over their roots)
+P([(82,54),(64,30),(42,8),(22,0),(26,14),(30,36),(50,60)], fill=g(.42), stroke=g(.72), stroke_width="2", stroke_linejoin="miter")
+P([(72,50),(58,32),(40,14),(30,8),(34,30),(50,52)], fill=g(.12))
+P([(22,0),(14,4),(26,8)], fill=g(.6)); P([(24,2),(20,-4),(30,6)], fill=g(.6)); P([(28,12),(18,16),(28,18)], fill=g(.6))
+# the head: a shield, no ruff, the jaw drawn in
+L=[(120,34),(90,36),(66,46),(40,64),(24,90),(20,122),(26,150),(24,172),(34,192),(60,212),(88,228),(120,232)]
 W(L+mir(L)[::-1][1:-1], fill=g(.36), stroke=g(.72), stroke_width="2", stroke_linejoin="miter")
-P([(32,12),(36,34),(60,36)], fill=g(.16))                      # the ear's inside
-P([(34,20),(38,32),(48,33)], fill=g(.6))                       # its tuft
-# the forehead: blades of dark fur, converging down to the middle
-P([(116,34),(92,32),(110,44)], fill=DARK)
-P([(114,50),(84,40),(106,58)], fill=DARK)
-P([(112,64),(78,52),(102,70)], fill=DARK)
-P([(64,40),(40,40),(62,50)], fill=DARK)
-P([(26,60),(58,58),(30,68)], fill=DARK)
-# the brow: a heavy plate, low to the middle (a scowl)
-P([(32,66),(70,72),(108,90),(110,98),(68,84),(34,78)], fill=g(.78))
-# the eye: narrow, its inner end lower, a slit; a dark line from it down beside the nose
-P([(40,84),(70,84),(102,98),(70,104)], fill=g(.95), stroke=DARK, stroke_width="2", stroke_linejoin="miter")
-P([(72.5,84),(76,94),(72.5,104),(69,94)], fill=DARK)
-P([(102,98),(108,104),(100,140),(98,108)], fill=DARK)
-# the cheeks: pale fur in blades, stripes cutting in from the edge
-P([(28,98),(86,110),(92,150),(60,172),(30,160),(18,128)], fill=g(.56))
-P([(4,112),(54,116),(10,122)], fill=DARK)
-P([(8,140),(62,138),(14,148)], fill=DARK)
-P([(24,166),(64,156),(32,174)], fill=DARK)
-# the muzzle: a rhino's armour, plates across it
-W([(100,104),(140,104),(156,150),(150,186),(120,196),(90,186),(84,150)], fill=g(.3), stroke=g(.6), stroke_width="1.5")
-for y in (128,146,164):
-    P([(88,y+6),(120,y),(120,y+4),(90,y+10)], fill=g(.55))
-# the great horn from the nose, broad at its root; the small one behind, above
-W([(110,98),(120,62),(130,98)], fill=g(.7), stroke=g(.86), stroke_width="1")
-W([(98,180),(110,130),(120,92),(130,130),(142,180),(120,174)], fill=g(.8), stroke=g(.88), stroke_width="1.5")
-W([(112,170),(118,112),(121,96),(120,120),(117,172)], fill=g(.88))
-# the nose, the mouth, the fangs
-W([(104,178),(136,178),(120,192)], fill=DARK)
-W([(119,192),(121,192),(121,202),(119,202)], fill=DARK)
-P([(120,202),(98,206),(84,200),(98,210),(120,208)], fill=DARK)
-P([(98,206),(106,205),(102,224)], fill=g(.86))
-# whiskers
-P([(84,168),(10,156),(10,158),(84,171)], fill=g(.6))
-P([(84,176),(8,180),(8,182),(84,179)], fill=g(.6))
-P([(86,184),(18,202),(19,204),(87,187)], fill=g(.6))
+for y in (48,58): P([(70,y+8),(92,y),(112,y+2),(92,y+4)], fill=g(.22))          # the skin's folds
+P([(54,56),(84,64),(58,66)], fill=DARK); P([(36,68),(70,74),(40,78)], fill=DARK)   # a tiger's stripes
+P([(26,104),(84,112),(88,152),(62,172),(30,164),(22,130)], fill=g(.54))          # the cheek
+P([(20,124),(64,126),(24,132)], fill=DARK); P([(22,146),(70,144),(26,154)], fill=DARK); P([(30,168),(66,160),(36,176)], fill=DARK)
+# the brow, a scowl; the eye on the head's side: it and its slit turned outward 55 degrees round its middle, in perspective
+P([(18,74),(49,78),(88,92),(86,98),(49,86),(20,82)], fill=g(.74))
+EX, EW, EY, EH, TURN, F = 22, 54, 90, 20, math.radians(55), 110
+XC, YC = EX + EW * .5, EY + EH * .3
+def turn(p):
+    d = p[0] - XC; s = F / (F - d * math.sin(TURN))
+    return (round(XC + d * math.cos(TURN) * s / math.cos(TURN) ** .5, 2), round(YC + (p[1] - YC) * s, 2))
+P([turn(q) for q in [(EX,EY),(EX+EW*.48,EY-EH*.2),(EX+EW,EY+EH*.55),(EX+EW*.48,EY+EH*.75)]], fill=g(.95), stroke=DARK, stroke_width="2", stroke_linejoin="miter")
+P([turn(q) for q in [(XC,EY-EH*.12),(XC+4.3,EY+EH*.3),(XC,EY+EH*.7),(XC-4.3,EY+EH*.3)]], fill=DARK)
+# the snout, its broad upper lip, the mouth and a tiger's fangs; the nostrils under the horn
+M=[(120,104),(100,108),(88,150),(78,198),(98,214),(120,216)]
+W(M+mir(M)[::-1][1:-1], fill=g(.3), stroke=g(.6), stroke_width="1.5")
+U=[(120,184),(96,184),(82,196),(94,208),(120,210)]
+W(U+mir(U)[::-1][1:-1], fill=g(.46))
+P([(120,206),(98,206),(80,198),(94,212),(120,214)], fill=DARK)
+P([(88,209),(97,209),(92,228)], fill=g(.86))
+P([(92,166),(106,170),(104,182),(92,178)], fill=DARK)
+# the horns: the small one behind, the great one from the nose (the eyes alone are brighter: they glow gold)
+W([(100,96),(120,44),(140,96)], fill=g(.6), stroke=g(.8), stroke_width="1.5")
+W([(90,162),(102,122),(112.8,78),(120,8),(127.2,78),(138,122),(150,162),(120,152)], fill=g(.8), stroke=g(.88), stroke_width="1.5")
+W([(113,148),(117,88),(120,16),(119.5,88),(117.5,150)], fill=g(.88))
 svg = '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><rect width="240" height="240" fill="#000"/>' + ''.join(out) + '</svg>'
 svg_path = os.path.join(HERE, 'face.svg')
 png_path = os.path.join(HERE, 'face.png')
