@@ -1290,22 +1290,34 @@ static void draw(void)
 }
 
 /* the logo: the rhino-tiger's face behind (face.h, its greys tinted dim, cyan above to violet below, its eyes gold), 犀
- * over 虎 large on it (each dot four pixels square, ringed in black, a rainbow downwards: magenta to acid green), and
- * across the middle a band, RHINOTIGER in it. At boot they come one by one, LOGO_STEP ms apart (the face alone, then
- * the characters on it, then the band), and all of them stay LOGO_HOLD ms. Drawn in two parts (the canvas holds 240 x 144): rows 0..103, 104..239 (the band
- * whole in the second) */
-#define LOGO_DOT 4
-#define LOGO_X (120 - LOGO_DOT * LOGO_N / 2)
-#define LOGO_Y(ch) (20 + (ch) * (LOGO_DOT * LOGO_N + 4))
+ * over 虎 large on it (logo.h: LOGO_PX square, their edges smooth, a dark ring round them, a rainbow downwards: magenta
+ * to acid green), and across the middle a band, RHINOTIGER in it. At boot they come one by one, LOGO_STEP ms apart
+ * (the face alone, then the characters on it, then the band), and all of them stay LOGO_HOLD ms. Drawn in two parts
+ * (the canvas holds 240 x 144): rows 0..103, 104..239 (the band whole in the second) */
+#define LOGO_X (120 - LOGO_PX / 2)
+#define LOGO_Y(ch) ((240 - 2 * LOGO_PX - 4) / 2 + (ch) * (LOGO_PX + 4))
 #define LOGO_BAND 106                    /* the band's top; 28 rows */
 enum { LOGO_FACE = 1, LOGO_CHARS = 2, LOGO_NAME = 4, LOGO_ALL = 7 };
 #define LOGO_STEP 300u
 #define LOGO_HOLD 900u
+static void cv_mix(int32_t x, int32_t y, uint16_t c, uint32_t a)   /* c over what is there, a of 15 */
+{
+    uint32_t i, o, r, g, b;
+    y += cv_oy;
+    if (!a || (uint32_t)x >= cv_w || y < cv_y0 || y >= cv_y1)
+        return;
+    i = (uint32_t)y * cv_w + (uint32_t)x;
+    o = swap16(cv_px[i]);
+    r = ((o >> 11) * (15u - a) + (uint32_t)(c >> 11) * a) / 15u;
+    g = (((o >> 5) & 63u) * (15u - a) + ((uint32_t)(c >> 5) & 63u) * a) / 15u;
+    b = ((o & 31u) * (15u - a) + ((uint32_t)c & 31u) * a) / 15u;
+    cv_px[i] = swap16(r << 11 | g << 5 | b);
+}
 static void draw_logo(uint32_t layers)
 {
     static const int32_t PART[3] = {0, 104, 240};
     uint32_t k = 0, run = 0, lv = 0;
-    int32_t pt, y, x, ch, ring;
+    int32_t pt, y, x;
     for (pt = 0; pt < 2; pt++) {
         int32_t y0 = PART[pt], h = PART[pt + 1] - y0;
         cv_begin(240, (uint32_t)h, RGB(0, 0, 0));
@@ -1325,20 +1337,35 @@ static void draw_logo(uint32_t layers)
                 else if (lv)
                     cv_pset(x, y, hsv(HUE_CYAN + (y0 + y) * (HUE_VIOLET - HUE_CYAN) / 240, 170, (int32_t)lv * 11));
             }
-        for (ring = 1; ring >= 0 && (layers & LOGO_CHARS); ring--)   /* the characters: their black ring, then them */
-            for (ch = 0; ch < 2; ch++) {
-                int32_t dy, dx;
-                for (dy = 0; dy < LOGO_N; dy++)
-                    for (dx = 0; dx < LOGO_N; dx++)
-                        if (LOGO[ch][dy] >> (LOGO_N - 1 - dx) & 1u) {
-                            int32_t px = LOGO_X + LOGO_DOT * dx, py = LOGO_Y(ch) + LOGO_DOT * dy - y0;
-                            if (ring)
-                                cv_rect(px - 2, py - 2, LOGO_DOT + 4, LOGO_DOT + 4, RGB(0, 0, 0));
-                            else
-                                cv_rect(px, py, LOGO_DOT, LOGO_DOT,
-                                        hsv(HUE_MAGENTA - (ch * LOGO_N + dy) * (HUE_MAGENTA - HUE_ACID) / (2 * LOGO_N), 230, 255));
-                        }
+        if (layers & LOGO_CHARS) {           /* the characters: their ring, then them, over what is there */
+            uint32_t i = 0, n = 0, v = 0, p, row = 0xFFFFFFFFu;
+            uint16_t col = 0;
+            for (p = 0; p < 2u * LOGO_PX * LOGO_PX; p++) {
+                uint32_t c2, q, dy, dx;
+                int32_t sy;
+                if (!n) {
+                    v = LOGO_RLE[i];
+                    n = LOGO_RLE[i + 1];
+                    i += 2;
+                }
+                n--;
+                if (!v)
+                    continue;
+                c2 = p / (LOGO_PX * LOGO_PX);
+                q = p % (LOGO_PX * LOGO_PX);
+                dy = q / LOGO_PX;
+                dx = q % LOGO_PX;
+                sy = LOGO_Y((int32_t)c2) + (int32_t)dy - y0;
+                if (sy < 0 || sy >= h)
+                    continue;
+                if (c2 * LOGO_PX + dy != row) {   /* a row's hue */
+                    row = c2 * LOGO_PX + dy;
+                    col = hsv(HUE_MAGENTA - (int32_t)row * (HUE_MAGENTA - HUE_ACID) / (2 * LOGO_PX), 230, 255);
+                }
+                cv_mix(LOGO_X + (int32_t)dx, sy, RGB(0, 0, 0), v & 15u);
+                cv_mix(LOGO_X + (int32_t)dx, sy, col, v >> 4);
             }
+        }
         if (pt == 1 && (layers & LOGO_NAME)) {   /* the band: black, a rainbow's edge above and below, the name in it */
             int32_t by = LOGO_BAND - y0, tw = text_w(&FONT_M, "RHINOTIGER");
             cv_rect(0, by, 240, 28, RGB(0, 0, 0));
