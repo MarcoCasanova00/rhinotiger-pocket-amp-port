@@ -31,7 +31,8 @@
  *                            (the kick and the bass: none, not shown), K4 its mute (right on, left off); a strip a
  *                            track, its meter, its level and its send
  *  12 ECHO (FX)              K1..K4 Feedback, Tone, Time, Level (the return)
- *  13 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
+ *  13 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme (the screen's colours and how they move: NEON,
+ *                            ACID, INFRA, ICE, MONO); K3 shows the audio's load (CPU); K4 MIDI in
  *                            (off by default); SAVE here keeps it all (tapped: as it is let go); held 1.5 s, every
  *                            knob of every page back where it began (the world's own sound: the knobs move from it),
  *                            not kept until SAVE (SAVE lit); the world, the lights, the theme and MIDI stay
@@ -65,7 +66,7 @@ typedef struct {
     uint32_t magic;
     uint8_t world;
     uint8_t lights;                      /* the buttons' glow: 0 off, 1 low, 2 high */
-    uint8_t theme;                       /* gfx.c PALETTES */
+    uint8_t theme;                       /* THEME (the screen's colours and their movement) */
     uint8_t flags;                       /* SET_MIDI */
     int16_t par[P_NPARAMS];
 } settings_t;
@@ -73,6 +74,9 @@ static settings_t set;
 #define SET_MIDI 2u                      /* MIDI in: notes throw events, start / stop / clock followed */
 static void midi_off(void);
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
+#define NTHEME 5                         /* THEME's (the screen's): NEON, ACID, INFRA, ICE, MONO */
+static void theme_apply(void);
+static const char *theme_name(int t);
 
 
 /* ------------------------------------------------------------------ audio --- */
@@ -109,7 +113,7 @@ static void settings_defaults(void)
     set.world = 2;                       /* COLD SIGNAL */
     set.lights = 1;
     set.flags = 0;
-    set.theme = APP_PALETTE;
+    set.theme = 0;                       /* NEON */
     for (p = 0; p < P_NPARAMS; p++)
         set.par[p] = ps_param(p)->def;
 }
@@ -120,7 +124,7 @@ static void settings_apply(void)
     for (p = 0; p < P_NPARAMS; p++)
         ps_set(p, set.par[p]);
     ps_world(set.world);
-    palette_set(set.theme);
+    theme_apply();
 }
 
 void app_init(void)
@@ -128,7 +132,7 @@ void app_init(void)
     int p, ok;
     ps_init();
     ok = plat_store_load(OBJ_SETTINGS, &set, sizeof set) == (int)sizeof set && set.magic == SET_MAGIC &&
-         set.world < PS_NWORLD && set.lights <= 2u && set.theme < NPALETTES &&
+         set.world < PS_NWORLD && set.lights <= 2u && set.theme < NTHEME &&
          (set.flags & ~SET_MIDI) == 0u;
     for (p = 0; ok && p < P_NPARAMS; p++)
         ok = set.par[p] >= ps_param(p)->lo && set.par[p] <= ps_param(p)->hi;
@@ -365,9 +369,9 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
             *pos = set.lights;
             *span = 2;
         } else if (k == 1) {
-            str_put(t, 12, PALETTES[set.theme].name);
+            str_put(t, 12, theme_name(set.theme));
             *pos = set.theme;
-            *span = (int32_t)NPALETTES - 1;
+            *span = NTHEME - 1;
         } else if (k == 2) {             /* the audio's load, of its budget (read only; the device's) */
             uint32_t c = plat_cpu_pct();
             uint32_t k = 0;
@@ -423,8 +427,8 @@ static void knob_turn(int k, int32_t d)
         if (k == 0)
             set.lights = (uint8_t)clamp(set.lights + d, 0, 2);
         else if (k == 1) {
-            set.theme = (uint8_t)clamp(set.theme + d, 0, (int32_t)NPALETTES - 1);
-            palette_set(set.theme);
+            set.theme = (uint8_t)clamp(set.theme + d, 0, NTHEME - 1);
+            theme_apply();
         } else if (k == 3) {
             set.flags = (uint8_t)(d > 0 ? set.flags | SET_MIDI : set.flags & ~SET_MIDI);
             if (!(set.flags & SET_MIDI))
@@ -840,6 +844,35 @@ enum { HUE_MAGENTA = 1365, HUE_VIOLET = 1173, HUE_BLUE = 981, HUE_CYAN = 789, HU
 static const int16_t LANE_HUE[NLANE] = {HUE_MAGENTA, HUE_VIOLET, HUE_CYAN, HUE_ACID, HUE_GOLD};
 static const int16_t PART_HUE[NPART] = {HUE_MAGENTA, HUE_VIOLET, HUE_CYAN, HUE_ACID, HUE_GOLD, HUE_BLUE};
 
+/* THEME: the hues gathered round one (spread < 256: the circle folded, a part's hue still its own place in it), their
+ * saturation, and how they move (the sway's depth and its bars, a build's turning, a drop's jump, a pulse on each
+ * beat, a break's saturation); the screen's two theme steps (gfx.c PALETTES) with them.
+ *   NEON   all the hues, as they were
+ *   ACID   yellow to green, quick: swaying fast and wide, a jolt on each beat
+ *   INFRA  red to magenta, heavy: slow, a drop's jump twice as far
+ *   ICE    cyan to blue, pale and still: slow and shallow, a build hardly turning
+ *   MONO   no hue: white and greys */
+typedef struct {
+    const char *name;
+    int16_t center;                      /* the hue they gather round */
+    int16_t spread;                      /* 256: as they are; less: folded into center +- 384 * spread / 256 */
+    uint8_t sat;                         /* of the saturation, /255 */
+    uint8_t sway, bars;                  /* the sway's depth (% of NEON's), its period (bars) */
+    uint8_t spin, jump;                  /* a build's turning, a drop's jump (%) */
+    uint8_t pulse;                       /* a jolt on each beat (hue, falling through the beat) */
+    uint8_t brk;                         /* a break's saturation */
+    uint8_t pal;                         /* gfx.c PALETTES */
+} theme_t;
+static const theme_t THEME[NTHEME] = {
+    {"NEON", 0, 256, 255, 100, 32, 100, 100, 0, 130, 1},
+    {"ACID", 330, 145, 255, 260, 8, 150, 120, 70, 190, 0},
+    {"INFRA", 1490, 100, 255, 120, 16, 100, 200, 0, 110, 3},
+    {"ICE", 880, 85, 185, 50, 64, 40, 40, 0, 90, 2},
+    {"MONO", 0, 256, 0, 0, 32, 0, 0, 0, 0, 4},
+};
+static const char *theme_name(int t) { return THEME[clamp(t, 0, NTHEME - 1)].name; }
+static void theme_apply(void) { palette_set(THEME[set.theme % NTHEME].pal); }
+
 static uint16_t hsv_lift(int32_t h, int32_t sat, int32_t v, int32_t lo);
 static uint16_t hsv(int32_t h, int32_t sat, int32_t v) { return hsv_lift(h, sat, v, 0); }
 
@@ -847,10 +880,17 @@ static uint16_t hsv(int32_t h, int32_t sat, int32_t v) { return hsv_lift(h, sat,
  * it is not: text in any hue stays legible on black */
 static uint16_t hsv_lift(int32_t h, int32_t sat, int32_t v, int32_t lo)
 {
+    const theme_t *th = &THEME[set.theme % NTHEME];
     int32_t f, p, q, t, r, g, b;
     h %= HUE_FULL;
     if (h < 0)
         h += HUE_FULL;
+    if (th->spread < 256) {              /* THEME: folded round its hue (the fold's phase: the parts far apart) */
+        int32_t x = (h + 408) % HUE_FULL;
+        x = x > HUE_FULL / 2 ? x - HUE_FULL / 2 : HUE_FULL / 2 - x;   /* 0..768, no seam */
+        h = (th->center + (x - HUE_FULL / 4) * th->spread / 256 + HUE_FULL) % HUE_FULL;
+    }
+    sat = sat * th->sat / 255;
     f = h & 255;
     p = v * (255 - sat) / 255;
     q = v * (255 - sat * f / 255) / 255;
@@ -882,24 +922,29 @@ static struct {
     uint32_t drop_tick;                  /* the last drop's tick (its jump fades from there) */
 } hue;
 
-static void hue_update(void)             /* once a frame: the sway, the section's colour */
+static void hue_update(void)             /* once a frame: the sway, the section's colour (THEME's measures) */
 {
-    uint32_t tick = ps_ui.tick, bar = 4u * PS_TPB;
-    int32_t sh = (int32_t)(110.0f * fm_sin_turns((float)(tick % (32u * bar)) / (float)(32u * bar)));
+    const theme_t *th = &THEME[set.theme % NTHEME];
+    uint32_t tick = ps_ui.tick, bar = 4u * PS_TPB, per = (uint32_t)th->bars * bar;
+    int32_t sh = (int32_t)(1.1f * (float)th->sway * fm_sin_turns((float)(tick % per) / (float)per));
+    if (th->pulse && ps_playing()) {     /* a jolt on each beat */
+        float u = 1.0f - (float)(tick % PS_TPB) / (float)PS_TPB;
+        sh += (int32_t)((float)th->pulse * u * u);
+    }
     if (ps_ui.drops != hue.drops_seen) {
         hue.drops_seen = ps_ui.drops;
         hue.drop_tick = tick;
     }
     if (ps_ui.section == SEC_BUILD) {    /* turning, faster and faster */
         float p = ((float)ps_ui.sec_bar + (float)(tick % bar) / (float)bar) / (float)(ps_ui.sec_len ? ps_ui.sec_len : 4u);
-        sh += (int32_t)(2.0f * HUE_FULL * p * p);
+        sh += (int32_t)(0.02f * (float)th->spin * HUE_FULL * p * p);
     }
     if (hue.drops_seen && tick - hue.drop_tick < 2u * bar) {   /* the drop: half way round, back over two bars */
         float k = 1.0f - (float)(tick - hue.drop_tick) / (float)(2u * bar);
-        sh += (int32_t)(HUE_FULL / 2 * k * k);
+        sh += (int32_t)(0.005f * (float)th->jump * HUE_FULL * k * k);
     }
     hue.shift = sh;
-    hue.sat = ps_ui.section == SEC_BREAK ? 130 : 225;
+    hue.sat = ps_ui.section == SEC_BREAK ? th->brk : 225;
 }
 
 static uint16_t part_col(int32_t base, int32_t v) { return hsv(base + hue.shift, hue.sat, v); }
