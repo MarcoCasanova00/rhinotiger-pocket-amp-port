@@ -238,6 +238,8 @@ static struct {
     float echo_d;                      /* the echo's delay in frames, gliding (a tempo moved, a time changed) */
     float dub_ph;                      /* DUB's waver (turns) */
     float frz_t;                       /* FREEZE: samples since it was pressed (0: not held) */
+    uint8_t gap;                       /* GAP: this beat silent (the bar's last) */
+    float gap_g;                       /* its gain, gliding (~2 ms) */
     float p_lp[2];                     /* the percussion's TONE's low-pass */
     float up[2];                       /* the music above the kick and the bass, the sample before (FREEZE's) */
     /* the sections */
@@ -394,7 +396,7 @@ static int build_breath(uint32_t beat);
 #include "line.c"
 
 /* the queue's commands: bits 16.. the kind (0 a key, 1 an effect, 2 a mute, 3 out, 4 a fill) */
-enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE, CMD_REC };
+enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE, CMD_REC, CMD_HALF, CMD_GAP };
 static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; 0: none yet beyond the world's own */
     [PART_KICK] = {"SOLID", "HARD", "KNOCK", "ZIP"},
     [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW"},
@@ -610,6 +612,8 @@ const char *ps_fx_name(int id) { return FX_NAME[(unsigned)id % FX_N]; }
 void ps_mute(int part) { cmd_post((uint32_t)CMD_MUTE << 16 | (uint32_t)(part & 7)); }
 void ps_out(int part, int on) { cmd_post((uint32_t)CMD_OUT << 16 | (uint32_t)(part & 7) | (uint32_t)(on != 0) << 5); }
 void ps_fill(void) { cmd_post((uint32_t)CMD_FILL << 16); }
+void ps_half(int on) { cmd_post((uint32_t)CMD_HALF << 16 | (uint32_t)(on != 0) << 5); }
+void ps_gap(void) { cmd_post((uint32_t)CMD_GAP << 16); }
 void ps_rec(int on) { cmd_post((uint32_t)CMD_REC << 16 | (uint32_t)(on != 0)); }
 int ps_take(void) { return take.n; }
 
@@ -632,6 +636,12 @@ static void cmd_do(uint32_t c)         /* (render, as a block begins) */
         break;
     case CMD_FILL:
         fx.fill_req = 1;
+        break;
+    case CMD_HALF:
+        fx.half = (uint8_t)b;
+        break;
+    case CMD_GAP:
+        fx.gap_req = 1;
         break;
     case CMD_TYPE:
         if ((c >> 8 & 7u) < NPART)
@@ -742,14 +752,19 @@ int ps_lane(int lane, uint8_t out[24])
         }
         if (groove || gro)
             for (i = 0; i < 16u; i++)
-                if (kick_at(rb, i / 4u, (i % 4u) * 6u) && !build_breath(i / 4u))
-                    out[i] = 3;
+                if ((fx.half ? i % 8u == 0u : kick_at(rb, i / 4u, (i % 4u) * 6u)) && !build_breath(i / 4u))
+                    out[i] = 3;   /* (HALF: on 1 and 3) */
         if (fake)
             out[0] = 3;
         break;
     case LANE_BASS:
         if (!groove && !gro && !fake)
             break;
+        if (fx.half) {                 /* HALF: an eighth's roll after the kick on 1 and 3 */
+            for (i = 0; i < 16u; i++)
+                out[i] = i % 8u && !(i & 1u) && !build_breath(i / 4u) ? 2 : 0;
+            break;
+        }
         if (bass_pat(rb) == 2u) {      /* triplets: six a beat, the kick on the first */
             n = 24;
             for (i = 0; i < 24u; i++)
@@ -831,6 +846,7 @@ void ps_init(void)
     s.h_k = s.o_k = s.c_k = s.r_k = 1.0f;
     s.k_ty = KICK_TYPE[0];
     s.p_w[0] = s.p_w[3] = 1.0f;
+    s.gap_g = 1.0f;
     s.rng = 0x9E3779B9u;
     s.lim = 1.0f;
     s.a_vg[0] = s.a_vg[1] = s.a_vg[2] = 1.0f;
@@ -872,6 +888,8 @@ int ps_stat(int which)
     uint32_t i;
     if (which == 7)
         return fx.out;
+    if (which == 8)
+        return s.gap | fx.gap_req << 1 | fx.half << 2;
     if (which <= 3)
         return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : which == 2 ? ev.last_type : (int)ln.drawn;
     for (i = 0; i < LN_STEPS; i++)     /* the line's steps as heard now: 4 on, 5 the highest note, 6 sliding */
@@ -1123,6 +1141,20 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
     }
 }
 
+static void bass_note(const world_t *w, uint32_t span)   /* the bass strikes, its room span ticks */
+{
+    s.b_t = 0.0f;
+    s.b_cph = s.b_mph = 0.0f;          /* every note from the same place: the roll is tight */
+    s.b_gate = w->gate * cf.b_len * s.tick_len * (float)span / PS_SR;   /* (LENGTH) */
+    {   /* room for its 3 ms release before the next */
+        float most = fm_minf(0.95f * s.tick_len * (float)span / PS_SR, s.tick_len * (float)span / PS_SR - 0.0035f);
+        if (s.b_gate > most)
+            s.b_gate = most;
+    }
+    s.b_inc = note_hz(m.root + (w->jump && rnd() % 100u < w->jump ? ((rnd() & 1u) ? 12 : 7) : 0)) / PS_SR;
+    ps_ui.hits[HIT_BASS]++;
+}
+
 static void step(const world_t *w)     /* a tick begins: what strikes on it */
 {
     uint32_t t = s.tick % TPB, beat = s.tick / TPB % 4u, bar = s.tick / TPBAR, rb;
@@ -1179,6 +1211,24 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     ps_ui.cued = (int8_t)(drop_n != s.drop_seen     ? PS_CUE_DROP
                           : build_n != s.build_seen ? PS_CUE_BUILD
                           : cue_n != s.cue_seen && s.sec == SEC_MAIN ? PS_CUE_BREAK : 0);
+    if (t == 0u && beat == 3u && fx.gap_req) {   /* GAP (a black key): this bar's last beat silent */
+        fx.gap_req = 0;
+        s.gap = 1;
+    } else if (t == 0u && beat == 0u)
+        s.gap = 0;
+    if (fx.half) {                     /* HALF (a black key held): half time, the kick on 1 and 3, the bass's roll over
+                                        * two beats (K-B-B-B, an eighth each); the kick's twists not */
+        uint32_t ht = (beat & 1u) * TPB + t;
+        if (ht == 0u) {
+            if (!kick_rests) {
+                s.k_t = 0.0f;
+                s.k_ph = 0.0f;
+                ps_ui.hits[HIT_KICK]++;
+            }
+        } else if (ht % 12u == 0u && !bass_rests && !(w->skip && rnd() % 100u < w->skip))
+            bass_note(w, 12u);
+        return;
+    }
     if (t == 0u || (t % 6u == 0u && kf != KF_NONE && kick_at(rb, beat, t))) {   /* (a twist's: its tick the kick's) */
         if (!kick_rests && kick_at(rb, beat, t)) {
             s.k_t = 0.0f;
@@ -1196,17 +1246,8 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
             return;
         if (w->skip && rnd() % 100u < w->skip)   /* a stutter: this one rests */
             return;
-        s.b_t = 0.0f;
-        s.b_cph = s.b_mph = 0.0f;      /* every note from the same place: the roll is tight */
-        s.b_gate = w->gate * cf.b_len * s.tick_len * (float)span / PS_SR;   /* (LENGTH) */
-        {   /* room for its 3 ms release before the next */
-            float most = fm_minf(0.95f * s.tick_len * (float)span / PS_SR, s.tick_len * (float)span / PS_SR - 0.0035f);
-            if (s.b_gate > most)
-                s.b_gate = most;
-        }
-        s.b_inc = note_hz(m.root + (w->jump && rnd() % 100u < w->jump ? ((rnd() & 1u) ? 12 : 7) : 0)) / PS_SR;
+        bass_note(w, span);
     }
-    ps_ui.hits[HIT_BASS]++;
 }
 
 static float kick(float dt)
@@ -1602,7 +1643,8 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.drop_seen = drop_n;
         s.build_seen = build_n;
         s.drops = 0;                   /* (the intro again: the events quiet its first bars) */
-        s.out = s.pat = s.fill_beat = 0;
+        s.out = s.pat = s.fill_beat = s.gap = 0;   /* (a GAP cued or sounding: forgotten) */
+        fx.gap_req = 0;
         s.trip_at = 255;
         s.kf = KF_NONE;
         ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */
@@ -1815,7 +1857,11 @@ void ps_render(float *outl, float *outr, uint32_t n)
             fx_send = fx_render(s.tick_len, &outl[i], &outr[i], ml, mr, n);
             {   /* the master: trimmed (the groove's peaks near 0.88), a limiter over 0.89 (at once down, back in
                  * ~90 ms, the two sides together), and a soft clip for what still gets past */
-                float ol = outl[i] * MASTER_TRIM, orr = outr[i] * MASTER_TRIM, pk = fm_maxf(fm_fabsf(ol), fm_fabsf(orr));
+                float ol, orr, pk;
+                s.gap_g += ((s.gap ? 0.0f : 1.0f) - s.gap_g) * 0.012f;   /* GAP: all of it out, ~2 ms slopes */
+                ol = outl[i] * MASTER_TRIM * s.gap_g;
+                orr = outr[i] * MASTER_TRIM * s.gap_g;
+                pk = fm_maxf(fm_fabsf(ol), fm_fabsf(orr));
                 if (pk * s.lim > 0.89f)
                     s.lim = 0.89f / pk;
                 else

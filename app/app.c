@@ -51,7 +51,8 @@
  * shows them: the white keys a grid of sixteen effects, four rows of four (REPEAT, FILTER, SPACE, MOTION; each row's
  * first key glows, the glow's high there), each while held; the black keys the parts, F#3 G#3 A#3 C#4 D#4 F#4 muted
  * (tapped, again: back; lit while sounding: KICK, BASS, PERC, EVENTS, LINE, ATMOS, the sounds' pages' order), G#4 a
- * fill on the next beat, A#4 and C#5 the kick and the bass out while held, D#5 both (a break while held), F#5 every
+ * fill on the next beat, A#4 half time while held (the kick on 1 and 3, the bass's roll in eighths), C#5 a gap (the
+ * last beat to come of a bar silent: before a drop), D#5 the kick and the bass out while held (a break), F#5 every
  * part back. A key does what it did when pressed until let go. */
 #include "fastmath.h"
 #include "psy.h"
@@ -518,7 +519,7 @@ static int key_place(int k)              /* its place among the white keys, or a
         n += key_black(i) == key_black(k);
     return n;
 }
-enum { BK_MUTE0 = 0, BK_FILL = 6, BK_NOKICK, BK_NOBASS, BK_NOLOW, BK_ALL, NBK };
+enum { BK_MUTE0 = 0, BK_FILL = 6, BK_HALF, BK_GAP, BK_NOLOW, BK_ALL, NBK };
 static const char *const PART_NAME[NPART] = {"KICK", "BASS", "PERC", "LINE", "EVENTS", "ATMOS"};
 /* the mute keys' parts, in the sounds' pages' order (the events before the line) */
 static const int8_t BK_PART[BK_FILL] = {PART_KICK, PART_BASS, PART_PERC, PART_EVENTS, PART_LINE, PART_ATMOS};
@@ -553,9 +554,12 @@ static void key_down(int k, int vel)
         } else if (b == BK_FILL) {
             ps_fill();
             app_say("FILL", "NEXT BEAT");
-        } else if (b == BK_NOKICK || b == BK_NOBASS) {
-            ps_out(b == BK_NOKICK ? PART_KICK : PART_BASS, 1);
-            app_say(b == BK_NOKICK ? "KICK" : "BASS", "OUT");
+        } else if (b == BK_HALF) {       /* half time while held */
+            ps_half(1);
+            app_say("HALF", "TIME");
+        } else if (b == BK_GAP) {        /* the bar's last beat silent */
+            ps_gap();
+            app_say("GAP", "LAST BEAT");
         } else if (b == BK_NOLOW) {      /* the kick and the bass out together: a break while held */
             ps_out(PART_KICK, 1);
             ps_out(PART_BASS, 1);
@@ -578,18 +582,14 @@ static void key_up(int k)
         int id = key_place(k);
         pf.fx_held &= (uint16_t)~(1u << id);
         ps_fx(id, 0);
-    } else {                             /* the kick and the bass back unless another black key still holds them out */
-        int b = key_place(k), j, kick = 0, bass = 0;
-        for (j = 0; j < (int)NKEYS; j++)
-            if (j != k && (ui.keys >> j & 1u) && pf.role[j] == ROLE_BLACK && key_black(j)) {
-                int o = key_place(j);
-                kick |= o == BK_NOKICK || o == BK_NOLOW;
-                bass |= o == BK_NOBASS || o == BK_NOLOW;
-            }
-        if ((b == BK_NOKICK || b == BK_NOLOW) && !kick)
+    } else {
+        int b = key_place(k);
+        if (b == BK_HALF)
+            ps_half(0);
+        if (b == BK_NOLOW) {
             ps_out(PART_KICK, 0);
-        if ((b == BK_NOBASS || b == BK_NOLOW) && !bass)
             ps_out(PART_BASS, 0);
+        }
     }
 }
 
@@ -1037,7 +1037,7 @@ static void draw_grid(void)
             cv_rect(c, 110, tw, 1, C_GRAY);
         c += tw + 10;
     }
-    cv_text(8, 126, &FONT_XS, "BLACK: MUTE  FILL  OUT  ALL", C_DIM);
+    cv_text(8, 126, &FONT_XS, "BLACK: MUTE  FILL HALF GAP  OUT  ALL", C_DIM);
     cv_blit(0, 32);
 }
 
@@ -1097,12 +1097,15 @@ static void draw_mix(uint32_t now)
 static void draw_lanes(uint32_t now)
 {
     uint32_t tick = ps_ui.tick ? ps_ui.tick - 1u : 0u;
-    int32_t lane, i, range = ps_line_range();
+    int32_t i, range = ps_line_range();
     int focus = page_lane(ui.page);
     uint8_t st[24];
+    static const int8_t ROW_LANE[NLANE] = {LANE_KICK, LANE_BASS, LANE_PERC, LANE_EVENTS, LANE_LINE};   /* (as the
+                                                                                                  * sounds' pages) */
+    int32_t row;
     cv_begin(240, 148, C_BLACK);
-    for (lane = 0; lane < NLANE; lane++) {
-        int32_t y = 4 + lane * 21, base = y + 15, n = ps_lane((int)lane, st), per = n / 4;
+    for (row = 0; row < NLANE; row++) {
+        int32_t lane = ROW_LANE[row], y = 4 + row * 21, base = y + 15, n = ps_lane((int)lane, st), per = n / 4;
         int f = lane == focus, muted = ps_ui.muted >> lane & 1u;   /* (the lanes in the parts' order) */
         int32_t cur = ps_playing() ? (int32_t)(n == 24 ? tick / 4u % 24u : tick / 6u % 16u) : -1;
         int flare = now - ui.struck_at[lane] < 90u;
@@ -1348,7 +1351,17 @@ int app_expect(const char *what, int *got)
         *got = ps_take();
     else if (!strcmp(what, "lines"))         /* the line's notes so far */
         *got = (int)ps_ui.hits[HIT_LINE];
-    else if (!strcmp(what, "out"))           /* the parts out while a black key is held, 1 << PART_* (the engine's) */
+    else if (!strcmp(what, "gap"))           /* GAP: 1 its beat silent now, 2 cued */
+        *got = ps_stat(8) & 3;
+    else if (!strcmp(what, "half"))          /* HALF held (the engine's) */
+        *got = ps_stat(8) >> 2 & 1;
+    else if (!strcmp(what, "kick_steps")) {  /* the kick's steps in the bar now (the lanes' plan) */
+        uint8_t st[24];
+        int n = ps_lane(LANE_KICK, st), k, c = 0;
+        for (k = 0; k < n; k++)
+            c += st[k] != 0;
+        *got = c;
+    } else if (!strcmp(what, "out"))           /* the parts out while a black key is held, 1 << PART_* (the engine's) */
         *got = ps_stat(7);
     else if (!strcmp(what, "muted"))         /* the parts muted, 1 << PART_* (the engine's) */
         *got = ps_ui.muted;

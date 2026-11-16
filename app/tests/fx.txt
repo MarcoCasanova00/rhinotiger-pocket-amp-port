@@ -78,7 +78,7 @@ key w15 down 90
 wait 3200
 key w15 up
 wait 1600
-# the parts: the kick muted (b0) and back; a fill (b6); the bass out while held (b8)
+# the parts: the kick muted (b0) and back; a fill (b6)
 tapkey b0
 wait 100
 expect muted 1
@@ -87,10 +87,6 @@ tapkey b0
 wait 100
 expect muted 0
 tapkey b6
-wait 1600
-key b8 down 90
-wait 1600
-key b8 up
 wait 1600
 # the mute keys in the sounds' pages' order: D#4 (b4) the line, C#4 (b3) the events
 listen
@@ -106,24 +102,38 @@ said EVENTS
 tapkey b3
 wait 100
 expect muted 0
+# A#4 (b7): half time while held (the kick on 1 and 3, the bass's roll in eighths); let go, the groove again
+expect kick_steps >2
+key b7 down 90
+wait 100
+said HALF
+expect half 1
+expect kick_steps 2
+wait 3200
+key b7 up
+wait 100
+expect half 0
+expect kick_steps >2
+wait 1600
+# C#5 (b8): the last beat to come of a bar silent (cued, then sounding, then over)
+key b8 down 90
+wait 50
+key b8 up
+said GAP
+expect gap >0
+wait 1700
+expect gap 0
+wait 1600
 # D#5 (b9): the kick and the bass out together while held
 key b9 down 90
 wait 100
 said KICK+BASS
+expect out 3
 wait 1500
 key b9 up
-wait 1600
-# A#4 (b7) and D#5 (b9) held, D#5 let go first: the kick stays out until A#4 is let go
-key b7 down 90
-key b9 down 90
-wait 100
-expect out 3
-key b9 up
-wait 100
-expect out 1
-key b7 up
 wait 100
 expect out 0
+wait 1600
 wavstop
 # off ECHO the keys are no grid, REC held or not (REC takes the keys into a loop: rec.txt)
 tap HOME

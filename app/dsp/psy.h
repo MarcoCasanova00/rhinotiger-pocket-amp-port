@@ -130,6 +130,9 @@ enum { PART_KICK, PART_BASS, PART_PERC, PART_LINE, PART_EVENTS, PART_ATMOS, NPAR
 void ps_mute(int part);                /* muted, or back */
 void ps_out(int part, int on);         /* out while held */
 void ps_fill(void);
+void ps_half(int on);                  /* while held (1 .. 0): the kick on 1 and 3, the bass's roll in eighths */
+void ps_gap(void);                     /* the last beat to come of a bar (this bar's, or the next's if it has begun)
+                                        * silent, all of it */
 
 /* the keys throw events (events.c): key 0..26 (F3..G5), down 1 (value: velocity), 0 up, 2 pressure (value 0..127). A
  * white key is a sound; a black key held, a rhythm for the white keys held with it */
@@ -137,7 +140,8 @@ void ps_key(int k, int down, int value);
 int ps_stat(int which);                /* 0 events begun, 1 thrown and remembered (up to 8), 2 the latest thrown's type,
                                         * 3 the line's phrases drawn whole; its 32 steps as heard now: 4 on, 5 the
                                         * highest note (over the register), 6 sliding; 7 the parts out
-                                        * while a black key is held (1 << PART_*) */
+                                        * while a black key is held (1 << PART_*); 8 GAP sounding (1), cued
+                                        * (2), HALF held (4) */
 const char *ps_event_name(int type);
 int ps_rhythm(void);                   /* the black key held whose rhythm the white keys throw on (-1: none) */
 void ps_rec(int on);                   /* REC: pressed (1), a take of the keys anew; let go (0), it loops (two bars) */

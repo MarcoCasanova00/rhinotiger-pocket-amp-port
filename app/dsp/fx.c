@@ -68,6 +68,8 @@ static struct {
     uint8_t muted;                     /* the parts muted (PART_* bits) */
     uint8_t out;                       /* the parts out while a key is held */
     uint8_t fill_req;                  /* a fill cued for the next beat */
+    uint8_t half;                      /* HALF held: the kick and the bass in half time */
+    uint8_t gap_req;                   /* GAP cued: the next bar's last beat to come silent */
     uint8_t auto_slice;                /* a STUTTER build's repeat, ticks (0: none): psy.c sets it a tick */
 } fx = {.buf_want = -1, .cur = {.id = -1}, .old = {.id = -1}};
 
