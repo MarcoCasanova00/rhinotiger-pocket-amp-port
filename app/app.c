@@ -222,6 +222,8 @@ static struct {
     uint8_t redraw;
     int8_t oct;                          /* the keys' events' octave (OCT- / OCT+) */
     uint32_t logo_until;                 /* the logo stays until (the keys and knobs already work) */
+    uint32_t logo_at;                    /* the logo began (its layers come one by one: LOGO_STEP) */
+    uint8_t logo_layers;                 /* its layers drawn (LOGO_FACE ...) */
 } ui;
 static int page_part(int p)              /* the part a page shows (PART_*), or -1 */
 {
@@ -1289,13 +1291,17 @@ static void draw(void)
 
 /* the logo: the rhino-tiger's face behind (face.h, its greys tinted dim, cyan above to violet below, its eyes gold), 犀
  * over 虎 large on it (each dot four pixels square, ringed in black, a rainbow downwards: magenta to acid green), and
- * across the middle a band, RHINOTIGER in it. Drawn in two parts (the canvas holds 240 x 144): rows 0..103, 104..239 (the band
+ * across the middle a band, RHINOTIGER in it. At boot they come one by one, LOGO_STEP ms apart (the face alone, then
+ * the characters on it, then the band), and all of them stay LOGO_HOLD ms. Drawn in two parts (the canvas holds 240 x 144): rows 0..103, 104..239 (the band
  * whole in the second) */
 #define LOGO_DOT 4
 #define LOGO_X (120 - LOGO_DOT * LOGO_N / 2)
 #define LOGO_Y(ch) (20 + (ch) * (LOGO_DOT * LOGO_N + 4))
 #define LOGO_BAND 106                    /* the band's top; 28 rows */
-static void draw_logo(void)
+enum { LOGO_FACE = 1, LOGO_CHARS = 2, LOGO_NAME = 4, LOGO_ALL = 7 };
+#define LOGO_STEP 300u
+#define LOGO_HOLD 900u
+static void draw_logo(uint32_t layers)
 {
     static const int32_t PART[3] = {0, 104, 240};
     uint32_t k = 0, run = 0, lv = 0;
@@ -1312,12 +1318,14 @@ static void draw_logo(void)
                 }
                 if (run)
                     run--;
+                if (!(layers & LOGO_FACE))
+                    continue;
                 if (lv >= 14u)               /* the brightest (its eyes alone): glowing gold */
                     cv_pset(x, y, hsv(HUE_GOLD, 190, (int32_t)lv * 16));
                 else if (lv)
                     cv_pset(x, y, hsv(HUE_CYAN + (y0 + y) * (HUE_VIOLET - HUE_CYAN) / 240, 170, (int32_t)lv * 11));
             }
-        for (ring = 1; ring >= 0; ring--)    /* the characters: first their black ring, then them */
+        for (ring = 1; ring >= 0 && (layers & LOGO_CHARS); ring--)   /* the characters: their black ring, then them */
             for (ch = 0; ch < 2; ch++) {
                 int32_t dy, dx;
                 for (dy = 0; dy < LOGO_N; dy++)
@@ -1331,7 +1339,7 @@ static void draw_logo(void)
                                         hsv(HUE_MAGENTA - (ch * LOGO_N + dy) * (HUE_MAGENTA - HUE_ACID) / (2 * LOGO_N), 230, 255));
                         }
             }
-        if (pt == 1) {                       /* the band: black, a rainbow's edge above and below, the name in it */
+        if (pt == 1 && (layers & LOGO_NAME)) {   /* the band: black, a rainbow's edge above and below, the name in it */
             int32_t by = LOGO_BAND - y0, tw = text_w(&FONT_M, "RHINOTIGER");
             cv_rect(0, by, 240, 28, RGB(0, 0, 0));
             for (x = 0; x < 240; x += 4) {
@@ -1346,13 +1354,15 @@ static void draw_logo(void)
 }
 
 #ifdef APP_SPLASH
-void app_splash(void) { draw_logo(); }
+void app_splash(void) { draw_logo(LOGO_FACE); }
 #endif
 
 void app_ui_init(void)
 {
-    draw_logo();                             /* (the device's splash already; the host's first sight of it) */
-    ui.logo_until = plat_ms() + 1200u;
+    draw_logo(LOGO_FACE);                    /* (the device's splash already; the host's first sight of it) */
+    ui.logo_layers = LOGO_FACE;
+    ui.logo_at = plat_ms();
+    ui.logo_until = ui.logo_at + 2u * LOGO_STEP + LOGO_HOLD;
     ui.thrown_type = -1;
     ui.redraw = 1;
 }
@@ -1376,9 +1386,16 @@ void app_frame(void)
         shed_at = 0;
         ps_shed(0);
     }
-    if (ui.logo_until) {                     /* the logo, a moment more */
-        if ((int32_t)(now - ui.logo_until) < 0)
+    if (ui.logo_until) {                     /* the logo, a moment more: its layers one by one */
+        if ((int32_t)(now - ui.logo_until) < 0) {
+            uint32_t el = now - ui.logo_at,
+                     want = el >= 2u * LOGO_STEP ? LOGO_ALL : el >= LOGO_STEP ? LOGO_FACE | LOGO_CHARS : LOGO_FACE;
+            if (want != ui.logo_layers) {
+                ui.logo_layers = (uint8_t)want;
+                draw_logo(want);
+            }
             return;
+        }
         ui.logo_until = 0;
         lcd_fill(0, 0, 240, 240, C_BLACK);
         ui.redraw = 1;
