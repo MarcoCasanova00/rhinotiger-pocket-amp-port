@@ -27,9 +27,9 @@
  *                            phrase drawn anew from the next bar
  *  10 ATMOS (LFO, a third)   K1..K4 Colour, Air, Motion (its sway's speed; past the middle the sway also opens and
  *                            closes it, more), Depth (how far)
- *  11 MIX (EDIT)             K1 the track (the six parts), K2 its level, K3 its send into the echo (the kick and the
- *                            bass: none, not shown), K4 its mute (right on, left off); a strip a track, its meter,
- *                            its level and its send
+ *  11 MIX (EDIT)             K1 the track (the six parts, as the pages), K2 its level, K3 its send into the echo
+ *                            (the kick and the bass: none, not shown), K4 its mute (right on, left off); a strip a
+ *                            track, its meter, its level and its send
  *  12 ECHO (FX)              K1..K4 Feedback, Tone, Time, Level (the return)
  *  13 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
  *                            (off by default); SAVE here keeps it all (tapped: as it is let go); held 1.5 s, every
@@ -149,10 +149,12 @@ static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEL, B_SEL, B_E
 /* MIX's tracks: the parts (PART_*), each its level, its send into the echo (-1: none, the kick's and the bass's low
  * end kept out of it) and its mute */
 #define NTRACK NPART
-static const char *const TRACK_NAME[NTRACK] = {"KICK", "BASS", "PERC", "LINE", "EVENTS", "ATMOS"};
-static const int8_t TRACK_LEVEL[NTRACK] = {P_KICK_LEVEL, P_BASS_LEVEL, P_PERC_LEVEL, P_LINE_LEVEL, P_EV_LEVEL,
+/* (in the sounds' pages' order: the events before the line) */
+static const int8_t TRACK_PART[NTRACK] = {PART_KICK, PART_BASS, PART_PERC, PART_EVENTS, PART_LINE, PART_ATMOS};
+static const char *const TRACK_NAME[NTRACK] = {"KICK", "BASS", "PERC", "EVENTS", "LINE", "ATMOS"};
+static const int8_t TRACK_LEVEL[NTRACK] = {P_KICK_LEVEL, P_BASS_LEVEL, P_PERC_LEVEL, P_EV_LEVEL, P_LINE_LEVEL,
                                            P_ATMOS_LEVEL};
-static const int8_t TRACK_SEND[NTRACK] = {-1, -1, P_PERC_SEND, P_LINE_SEND, P_EV_ECHO, P_ATMOS_WASH};
+static const int8_t TRACK_SEND[NTRACK] = {-1, -1, P_PERC_SEND, P_EV_ECHO, P_LINE_SEND, P_ATMOS_WASH};
 static uint8_t mix_track;                /* MIX's K1: the track K2 and K3 act on */
 /* the performance's keys (ECHO), and the parts muted (ECHO's black keys, MIX's K4) */
 enum { ROLE_EVENT, ROLE_FX, ROLE_BLACK };
@@ -388,7 +390,7 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
         return;
     }
     if (page == PG_MIX && k == 3) {      /* its mute */
-        int mu = pf.muted >> (mix_track % NTRACK) & 1u;
+        int mu = pf.muted >> TRACK_PART[mix_track % NTRACK] & 1u;
         str_put(t, 12, mu ? "ON" : "OFF");
         *pos = mu;
         *span = 1;
@@ -437,11 +439,11 @@ static void knob_turn(int k, int32_t d)
         app_say("TRACK", t);
         return;
     } else if (page == PG_MIX && k == 3) {   /* its mute: right on, left off (the same as ECHO's black keys) */
-        int tr = mix_track % NTRACK, mu = pf.muted >> tr & 1u;
+        int tr = mix_track % NTRACK, pt = TRACK_PART[tr], mu = pf.muted >> pt & 1u;
         if ((d > 0) == mu)
             return;
-        ps_mute(tr);
-        pf.muted ^= (uint8_t)(1u << tr);
+        ps_mute(pt);
+        pf.muted ^= (uint8_t)(1u << pt);
         app_say(TRACK_NAME[tr], mu ? "BACK" : "MUTED");
         return;
     } else {
@@ -1049,10 +1051,11 @@ static void draw_mix(uint32_t now)
                                         (ui.turned_at[2] && now - ui.turned_at[2] < 600u);
     cv_begin(240, 148, C_BLACK);
     for (i = 0; i < NTRACK; i++) {
-        int32_t x = 11 + i * 38, y0 = 8, h = 96, hue = PART_HUE[i], cap, lit_n;
-        int mu = ps_ui.muted >> i & 1u, f = i == sel, sp = TRACK_SEND[i];
+        int pt = TRACK_PART[i];
+        int32_t x = 11 + i * 38, y0 = 8, h = 96, hue = PART_HUE[pt], cap, lit_n;
+        int mu = ps_ui.muted >> pt & 1u, f = i == sel, sp = TRACK_SEND[i];
         int32_t v = f ? 255 : 150;           /* the chosen brighter */
-        float m = (float)ps_ui.meter[i] / 255.0f, db;
+        float m = (float)ps_ui.meter[pt] / 255.0f, db;
         ui.meter_s[i] = fm_maxf(m, ui.meter_s[i] * 0.9f);   /* (the engine's held; a little more here) */
         db = ui.meter_s[i] > 0.0001f ? 6.0206f * fm_log2f(ui.meter_s[i]) : -99.0f;
         lit_n = mu ? 0 : clamp((int32_t)((db + 36.0f) / 36.0f * 23.0f + 0.5f), 0, 23);
@@ -1070,7 +1073,7 @@ static void draw_mix(uint32_t now)
         cap = y0 + h - 2 - clamp(set.par[TRACK_LEVEL[i]], 0, 100) * (h - 4) / 100;
         cv_rect(x + 14, cap, 10, 3, f && lit ? C_WHITE : mu ? C_GRAY : part_txt(hue, v));
         {
-            static const char *const SHORT[NTRACK] = {"KICK", "BASS", "PERC", "LINE", "EVT", "ATM"};
+            static const char *const SHORT[NTRACK] = {"KICK", "BASS", "PERC", "EVT", "LINE", "ATM"};
             const char *nm = SHORT[i];       /* (a strip's width) */
             int32_t tw = text_w(&FONT_XS, nm);
             cv_text(x + 12 - tw / 2, 110, &FONT_XS, nm, mu ? C_LINE : f ? C_WHITE : part_txt(hue, 190));
@@ -1363,7 +1366,7 @@ int app_expect(const char *what, int *got)
         *got = ps_stat(2);
     else if (!strncmp(what, "meter", 5))     /* meterN: part N's peak, held (psy.h), 0..255 */
         *got = ps_ui.meter[atoi(what + 5) % NPART];
-    else if (!strcmp(what, "track"))         /* MIX's track (K1): 0..5 the parts (PART_*) */
+    else if (!strcmp(what, "track"))         /* MIX's track (K1): 0..5 (KICK BASS PERC EVENTS LINE ATMOS) */
         *got = mix_track;
     else if (!strcmp(what, "kits"))          /* kits taken (MAIN's ALGORITHM) */
         *got = ps_ui.kits;

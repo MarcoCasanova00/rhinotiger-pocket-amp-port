@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# MIX (EDIT, page 10): K1 the track (0..5 the parts), K2 its level, K3 its send into the echo (the kick and the bass:
-# none, not shown), K4 its mute (right on, left off; ECHO's black keys the same). The levels and the sends are MIX's
+# MIX (EDIT, page 10): K1 the track (0..5: KICK BASS PERC EVENTS LINE ATMOS, the sounds' pages' order), K2 its level,
+# K3 its send into the echo (the kick and the bass: none, not shown), K4 its mute (right on, left off; ECHO's black keys the same). The levels and the sends are MIX's
 # only: param8 KICK, 12 BASS, 16 PERC, 32 LINE, 20 EVENTS, 28 ATMOS; sends 44 PERC, 45 LINE, 23 EVENTS, 31 ATMOS. The
 # echo's level (param24) is ECHO's K4. A strip a track, its meter (meterN). The keys throw events as on the other
 # pages. COLD SIGNAL, 152.
@@ -36,10 +36,14 @@ said KICK
 turn K3 10
 wait 30
 said_none
-# K1 to LINE (3): K2 its level, K3 its send
+# K1 to LINE (4: after EVENTS, as the sounds' pages): K2 its level, K3 its send
 turn K1 3
 wait 30
 expect track 3
+said EVENTS
+turn K1 1
+wait 30
+expect track 4
 said LINE
 expect param32 70
 turn K2 -35
@@ -72,9 +76,9 @@ expect muted 0
 said BACK
 shot mix-mute.png
 # back, and the kick and the line again
-turn K1 -2
+turn K1 -1
 wait 30
-expect track 3
+expect track 4
 turn K2 35
 turn K1 -10
 wait 30
