@@ -541,7 +541,11 @@ static float ev_highpass(int ch, float x)   /* ~180 Hz, 12 dB an octave: the eve
 
 static float ev_render(float dt, float *l, float *r)
 {
-    float send = 0.0f, el = 0.0f, er = 0.0f, spread = (float)par[P_EV_SPREAD] / 50.0f;   /* (0..2, 50: 1) */
+    /* SPREAD: 0 all in the middle, 50 as each event has it, 100 three times as far (to the sides), the pan's law
+     * from half to whole (hard left, hard right), and each crossing to the other side as it sounds */
+    float send = 0.0f, el = 0.0f, er = 0.0f, sp = (float)par[P_EV_SPREAD] / 50.0f,
+          wide = sp <= 1.0f ? sp : 1.0f + 2.0f * (sp - 1.0f), law = 0.5f + 0.25f * (wide - 1.0f > 0.0f ? wide - 1.0f : 0.0f),
+          cross = sp > 1.0f ? sp - 1.0f : 0.0f;
     int k;
     for (k = 0; k < EV_NVOICE; k++) {
         evoice_t *v = &ev.v[k];
@@ -580,9 +584,12 @@ static float ev_render(float dt, float *l, float *r)
             x = v->hx;
         }
         x = fm_tanhf(1.4f * x) * amp * v->level * 0.28f;
-        pan = fm_clampf((v->pan0 + (v->pan1 - v->pan0) * u) * spread, -1.6f, 1.6f);   /* (SPREAD) */
-        el += x * (1.0f - 0.5f * pan);
-        er += x * (1.0f + 0.5f * pan);
+        {
+            float p1 = v->pan1 + (-v->pan0 - v->pan1) * cross;   /* (SPREAD past 50: crossing) */
+            pan = fm_clampf((v->pan0 + (p1 - v->pan0) * u) * wide, -1.0f, 1.0f);
+        }
+        el += x * (1.0f - law * pan);
+        er += x * (1.0f + law * pan);
         v->t += dt;
     }
     el = hp2(&ev_hp2[0], ev_highpass(0, el), 0.9747f);   /* (twice: 24 dB an octave, a dive's depths out) */

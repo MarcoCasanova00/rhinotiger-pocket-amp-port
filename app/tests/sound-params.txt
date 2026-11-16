@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The sounds' pages' K4 (K3 and K4 on EVENTS and ATMOS), where their levels were: KICK Decay (param46), BASS Tone (47),
-# PERC Open (48), EVENTS Pitch (50, semitones -12..12, one a detent) and Spread (51), LINE Drive (49, 0: clean), ATMOS
+# The sounds' pages' new knobs, where their levels were: KICK Decay (K4, param46), BASS Decay (K2, 47: how fast its bite
+# closes), PERC Open (K2, 48), EVENTS Pitch (50, semitones -12..12, one a detent) and Spread (51), LINE Drive (49, 0: clean), ATMOS
 # Motion (52) and Depth (53); each reaching the engine. At their defaults the sound is as it was. Recorded
 # (build/host/sound-params.wav): two bars of each pushed to an end, after two as they are. COLD SIGNAL, 152.
 listen
@@ -30,28 +30,28 @@ expect engine46 100
 said DECAY
 wait 3200
 turn K4 -25
-# BASS: Tone down (darker)
+# BASS: Decay down (the bite closing at once, a rounder body)
 tap SEL
 wait 30
 expect page 4
-turn K4 -25
+turn K2 -25
 wait 30
 expect param47 0
 expect engine47 0
-said TONE
+said DECAY
 wait 3200
-turn K4 25
+turn K2 25
 # PERC: Open up (the open hat long)
 tap ENV
 wait 30
 expect page 5
-turn K4 25
+turn K2 25
 wait 30
 expect param48 100
 expect engine48 100
 said OPEN
 wait 3200
-turn K4 -25
+turn K2 -25
 # EVENTS: Pitch +7, Spread wide
 tap ENV
 wait 30

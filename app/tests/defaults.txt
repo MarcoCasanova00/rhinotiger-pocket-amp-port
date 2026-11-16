@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# SAVE held 1.5 s on GLOBAL: every knob of every page back where it began (the world's own sound), not kept until SAVE
+# (SAVE lit); the world stays. Tapped there it saves, as before.
+listen
+jack in
+wait 600
+# a few knobs pushed far: MAIN's Energy, the kick's Decay, the bass's Bite, MIX's kick level, the world turned
+turn K1 20
+wait 30
+expect param0 90
+tap SEL
+wait 30
+turn K4 -25
+wait 30
+expect param46 0
+tap SEL
+wait 30
+turn K1 25
+wait 30
+expect param13 100
+tap EDIT
+wait 30
+turn K2 -40
+wait 30
+expect param8 0
+turn PRESET 1
+wait 30
+expect world 3
+tap GLO
+wait 30
+tap SAVE
+wait 30
+expect dirty 0
+# held, but let go before 1.5 s: saved, nothing else
+press SAVE
+wait 1000
+release SAVE
+wait 30
+expect param0 90
+said SAVED
+# held 1.5 s: the defaults
+press SAVE
+wait 1600
+said DEFAULTS
+expect param0 50
+expect param46 50
+expect engine46 50
+expect param13 50
+expect param8 80
+expect engine8 80
+expect world 3
+expect dirty 1
+release SAVE
+wait 30
+unsaid SAVED
+expect dirty 1
+reboot
+wait 600
+expect param0 90
+expect param46 0
+# again, and kept this time
+tap GLO
+wait 30
+press SAVE
+wait 1600
+release SAVE
+wait 30
+tap SAVE
+wait 30
+expect dirty 0
+reboot
+wait 600
+expect param0 50
+expect param46 50
+expect world 3

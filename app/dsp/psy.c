@@ -157,7 +157,7 @@ static const ps_param_t PAR[P_NPARAMS] = {
     {"BREAKS", 0, 100, 50}, {"BREAK", 0, 4, 0}, {"BUILD", 0, 2, 1}, {"GAP", 0, 3, 1},
     {"RANGE", 0, 100, 50}, {"SLIDE", 0, 100, 50}, {"BITE", 0, 100, 50}, {"DECAY", 0, 100, 50},
     {"SEND", 0, 100, 0}, {"SEND", 0, 100, 50},
-    {"DECAY", 0, 100, 50}, {"TONE", 0, 100, 50}, {"OPEN", 0, 100, 50}, {"DRIVE", 0, 100, 0},
+    {"DECAY", 0, 100, 50}, {"DECAY", 0, 100, 50}, {"OPEN", 0, 100, 50}, {"DRIVE", 0, 100, 0},
     {"PITCH", -12, 12, 0}, {"SPREAD", 0, 100, 50}, {"MOTION", 0, 100, 50}, {"DEPTH", 0, 100, 50},
 };
 static const uint8_t BREAK_BARS[5] = {0, 4, 8, 16, 32};   /* P_BREAK_LEN (0: the world's) */
@@ -237,6 +237,9 @@ static struct {
     float g[NG];                       /* the levels, gliding: kick, bass, perc, events, line, the events' send, the echo */
     float echo_d;                      /* the echo's delay in frames, gliding (a tempo moved, a time changed) */
     float dub_ph;                      /* DUB's waver (turns) */
+    float frz_t;                       /* FREEZE: samples since it was pressed (0: not held) */
+    float p_lp[2];                     /* the percussion's TONE's low-pass */
+    float up[2];                       /* the music above the kick and the bass, the sample before (FREEZE's) */
     /* the sections */
     uint8_t sec, drops;
     uint8_t type[NPART];                 /* each part's type (PART_*: the bass's is its colour) */
@@ -286,10 +289,18 @@ static struct {
     float k_drive;                     /* DRIVE: the kick's, of its type's */          /* the clap's, the riser's and the atmos's air's band-passes */
     float a_inc[3];                    /* the atmos's notes, turns a sample */
     float k_body;                      /* DECAY: the kick's body, of its type's (50: 1) */
-    float b_lp;                        /* the bass's low-pass (TONE, Dark) */
+    float k_cut, k_fade;               /* DECAY: under 50 the kick cut short after its drive (1/s, 0: none); over, its
+                                        * end's fade held off (the power of t over its length, 1: straight) */
+    float b_lp;                        /* the bass's low-pass (Dark) */
+    float b_idx_k;                     /* DECAY: how fast the bass's bite closes (1/s) */
+    float b_floor;                     /* DECAY under 50: what stays of the bite, of the world's (1: all) */
+    float b_len;                       /* LENGTH: its notes', of the world's */
     float o_len;                       /* OPEN: the open hat's length, of its type's (50: 1) */
     float l_drive, l_cmp;              /* the line's DRIVE (0: none), its loudness kept */
     float a_rate;                      /* MOTION: the atmos's sway, turns a sample */
+    float a_more;                      /* MOTION past the middle: the sway deeper and opening the atmos (0..1) */
+    float p_thin, p_lp;                /* the percussion's TONE: over 50 the hats thinner (their high-passes' a, less);
+                                        * under, a low-pass over all of it (its coefficient; 1: none) */
 } cf;
 
 #define ECHO_N 20480u                  /* (a dotted eighth at 125 bpm, the slowest a world can be moved to: 15876; DUB
@@ -1185,7 +1196,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
             return;
         s.b_t = 0.0f;
         s.b_cph = s.b_mph = 0.0f;      /* every note from the same place: the roll is tight */
-        s.b_gate = w->gate * (0.6f + 0.8f * (float)par[P_BASS_LEN] / 100.0f) * s.tick_len * (float)span / PS_SR;
+        s.b_gate = w->gate * cf.b_len * s.tick_len * (float)span / PS_SR;   /* (LENGTH) */
         {   /* room for its 3 ms release before the next */
             float most = fm_minf(0.95f * s.tick_len * (float)span / PS_SR, s.tick_len * (float)span / PS_SR - 0.0035f);
             if (s.b_gate > most)
@@ -1226,7 +1237,8 @@ static float kick(float dt)
     if (s.k_ph >= 1.0f)
         s.k_ph -= 1.0f;
     env = fm_expf(-t / (s.k_len * ty[KT_BODY] * cf.k_body));   /* (DECAY: the body; its end stays the bass's) */
-    env *= 1.0f - t / s.k_len;                      /* to nothing by its end: the bass's place stays clear */
+    env *= 1.0f - (cf.k_fade == 1.0f ? t / s.k_len : fm_powf(t / s.k_len, cf.k_fade));   /* to nothing by its end: the
+                                                     * bass's place stays clear (DECAY over 50: later) */
     if (t < 0.0002f)                                /* its first 0.2 ms a slope, not a step (the click too) */
         env *= t / 0.0002f;
     if (ty[KT_FM] > 0.0f) {                         /* KNOCK: a modulator a little off the note, its depth falling fast */
@@ -1239,7 +1251,8 @@ static float kick(float dt)
     x += (t < 0.002f ? 0.35f * punch * ty[KT_CLICK] * (1.0f - t / 0.002f) : 0.0f) * fm_sin_turns(s.k_ph * 7.0f) *   /* the click */
          (t < 0.0002f ? t / 0.0002f : 1.0f);
     s.k_t = t + dt;
-    return fm_tanhf(x * s.k_dr) * ty[KT_LEVEL] * s.k_cmp;
+    x = fm_tanhf(x * s.k_dr) * ty[KT_LEVEL] * s.k_cmp;
+    return cf.k_cut > 0.0f ? x * fm_expf(-t * cf.k_cut) : x;   /* (DECAY under 50: cut short after the drive) */
 }
 
 static const float COLOUR[4][2] = {{1.0f, 1.0f}, {1.0f, 1.35f}, {1.5f, 0.8f}, {0.5f, 1.25f}};   /* ratio, bite */
@@ -1260,7 +1273,7 @@ static float bass(const world_t *w, float dt)
         }
     }
     idx = w->index * bite * (1.0f - 0.5f * depth + depth * s.drift);   /* the slow movement opens and closes it */
-    idx = idx * fm_expf(-t * 1000.0f / w->index_ms) + w->floor * bite;
+    idx = idx * fm_expf(-t * cf.b_idx_k) + w->floor * bite * cf.b_floor;   /* (DECAY: how fast it closes) */
     mo = fm_sin_turns(s.b_mph);
     x = fm_sin_turns(s.b_cph + idx * mo * 0.159155f) * env;
     s.b_cph += s.b_inc;
@@ -1272,7 +1285,7 @@ static float bass(const world_t *w, float dt)
     if (s.b_t >= 0.0f)
         s.b_t = t + dt;
     x = fm_tanhf(x * w->drive * (0.5f + (float)par[P_BASS_DRIVE] / 100.0f));
-    s.lp += (x - s.lp) * cf.b_lp;      /* TONE: brighter or darker (Dark: darker) */
+    s.lp += (x - s.lp) * cf.b_lp;      /* (Dark: darker) */
     return s.lp;
 }
 
@@ -1296,7 +1309,7 @@ static void perc(const world_t *w, float dt, float *l, float *r)
     int i;
     for (i = 0; i < 4; i++)            /* the source, moving to the type's over ~3 ms (the hats ring through it) */
         s.p_w[i] += (pt[PT_NOISE + i] - s.p_w[i]) * 0.008f;
-    a = fm_clampf(w->hat_hp + 0.002f * (float)(par[P_HAT_TONE] - 50) - 0.05f * m.dark + pt[PT_THIN], 0.5f, 0.97f);
+    a = fm_clampf(w->hat_hp - cf.p_thin - 0.05f * m.dark + pt[PT_THIN], 0.4f, 0.97f);   /* (TONE over 50: thinner) */
     src = n * s.p_w[0];
     if (s.p_w[1] > 0.0005f) {          /* TIN: six squares, inharmonic */
         static const float SQ[6] = {307.9f, 456.6f, 554.4f, 784.0f, 810.0f, 1200.0f};
@@ -1427,7 +1440,8 @@ static float atmos(const world_t *w, float n, float *l, float *r)
     colour += 0.4f * build_progress(); /* it opens as the build rises */
     if ((s.a_lfo += cf.a_rate) >= 1.0f)   /* MOTION: how fast it sways (50: 0.05 Hz) */
         s.a_lfo -= 1.0f;
-    wob = fm_sin_turns(s.a_lfo) * (float)par[P_ATMOS_DEPTH] / 50.0f;   /* DEPTH: how far (0..2, 50: 1) */
+    wob = fm_sin_turns(s.a_lfo) * (float)par[P_ATMOS_DEPTH] / 50.0f * (1.0f + 0.6f * cf.a_more);   /* DEPTH: how far (0..2,
+                                                     * 50: 1; MOTION past 50: more) */
     {   /* the type: each of its values moving to the type's over ~45 ms (a held chord: no step) */
         const float *tt = ATMOS_TYPE[s.type[PART_ATMOS]];
         for (i = 0; i < AM_N; i++)
@@ -1449,7 +1463,9 @@ static float atmos(const world_t *w, float n, float *l, float *r)
         if ((s.a_ph[i][1] += inc * (1.0f + s.a_m[AM_DET] * (float)(i + 1))) >= 1.0f)
             s.a_ph[i][1] -= 1.0f;
     }
-    k = fm_minf(fm_clampf(0.03f + 0.35f * colour, 0.02f, 0.6f) * s.a_m[AM_LP], 0.9f);
+    k = fm_minf(fm_clampf(0.03f + 0.35f * colour, 0.02f, 0.6f) * s.a_m[AM_LP] *
+                (cf.a_more > 0.0f ? fm_exp2f(0.6f * cf.a_more * wob) : 1.0f), 0.9f);   /* (MOTION past 50: opening and
+                                                                                        * closing with the sway) */
     s.a_lp[0] += (al - s.a_lp[0]) * k;
     s.a_lp[1] += (ar - s.a_lp[1]) * k;
     {   /* the air: a band of noise, wandering, swaying left and right */
@@ -1484,10 +1500,11 @@ static void flush_states(void)         /* as a block begins: what decays towards
     s.z_g = fm_flush(s.z_g), s.z_low = fm_flush(s.z_low), s.z_band = fm_flush(s.z_band);
     s.a_lvl = fm_flush(s.a_lvl), s.a_lp[0] = fm_flush(s.a_lp[0]), s.a_lp[1] = fm_flush(s.a_lp[1]);
     s.e_lp[0] = fm_flush(s.e_lp[0]), s.e_lp[1] = fm_flush(s.e_lp[1]);
-    s.c_low = fm_flush(s.c_low), s.c_band = fm_flush(s.c_band);
+    s.c_low = fm_flush(s.c_low), s.c_band = fm_flush(s.c_band), s.p_lp[0] = fm_flush(s.p_lp[0]), s.p_lp[1] = fm_flush(s.p_lp[1]);
     ln.lp = fm_flush(ln.lp);
     fx.wet = fm_flush(fx.wet), fx.lo_g = fm_flush(fx.lo_g), fx.hi_g = fm_flush(fx.hi_g);
     fx.band_g = fm_flush(fx.band_g), fx.fl_g = fm_flush(fx.fl_g), fx.riser_g = fm_flush(fx.riser_g), fx.gate_g = fm_flush(fx.gate_g);
+    fx.throw_g = fm_flush(fx.throw_g), fx.frz_g = fm_flush(fx.frz_g), fx.ret_lift = fm_flush(fx.ret_lift);
 }
 
 static void coefs(const world_t *w)    /* as a block begins: what changes slowly */
@@ -1499,7 +1516,8 @@ static void coefs(const world_t *w)    /* as a block begins: what changes slowly
     cf.kick_f0 = note_hz(m.root + par[P_KICK_TUNE]) * (s.bk == PS_BUILD_KICK ? fm_exp2f(bp) : 1.0f);   /* (KICK: an
                                                                                                        * octave up) */
     cf.kick_bright = w->kick_bright;
-    cf.clap_f = 2.0f * fm_sinf(3.14159265f * w->clap_hz *   /* (TRIPLET: rising; SINK: falling an octave) */
+    cf.clap_f = 2.0f * fm_sinf(3.14159265f * w->clap_hz * fm_exp2f((float)(par[P_HAT_TONE] - 50) / 50.0f * 0.8f) *   /* (TONE:
+                                                     * x0.57 .. x1.74; TRIPLET: rising; SINK: falling an octave) */
                                (s.bk == PS_BUILD_TRIP ? fm_exp2f(1.3f * bp) : s.bk == PS_BUILD_SINK ? fm_exp2f(-bp) : 1.0f) / PS_SR);
     cf.z_f = 2.0f * fm_sinf(3.14159265f * 300.0f *   /* 300 Hz to 6.8 kHz (SINK: down) */
                             fm_exp2f(4.5f * (s.bk == PS_BUILD_SINK && s.sec == SEC_BUILD ? 1.0f - bp : bp)) / PS_SR);
@@ -1507,12 +1525,37 @@ static void coefs(const world_t *w)    /* as a block begins: what changes slowly
     cf.air_f = 2.0f * fm_sinf(3.14159265f * (1200.0f + 900.0f * fm_sin_turns(s.a_lfo) + 1500.0f * colour) / PS_SR);
     for (i = 0; i < 3; i++)
         cf.a_inc[i] = note_hz(m.root + IV[m.dark > 0.3f][i]) / PS_SR;
-    cf.k_body = fm_exp2f((float)(par[P_KICK_DECAY] - 50) / 50.0f * 1.3f);   /* x0.4 .. x2.5 */
-    cf.b_lp = fm_clampf((0.45f - 0.2f * m.dark) * fm_exp2f((float)(par[P_BASS_TONE] - 50) / 50.0f * 1.3f), 0.06f, 0.95f);
+    {   /* the kick's DECAY: its body x0.4 .. x2.5; under 50 cut short after its drive too (its drive flattens the body:
+         * the cut is heard), over 50 its end's fade held off (fuller to the bass) */
+        float d = (float)(par[P_KICK_DECAY] - 50) / 50.0f;
+        cf.k_body = fm_exp2f(d * 1.3f);
+        cf.k_cut = d < 0.0f && s.k_len > 0.0f ? -d * 7.0f / s.k_len : 0.0f;
+        cf.k_fade = d > 0.0f ? 1.0f + 3.0f * d : 1.0f;
+    }
+    cf.b_lp = fm_clampf(0.45f - 0.2f * m.dark, 0.06f, 0.95f);
+    {   /* the percussion's TONE: 0 a low-pass at 1.8 kHz over all of it, 50 none, 100 the hats thinner (and the clap's
+         * band higher: cf.clap_f) */
+        int v = par[P_HAT_TONE];
+        cf.p_thin = v > 50 ? 0.007f * (float)(v - 50) : 0.0f;
+        cf.p_lp = v < 50 ? 1.0f - fm_expf(-6.2831853f * 1800.0f * fm_exp2f(3.3f * (float)v / 50.0f) / PS_SR) : 1.0f;
+    }
+    {   /* the bass's DECAY: how long its bite stays, of the world's: x0.25 .. x5 */
+        float d = (float)(par[P_BASS_DECAY] - 50) / 50.0f;
+        cf.b_idx_k = 1000.0f / (w->index_ms * fm_exp2f(d * (d < 0.0f ? 2.0f : 2.3f)));
+        cf.b_floor = d < 0.0f ? 1.0f + 0.7f * d : 1.0f;   /* (under 50 what stays of it less too: a rounder body) */
+    }
+    {   /* the bass's LENGTH: 0 a quarter of the world's, 50 the world's, 100 as long as a note can be (0.95) */
+        int v = par[P_BASS_LEN];
+        cf.b_len = v <= 50 ? fm_exp2f((float)(v - 50) / 25.0f) : 1.0f + (0.95f / w->gate - 1.0f) * (float)(v - 50) / 50.0f;
+    }
     cf.o_len = fm_exp2f((float)(par[P_PERC_OPEN] - 50) / 25.0f);   /* x0.25 .. x4 */
     cf.l_drive = par[P_LINE_DRIVE] ? 1.0f + 0.08f * (float)par[P_LINE_DRIVE] : 0.0f;   /* x1 .. x9 into a tanh */
     cf.l_cmp = cf.l_drive > 0.0f ? fm_powf(cf.l_drive, -0.3f) / fm_tanhf(cf.l_drive) : 1.0f;
-    cf.a_rate = 0.05f * fm_exp2f((float)(par[P_ATMOS_MOTION] - 50) / 25.0f) / PS_SR;   /* 0.0125 .. 0.2 Hz */
+    {   /* MOTION: 0.0125 .. 0.05 Hz (50) .. 0.8 Hz; past 50 the sway deeper and opening and closing it too */
+        int v = par[P_ATMOS_MOTION];
+        cf.a_rate = 0.05f * fm_exp2f((float)(v - 50) / (v <= 50 ? 25.0f : 12.5f)) / PS_SR;
+        cf.a_more = v > 50 ? (float)(v - 50) / 50.0f : 0.0f;
+    }
     fx_block(s.tick_len);
 }
 
@@ -1575,9 +1618,9 @@ void ps_render(float *outl, float *outr, uint32_t n)
             fx.buf_on = 0;
     }
     if (fx.held >> FX_DUB & 1u) {      /* DUB: the echo longer and darker (its time stretching: below); FREEZE: it
-                                        * keeps what it holds */
-        fb = 0.86f;
-        tone = 0.14f;
+                                        * takes in the music for one echo's time, then keeps it (below) */
+        fb = 0.9f;
+        tone = 0.12f;
     }
     if (fx.held >> FX_FREEZE & 1u) {
         fb = 1.0f;
@@ -1636,6 +1679,13 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 s.hp_b[0] = s.hp_b[1] = 0.0f;
             c = kick_g * pg[PART_KICK] * s_kick + bass_g * pg[PART_BASS] * s_bass;
             perc(w, dt, &l, &r);
+            if (cf.p_lp < 1.0f) {      /* TONE under 50: darker */
+                s.p_lp[0] += (l - s.p_lp[0]) * cf.p_lp;
+                s.p_lp[1] += (r - s.p_lp[1]) * cf.p_lp;
+                l = s.p_lp[0];
+                r = s.p_lp[1];
+            } else
+                s.p_lp[0] = s.p_lp[1] = 0.0f;
             l *= pg[PART_PERC];
             r *= pg[PART_PERC];
             send = ev_render(dt, &el, &er) * ev_g * send_g * pg[PART_EVENTS] + perc_g * (l + r) * perc_send;
@@ -1675,10 +1725,10 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 dt_e = fm_minf(dt_e * (1.0f + s.e_tape * (0.005f * fm_sin_turns(s.e_wow) + 0.0015f * fm_sin_turns(s.e_flut))),
                                (float)(ECHO_N - 2u));
             }
-            if (fx.held >> FX_DUB & 1u) {  /* DUB: half again as long over ~2 s, wavering ~0.3 % at 0.7 Hz */
+            if (fx.held >> FX_DUB & 1u) {  /* DUB: half again as long over ~2 s, wavering ~0.6 % at 0.7 Hz */
                 if ((s.dub_ph += 0.7f / PS_SR) >= 1.0f)
                     s.dub_ph -= 1.0f;
-                dt_e = fm_minf(dt_e * 1.5f * (1.0f + 0.003f * fm_sin_turns(s.dub_ph)), (float)(ECHO_N - 2u));
+                dt_e = fm_minf(dt_e * 1.5f * (1.0f + 0.006f * fm_sin_turns(s.dub_ph)), (float)(ECHO_N - 2u));
                 s.echo_d += (dt_e - s.echo_d) * 0.00002f;
             } else
                 s.echo_d += (dt_e - s.echo_d) * 0.0002f;   /* ~0.1 s: a new time a short tape-like slide, no jump (DUB
@@ -1710,6 +1760,21 @@ void ps_render(float *outl, float *outr, uint32_t n)
                     wl = soft(wl * g) / g;
                     wr = soft(wr * g) / g;
                 }
+                if (fx.held >> FX_FREEZE & 1u) {   /* FREEZE: for one echo's time what is above the kick and the
+                                                    * bass (the sample before's) taken in, both sides as they are,
+                                                    * its ends ~2 ms slopes (the loop's seam: no click); then the echo
+                                                    * as it is, again and again */
+                    if (s.frz_t < s.echo_d) {
+                        float win = fm_clampf(fm_minf(s.frz_t, s.echo_d - s.frz_t) / 88.0f, 0.0f, 1.0f);
+                        wl = s.e_lp[0] = s.up[0] * win;
+                        wr = s.e_lp[1] = s.up[1] * win;
+                    } else {
+                        wl = s.e_lp[0] = xl;
+                        wr = s.e_lp[1] = xr;
+                    }
+                    s.frz_t += 1.0f;
+                } else
+                    s.frz_t = 0.0f;
                 echo_buf[0][echo_w % ECHO_N] = (int16_t)(soft(wl) * 32767.0f);   /* (a throw rounded, not cut) */
                 echo_buf[1][echo_w % ECHO_N] = (int16_t)(soft(wr) * 32767.0f);
             }
@@ -1738,8 +1803,13 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 mr += (s.lp_u[1][0] - mr) * s.lp_g;
             } else
                 s.lp_u[0][0] = s.lp_u[0][1] = s.lp_u[1][0] = s.lp_u[1][1] = 0.0f;
-            outl[i] = c + ml + ret_g * xl;
-            outr[i] = c + mr + ret_g * xr;
+            s.up[0] = ml;              /* (FREEZE takes it in) */
+            s.up[1] = mr;
+            {   /* THROW and FREEZE: the return lifted (fx.c) */
+                float rg = fm_maxf(ret_g, fx.ret_lift);
+                outl[i] = c + ml + rg * xl;
+                outr[i] = c + mr + rg * xr;
+            }
             fx_send = fx_render(s.tick_len, &outl[i], &outr[i], ml, mr, n);
             {   /* the master: trimmed (the groove's peaks near 0.88), a limiter over 0.89 (at once down, back in
                  * ~90 ms, the two sides together), and a soft clip for what still gets past */

@@ -16,21 +16,25 @@
  *                            rests a phrase)
  *   3 PHASE (SEQ)            K1..K4 Breaks (how often one comes on its own; 0: only when cued), Break (its bars: the
  *                            world's, 4..32), Build (2, 4, 8 bars), Gap (bars after a drop before one comes on its own)
- *   4 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body)
- *   5 BASS (SEL again)       K1..K4 Bite, Length, Drive, Tone (brighter, darker)
- *   6 PERC (ENV)             K1..K4 Hats, Tone, Clap, Open (the open hat's length)
- *   7 EVENTS (ENV again)     K1..K4 Density, Runs, Pitch (semitones), Spread (left and right)
+ *   4 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body: short and tight, or long and full)
+ *   5 BASS (SEL again)       K1..K4 Bite, Decay (how fast the bite closes), Length, Drive (as LINE's)
+ *   6 PERC (ENV)             K1..K4 Hats, Open (the open hat's length), Clap, Tone (all of it brighter, darker)
+ *   7 EVENTS (ENV again)     K1..K4 Density, Runs, Pitch (semitones), Spread (0 the middle; up, wider, and each
+ *                            crossing to the other side)
  *   8 LINE (LFO)             K1..K4 Bite (the modulation's height), Decay (its fall), Length, Drive
  *   9 LINE SEQ (LFO again)   K1..K4 Density, Mutate, Range (how far the notes go up), Slide (how many)
  *                            On either LINE page LFO acts as it is let go (tapped: the next); held, the line's
  *                            phrase drawn anew from the next bar
- *  10 ATMOS (LFO, a third)   K1..K4 Colour, Air, Motion (its sway's speed), Depth (how far)
+ *  10 ATMOS (LFO, a third)   K1..K4 Colour, Air, Motion (its sway's speed; past the middle the sway also opens and
+ *                            closes it, more), Depth (how far)
  *  11 MIX (EDIT)             K1 the track (the six parts), K2 its level, K3 its send into the echo (the kick and the
  *                            bass: none, not shown), K4 its mute (right on, left off); a strip a track, its meter,
  *                            its level and its send
  *  12 ECHO (FX)              K1..K4 Feedback, Tone, Time, Level (the return)
  *  13 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme; K3 shows the audio's load (CPU); K4 MIDI in
- *                            (off by default); SAVE here keeps it all
+ *                            (off by default); SAVE here keeps it all (tapped: as it is let go); held 1.5 s, every
+ *                            knob of every page back where it began (the world's own sound: the knobs move from it),
+ *                            not kept until SAVE (SAVE lit); the world, the lights, the theme and MIDI stay
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
  * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on PHASE the
  * builds' kind, on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
@@ -45,9 +49,10 @@
  * The keys play no notes: each throws an event into the music on the next sixteenth (dsp/events.c); the screen
  * names it at once. On ECHO (FX) they are the performance instead (dsp/fx.c), and the screen
  * shows them: the white keys a grid of sixteen effects, four rows of four (REPEAT, FILTER, SPACE, MOTION; each row's
- * first key glows), each while held; the black keys the parts, F#3 G#3 A#3 C#4 D#4 F#4 muted (tapped, again: back:
- * KICK, BASS, PERC, LINE, EVENTS, ATMOS), G#4 a fill on the next beat, A#4 and C#5 the kick and the bass out while
- * held, F#5 every part back. A key does what it did when pressed until let go. */
+ * first key glows, the glow's high there), each while held; the black keys the parts, F#3 G#3 A#3 C#4 D#4 F#4 muted
+ * (tapped, again: back; lit while sounding: KICK, BASS, PERC, EVENTS, LINE, ATMOS, the sounds' pages' order), G#4 a
+ * fill on the next beat, A#4 and C#5 the kick and the bass out while held, D#5 both (a break while held), F#5 every
+ * part back. A key does what it did when pressed until let go. */
 #include "fastmath.h"
 #include "psy.h"
 #include "logo.h"
@@ -164,8 +169,8 @@ static int page_par(int p, int k)
         {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
         {P_BREAKS, P_BREAK_LEN, P_BUILD_LEN, P_GAP},
         {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, P_KICK_DECAY},   /* (the levels and the sends: MIX's) */
-        {P_BASS_BITE, P_BASS_LEN, P_BASS_DRIVE, P_BASS_TONE},
-        {P_HATS, P_HAT_TONE, P_CLAP, P_PERC_OPEN},
+        {P_BASS_BITE, P_BASS_DECAY, P_BASS_LEN, P_BASS_DRIVE},   /* (as LINE's) */
+        {P_HATS, P_PERC_OPEN, P_CLAP, P_HAT_TONE},   /* (TONE: all of it, the clap's too) */
         {P_EV_DENSITY, P_EV_RUNS, P_EV_PITCH, P_EV_SPREAD},
         {P_LINE_BITE, P_LINE_DECAY, P_LINE_LEN, P_LINE_DRIVE},
         {P_LINE_DENSITY, P_LINE_MUTATE, P_LINE_RANGE, P_LINE_SLIDE},
@@ -199,6 +204,8 @@ static struct {
     uint8_t arp_held;                    /* ARP held long enough: the drop cued */
     uint32_t lfo_at;                     /* LFO pressed on a LINE page at (tapped: the next page; held: a phrase anew) */
     uint8_t lfo_wait;                    /* LFO down on a LINE page, neither yet */
+    uint32_t save_at;                    /* SAVE pressed on GLOBAL at (tapped: saved; held: the knobs' defaults) */
+    uint8_t save_wait;                   /* SAVE down on GLOBAL, neither yet */
     uint8_t kits_seen;                   /* the engine's kits as last said */
     float meter_s[NPART];                /* the mix's meters as drawn (falling back) */
     uint8_t msg_kit;                     /* the message a kit's: its words its parts' types, in their hues (the parts) */
@@ -488,6 +495,17 @@ static void save(void)
     }
 }
 
+static void knobs_default(void)          /* every page's knobs where they began (not kept: SAVE lit) */
+{
+    int p;
+    for (p = 0; p < P_NPARAMS; p++) {
+        set.par[p] = ps_param(p)->def;
+        ps_set(p, set.par[p]);
+    }
+    set_dirty = 1;
+    app_say("DEFAULTS", "SAVE: KEEP IT");
+}
+
 /* ------------------------------------------------------------ performance --- */
 /* the keys as the performance: key k (0: F3) white (0..15 its place in the grid) or black (0..10) */
 static int key_black(int k) { int pc = (k + 5) % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
@@ -498,8 +516,10 @@ static int key_place(int k)              /* its place among the white keys, or a
         n += key_black(i) == key_black(k);
     return n;
 }
-enum { BK_MUTE0 = 0, BK_FILL = 6, BK_NOKICK, BK_NOBASS, BK_NONE, BK_ALL, NBK };
+enum { BK_MUTE0 = 0, BK_FILL = 6, BK_NOKICK, BK_NOBASS, BK_NOLOW, BK_ALL, NBK };
 static const char *const PART_NAME[NPART] = {"KICK", "BASS", "PERC", "LINE", "EVENTS", "ATMOS"};
+/* the mute keys' parts, in the sounds' pages' order (the events before the line) */
+static const int8_t BK_PART[BK_FILL] = {PART_KICK, PART_BASS, PART_PERC, PART_EVENTS, PART_LINE, PART_ATMOS};
 static const char *const FX_ROW[4] = {"REPEAT", "FILTER", "SPACE", "MOTION"};
 
 
@@ -524,15 +544,20 @@ static void key_down(int k, int vel)
     {
         int b = key_place(k), p;
         if (b < BK_FILL) {
-            ps_mute(b);
-            pf.muted ^= (uint8_t)(1u << b);
-            app_say(PART_NAME[b], pf.muted >> b & 1u ? "MUTED" : "BACK");
+            p = BK_PART[b];
+            ps_mute(p);
+            pf.muted ^= (uint8_t)(1u << p);
+            app_say(PART_NAME[p], pf.muted >> p & 1u ? "MUTED" : "BACK");
         } else if (b == BK_FILL) {
             ps_fill();
             app_say("FILL", "NEXT BEAT");
         } else if (b == BK_NOKICK || b == BK_NOBASS) {
             ps_out(b == BK_NOKICK ? PART_KICK : PART_BASS, 1);
             app_say(b == BK_NOKICK ? "KICK" : "BASS", "OUT");
+        } else if (b == BK_NOLOW) {      /* the kick and the bass out together: a break while held */
+            ps_out(PART_KICK, 1);
+            ps_out(PART_BASS, 1);
+            app_say("KICK+BASS", "OUT");
         } else if (b == BK_ALL) {
             for (p = 0; p < NPART; p++)
                 if (pf.muted >> p & 1u)
@@ -553,8 +578,10 @@ static void key_up(int k)
         ps_fx(id, 0);
     } else {
         int b = key_place(k);
-        if (b == BK_NOKICK || b == BK_NOBASS)
-            ps_out(b == BK_NOKICK ? PART_KICK : PART_BASS, 0);
+        if (b == BK_NOKICK || b == BK_NOLOW)
+            ps_out(PART_KICK, 0);
+        if (b == BK_NOBASS || b == BK_NOLOW)
+            ps_out(PART_BASS, 0);
     }
 }
 
@@ -663,15 +690,24 @@ static void input(void)
         ps_play(!ps_playing());
         app_say(ps_playing() ? "RESTING" : "PLAYING", "");   /* (it changes as the next block starts) */
     }
-    if ((down & 1u << B_SAVE) && ui.page == PG_GLOBAL)
-        save();
-    else if ((down & 1u << B_SAVE) && ps_playing()) {   /* SAVE elsewhere: down, a break */
+    if ((down & 1u << B_SAVE) && ui.page == PG_GLOBAL) {   /* GLOBAL: tapped, saved; held, the defaults */
+        ui.save_at = plat_ms();
+        ui.save_wait = 1;
+    } else if ((down & 1u << B_SAVE) && ps_playing()) {   /* SAVE elsewhere: down, a break */
         int sec = ps_section();
         if (sec == SEC_MAIN) {
             ps_cue(PS_CUE_BREAK);
             app_say("BREAK", "NEXT BAR");
         } else
             app_say(sec == SEC_BREAK ? "IN A BREAK" : "BUILDING", "ARP: UP");
+    }
+    if (ui.save_wait && (btn & 1u << B_SAVE) && plat_ms() - ui.save_at >= 1500u) {
+        ui.save_wait = 0;
+        knobs_default();
+    } else if (ui.save_wait && !(btn & 1u << B_SAVE)) {
+        ui.save_wait = 0;
+        if (ui.page == PG_GLOBAL)
+            save();
     }
     if (down & 1u << B_ARP) {                /* ARP: up, a build and the drop */
         ui.arp_at = plat_ms();
@@ -768,15 +804,20 @@ static void input(void)
                        (ui.oct > 0 ? 1u << B_OCTUP : 0u);
         uint32_t dim = 1u << B_HOME | 1u << B_SEL | 1u << B_ENV | 1u << B_LFO | 1u << B_EDIT | 1u << B_FX | 1u << B_GLO |
                        1u << B_SEQ | 1u << B_REC | 1u << B_SAVE | 1u << B_ARP | 1u << B_PLAY | 1u << B_OCTDN | 1u << B_OCTUP, klit = keys, kdim = 0;
-        if (grid_mode())                     /* the grid: each row's first key glows, a muted part's key is lit */
+        int glow = set.lights;
+        if (grid_mode()) {                   /* the grid: each row's first key glows (the glow's high: it marks the
+                                              * rows), a sounding part's key is lit (muted: dark) */
             for (k = 0; k < NKEYS; k++) {
                 int pl = key_place((int)k);
                 if (!key_black((int)k) && pl % 4 == 0)
                     kdim |= 1u << k;
-                if (key_black((int)k) && pl < NPART && (ps_ui.muted >> pl & 1u))
+                if (key_black((int)k) && pl < BK_FILL && !(ps_ui.muted >> BK_PART[pl] & 1u))
                     klit |= 1u << k;
             }
-        plat_lights(lit, klit, dim, kdim, set.lights);
+            if (glow)
+                glow = 2;
+        }
+        plat_lights(lit, klit, dim, kdim, glow);
     }
 }
 
@@ -980,10 +1021,10 @@ static void draw_grid(void)
             cv_text(x + (44 - tw) / 2, y + 4, &FONT_XS, ps_fx_name(id), on ? C_BLACK : C_WHITE);
         }
     }
-    for (i = 0, c = 8; i < NPART; i++) {     /* the parts, in the black keys' order (c: x) */
-        int mu = ps_ui.muted >> i & 1u;
-        int32_t tw = text_w(&FONT_XS, PART_NAME[i]);
-        cv_text(c, 106, &FONT_XS, PART_NAME[i], mu ? C_LINE : part_txt(PART_HUE[i], 240));
+    for (i = 0, c = 8; i < BK_FILL; i++) {   /* the parts, in the black keys' order (c: x) */
+        int pt = BK_PART[i], mu = ps_ui.muted >> pt & 1u;
+        int32_t tw = text_w(&FONT_XS, PART_NAME[pt]);
+        cv_text(c, 106, &FONT_XS, PART_NAME[pt], mu ? C_LINE : part_txt(PART_HUE[pt], 240));
         if (mu)
             cv_rect(c, 110, tw, 1, C_GRAY);
         c += tw + 10;

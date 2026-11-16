@@ -17,7 +17,7 @@ tapkey b0
 wait 12000
 wav fx.wav
 wait 3200
-# REPEAT 1/2 (w0, from the next beat), 1/4 (w1), 1/8T (w2), then STAIRS (w14)
+# REPEAT 1/4 (w0, from the next beat), 1/4T (w1, from the next beat), 1/8 (w2), then STAIRS (w14)
 key w0 down 90
 wait 3200
 expect fx 1
@@ -91,6 +91,27 @@ wait 1600
 key b8 down 90
 wait 1600
 key b8 up
+wait 1600
+# the mute keys in the sounds' pages' order: D#4 (b4) the line, C#4 (b3) the events
+listen
+tapkey b4
+wait 100
+expect muted 8
+said LINE
+tapkey b4
+tapkey b3
+wait 100
+expect muted 16
+said EVENTS
+tapkey b3
+wait 100
+expect muted 0
+# D#5 (b9): the kick and the bass out together while held
+key b9 down 90
+wait 100
+said KICK+BASS
+wait 1500
+key b9 up
 wait 1600
 wavstop
 # off ECHO the keys are no grid, REC held or not (REC takes the keys into a loop: rec.txt)
