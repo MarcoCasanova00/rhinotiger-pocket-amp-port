@@ -576,11 +576,17 @@ static void key_up(int k)
         int id = key_place(k);
         pf.fx_held &= (uint16_t)~(1u << id);
         ps_fx(id, 0);
-    } else {
-        int b = key_place(k);
-        if (b == BK_NOKICK || b == BK_NOLOW)
+    } else {                             /* the kick and the bass back unless another black key still holds them out */
+        int b = key_place(k), j, kick = 0, bass = 0;
+        for (j = 0; j < (int)NKEYS; j++)
+            if (j != k && (ui.keys >> j & 1u) && pf.role[j] == ROLE_BLACK && key_black(j)) {
+                int o = key_place(j);
+                kick |= o == BK_NOKICK || o == BK_NOLOW;
+                bass |= o == BK_NOBASS || o == BK_NOLOW;
+            }
+        if ((b == BK_NOKICK || b == BK_NOLOW) && !kick)
             ps_out(PART_KICK, 0);
-        if (b == BK_NOBASS || b == BK_NOLOW)
+        if ((b == BK_NOBASS || b == BK_NOLOW) && !bass)
             ps_out(PART_BASS, 0);
     }
 }
@@ -1339,6 +1345,8 @@ int app_expect(const char *what, int *got)
         *got = ps_take();
     else if (!strcmp(what, "lines"))         /* the line's notes so far */
         *got = (int)ps_ui.hits[HIT_LINE];
+    else if (!strcmp(what, "out"))           /* the parts out while a black key is held, 1 << PART_* (the engine's) */
+        *got = ps_stat(7);
     else if (!strcmp(what, "muted"))         /* the parts muted, 1 << PART_* (the engine's) */
         *got = ps_ui.muted;
     else if (!strcmp(what, "fx"))            /* the grid's effects held, 1 << id */

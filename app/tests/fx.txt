@@ -113,6 +113,17 @@ said KICK+BASS
 wait 1500
 key b9 up
 wait 1600
+# A#4 (b7) and D#5 (b9) held, D#5 let go first: the kick stays out until A#4 is let go
+key b7 down 90
+key b9 down 90
+wait 100
+expect out 3
+key b9 up
+wait 100
+expect out 1
+key b7 up
+wait 100
+expect out 0
 wavstop
 # off ECHO the keys are no grid, REC held or not (REC takes the keys into a loop: rec.txt)
 tap HOME

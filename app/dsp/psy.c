@@ -870,6 +870,8 @@ int ps_stat(int which)
     const world_t *w = &W[world];
     int r = 0;
     uint32_t i;
+    if (which == 7)
+        return fx.out;
     if (which <= 3)
         return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : which == 2 ? ev.last_type : (int)ln.drawn;
     for (i = 0; i < LN_STEPS; i++)     /* the line's steps as heard now: 4 on, 5 the highest note, 6 sliding */

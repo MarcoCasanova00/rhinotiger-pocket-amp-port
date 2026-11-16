@@ -136,7 +136,8 @@ void ps_fill(void);
 void ps_key(int k, int down, int value);
 int ps_stat(int which);                /* 0 events begun, 1 thrown and remembered (up to 8), 2 the latest thrown's type,
                                         * 3 the line's phrases drawn whole; its 32 steps as heard now: 4 on, 5 the
-                                        * highest note (over the register), 6 sliding */
+                                        * highest note (over the register), 6 sliding; 7 the parts out
+                                        * while a black key is held (1 << PART_*) */
 const char *ps_event_name(int type);
 int ps_rhythm(void);                   /* the black key held whose rhythm the white keys throw on (-1: none) */
 void ps_rec(int on);                   /* REC: pressed (1), a take of the keys anew; let go (0), it loops (two bars) */
