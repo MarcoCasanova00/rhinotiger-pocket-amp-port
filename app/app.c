@@ -58,6 +58,7 @@
 #include "fastmath.h"
 #include "psy.h"
 #include "logo.h"
+#include "face.h"
 
 #define SET_MAGIC 0x37544852u            /* "RHT7": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
                                           * 4: PHASE's four, the breaks' switch gone into BREAKS; 5: MIX's TOP; 6: the
@@ -857,7 +858,8 @@ typedef struct {
     int16_t center;                      /* the hue they gather round */
     int16_t spread;                      /* 256: as they are; less: folded into center +- 384 * spread / 256 */
     uint8_t sat;                         /* of the saturation, /255 */
-    uint8_t sway, bars;                  /* the sway's depth (% of NEON's), its period (bars) */
+    uint16_t sway;                       /* the sway's depth (% of NEON's) */
+    uint8_t bars;                        /* its period (bars) */
     uint8_t spin, jump;                  /* a build's turning, a drop's jump (%) */
     uint8_t pulse;                       /* a jolt on each beat (hue, falling through the beat) */
     uint8_t brk;                         /* a break's saturation */
@@ -1285,23 +1287,62 @@ static void draw(void)
     draw_knobs(now);
 }
 
-/* the logo: 犀 over 虎, each dot three pixels square, a rainbow downwards on black, the name small under them */
+/* the logo: the rhino-tiger's face behind (face.h, its greys tinted dim, cyan above to violet below, its eyes gold), 犀
+ * over 虎 large on it (each dot four pixels square, ringed in black, a rainbow downwards: magenta to acid green), and
+ * across the middle a band, RHINOTIGER in it. Drawn in two parts (the canvas holds 240 x 144): rows 0..103, 104..239 (the band
+ * whole in the second) */
+#define LOGO_DOT 4
+#define LOGO_X (120 - LOGO_DOT * LOGO_N / 2)
+#define LOGO_Y(ch) (20 + (ch) * (LOGO_DOT * LOGO_N + 4))
+#define LOGO_BAND 106                    /* the band's top; 28 rows */
 static void draw_logo(void)
 {
-    int32_t ch, y, x;
-    lcd_fill(0, 0, 240, 240, RGB(0, 0, 0));
-    for (ch = 0; ch < 2; ch++) {
-        cv_begin(240, 3 * LOGO_N, RGB(0, 0, 0));
-        for (y = 0; y < LOGO_N; y++)
-            for (x = 0; x < LOGO_N; x++)
-                if (LOGO[ch][y] >> (LOGO_N - 1 - x) & 1u)
-                    cv_rect(120 - 3 * LOGO_N / 2 + 3 * x, 3 * y, 3, 3,   /* down the two: magenta to acid green */
-                            hsv(HUE_MAGENTA - (ch * LOGO_N + y) * (HUE_MAGENTA - HUE_ACID) / (2 * LOGO_N), 230, 255));
-        cv_blit(0, 22 + ch * (3 * LOGO_N + 6));
+    static const int32_t PART[3] = {0, 104, 240};
+    uint32_t k = 0, run = 0, lv = 0;
+    int32_t pt, y, x, ch, ring;
+    for (pt = 0; pt < 2; pt++) {
+        int32_t y0 = PART[pt], h = PART[pt + 1] - y0;
+        cv_begin(240, (uint32_t)h, RGB(0, 0, 0));
+        for (y = 0; y < h; y++)              /* the face (its runs read on from the part before) */
+            for (x = 0; x < 240; x++) {
+                if (!run && k < FACE_N) {
+                    lv = FACE[k] >> 4;
+                    run = (FACE[k] & 15u) + 1u;
+                    k++;
+                }
+                if (run)
+                    run--;
+                if (lv >= 14u)               /* the brightest (its eyes alone): glowing gold */
+                    cv_pset(x, y, hsv(HUE_GOLD, 190, (int32_t)lv * 16));
+                else if (lv)
+                    cv_pset(x, y, hsv(HUE_CYAN + (y0 + y) * (HUE_VIOLET - HUE_CYAN) / 240, 170, (int32_t)lv * 11));
+            }
+        for (ring = 1; ring >= 0; ring--)    /* the characters: first their black ring, then them */
+            for (ch = 0; ch < 2; ch++) {
+                int32_t dy, dx;
+                for (dy = 0; dy < LOGO_N; dy++)
+                    for (dx = 0; dx < LOGO_N; dx++)
+                        if (LOGO[ch][dy] >> (LOGO_N - 1 - dx) & 1u) {
+                            int32_t px = LOGO_X + LOGO_DOT * dx, py = LOGO_Y(ch) + LOGO_DOT * dy - y0;
+                            if (ring)
+                                cv_rect(px - 2, py - 2, LOGO_DOT + 4, LOGO_DOT + 4, RGB(0, 0, 0));
+                            else
+                                cv_rect(px, py, LOGO_DOT, LOGO_DOT,
+                                        hsv(HUE_MAGENTA - (ch * LOGO_N + dy) * (HUE_MAGENTA - HUE_ACID) / (2 * LOGO_N), 230, 255));
+                        }
+            }
+        if (pt == 1) {                       /* the band: black, a rainbow's edge above and below, the name in it */
+            int32_t by = LOGO_BAND - y0, tw = text_w(&FONT_M, "RHINOTIGER");
+            cv_rect(0, by, 240, 28, RGB(0, 0, 0));
+            for (x = 0; x < 240; x += 4) {
+                uint16_t c = hsv(HUE_MAGENTA - x * 4, 230, 255);
+                cv_rect(x, by, 4, 2, c);
+                cv_rect(x, by + 26, 4, 2, c);
+            }
+            text_rainbow((240 - tw) / 2, by + 3, &FONT_M, "RHINOTIGER", HUE_MAGENTA, -96, 200, 255);
+        }
+        cv_blit(0, (uint32_t)y0);
     }
-    cv_begin(240, 16, RGB(0, 0, 0));
-    text_rainbow((240 - text_w(&FONT_XS, "RHINOTIGER")) / 2, 2, &FONT_XS, "RHINOTIGER", HUE_MAGENTA, -96, 160, 200);
-    cv_blit(0, 200);
 }
 
 #ifdef APP_SPLASH
