@@ -38,7 +38,7 @@ def turn(p):
     d = p[0] - XC; s = F / (F - d * math.sin(TURN))
     return (round(XC + d * math.cos(TURN) * s / math.cos(TURN) ** .5, 2), round(YC + (p[1] - YC) * s, 2))
 P([turn(q) for q in [(EX,EY),(EX+EW*.48,EY-EH*.2),(EX+EW,EY+EH*.55),(EX+EW*.48,EY+EH*.75)]], fill=g(.95), stroke=DARK, stroke_width="2", stroke_linejoin="miter")
-P([turn(q) for q in [(XC,EY-EH*.12),(XC+4.3,EY+EH*.3),(XC,EY+EH*.7),(XC-4.3,EY+EH*.3)]], fill=DARK)
+P([turn(q) for q in [(XC,EY-EH*.12),(XC+5,EY+EH*.3),(XC,EY+EH*.7),(XC-5,EY+EH*.3)]], fill=DARK)
 # the snout, its broad upper lip, the mouth and a tiger's fangs; the nostrils under the horn
 M=[(120,104),(100,108),(88,150),(78,198),(98,214),(120,216)]
 W(M+mir(M)[::-1][1:-1], fill=g(.3), stroke=g(.6), stroke_width="1.5")
