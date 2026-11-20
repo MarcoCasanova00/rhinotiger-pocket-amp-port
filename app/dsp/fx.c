@@ -6,8 +6,9 @@
  *   REPEAT   1/4, a quarter triplet, 1/8, an eighth triplet: that much of the music, again and again (the quarters
  *            from the next beat, the eighths from the next sixteenth)
  *   FILTER   LOW and HIGH (the cutoff glides down, up), FLANGE (a short swept delay), BAND (a telephone's)
- *   SPACE    THROW (the music, but the kick and the bass, into the echo, its own sound sinking: the echo heard; let
- *            go, it rings on), DUB (into the echo too, the echo darker, longer, its time stretching slowly, wavering
+ *   SPACE    THROW (the music, but the kick and the bass, into the echo, its own sound gone: the echo alone heard,
+ *            bright, ping-ponging from side to side, more of it; let go, the music back, the echo ringing out over a
+ *            few seconds), DUB (into the echo too, the echo darker, longer, its time stretching slowly, wavering
  *            like a tape's: its pitch sinking; let go, it springs back), FREEZE (the music above the kick and the bass
  *            taken into the echo for one echo's time, then looped there, no more in, its own sound sinking beneath),
  *            REVERSE (the last beat, backwards). THROW and FREEZE bring the echo's return up to most of its height
@@ -64,6 +65,7 @@ static struct {
     float gate_g, gate_s, six_el;      /* GATE: its depth (glides), the cut heard, frames since the sixteenth */
     float throw_g, frz_g;              /* THROW, FREEZE: how far the music above the kick and the bass has sunk (glide) */
     float ret_lift;                    /* THROW, FREEZE: the echo's return at least this (falls back over ~2 s) */
+    float throw_t;                     /* THROW's echo: 1 held, falling away over ~2 s after (a block at a time) */
     float lo_f, hi_f, bp_f, rz_f;      /* worked out as a block begins (fx_block) */
     uint8_t muted;                     /* the parts muted (PART_* bits) */
     uint8_t out;                       /* the parts out while a key is held */
@@ -255,10 +257,10 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         fx.frz_g += ((fz ? 1.0f : 0.0f) - fx.frz_g) * (fz ? 0.002f : 0.0006f);
         fx.ret_lift = th || fz ? 0.9f : fx.ret_lift * 0.999985f;   /* (~1.5 s to a third) */
         if (fx.throw_g > 0.0005f || fx.frz_g > 0.0005f) {
-            float sink = (0.6f * fx.throw_g + 0.6f * fx.frz_g) * (1.0f - fx.wet) *
-                         (1.0f - fx.gate_g * fx.gate_s);   /* (GATE's cut already gone) */
-            if (sink > 0.75f)
-                sink = 0.75f;
+            float sink = (fx.throw_g + 0.6f * fx.frz_g) * (1.0f - fx.wet) *
+                         (1.0f - fx.gate_g * fx.gate_s);   /* (GATE's cut already gone; THROW: all of it, the echo alone) */
+            if (sink > 1.0f)
+                sink = 1.0f;
             dl -= sink * upper_l;
             dr -= sink * upper_r;
         }

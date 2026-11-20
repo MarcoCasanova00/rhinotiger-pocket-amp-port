@@ -1661,6 +1661,11 @@ void ps_render(float *outl, float *outr, uint32_t n)
         if (fx.cur.id == FX_AUTO)
             fx.buf_on = 0;
     }
+    fx.throw_t = fx.held >> FX_THROW & 1u ? 1.0f : fm_flush(fx.throw_t * 0.997f);   /* (~2 s to a third) */
+    if (fx.throw_t > 0.0f) {           /* THROW: the echo brighter and longer (ping-pong: below), easing back after */
+        fb += (0.8f - fb) * fx.throw_t * (fb < 0.8f);
+        tone += (0.85f - tone) * fx.throw_t * (tone < 0.85f);
+    }
     if (fx.held >> FX_DUB & 1u) {      /* DUB: the echo longer and darker (its time stretching: below); FREEZE: it
                                         * takes in the music for one echo's time, then keeps it (below) */
         fb = 0.9f;
@@ -1756,7 +1761,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
             if (s.echo_d < 1.0f)
                 s.echo_d = dt_e;
             {   /* the echo's kind, by degrees (~45 ms) */
-                int ek = echo_kind;
+                int ek = fx.throw_t > 0.3f ? PS_ECHO_PING : echo_kind;   /* (THROW: ping-pong, plain) */
                 s.e_route += ((ek == PS_ECHO_STRAIGHT ? 1.0f : 0.0f) - s.e_route) * 0.0005f;
                 s.e_smear += ((ek == PS_ECHO_SMEAR ? 1.0f : 0.0f) - s.e_smear) * 0.0005f;
                 s.e_tape += ((ek == PS_ECHO_TAPE ? 1.0f : 0.0f) - s.e_tape) * 0.0005f;
