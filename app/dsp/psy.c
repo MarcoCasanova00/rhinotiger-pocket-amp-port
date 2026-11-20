@@ -1547,7 +1547,7 @@ static void flush_states(void)         /* as a block begins: what decays towards
     ln.lp = fm_flush(ln.lp);
     fx.wet = fm_flush(fx.wet), fx.lo_g = fm_flush(fx.lo_g), fx.hi_g = fm_flush(fx.hi_g);
     fx.band_g = fm_flush(fx.band_g), fx.fl_g = fm_flush(fx.fl_g), fx.riser_g = fm_flush(fx.riser_g), fx.gate_g = fm_flush(fx.gate_g);
-    fx.throw_g = fm_flush(fx.throw_g), fx.frz_g = fm_flush(fx.frz_g), fx.ret_lift = fm_flush(fx.ret_lift);
+    fx.wash_g = fm_flush(fx.wash_g), fx.frz_g = fm_flush(fx.frz_g), fx.ret_lift = fm_flush(fx.ret_lift);
 }
 
 static void coefs(const world_t *w)    /* as a block begins: what changes slowly */
@@ -1661,11 +1661,6 @@ void ps_render(float *outl, float *outr, uint32_t n)
         if (fx.cur.id == FX_AUTO)
             fx.buf_on = 0;
     }
-    fx.throw_t = fx.held >> FX_THROW & 1u ? 1.0f : fm_flush(fx.throw_t * 0.997f);   /* (~2 s to a third) */
-    if (fx.throw_t > 0.0f) {           /* THROW: the echo brighter and longer (ping-pong: below), easing back after */
-        fb += (0.8f - fb) * fx.throw_t * (fb < 0.8f);
-        tone += (0.85f - tone) * fx.throw_t * (tone < 0.85f);
-    }
     if (fx.held >> FX_DUB & 1u) {      /* DUB: the echo longer and darker (its time stretching: below); FREEZE: it
                                         * takes in the music for one echo's time, then keeps it (below) */
         fb = 0.9f;
@@ -1761,7 +1756,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
             if (s.echo_d < 1.0f)
                 s.echo_d = dt_e;
             {   /* the echo's kind, by degrees (~45 ms) */
-                int ek = fx.throw_t > 0.3f ? PS_ECHO_PING : echo_kind;   /* (THROW: ping-pong, plain) */
+                int ek = echo_kind;
                 s.e_route += ((ek == PS_ECHO_STRAIGHT ? 1.0f : 0.0f) - s.e_route) * 0.0005f;
                 s.e_smear += ((ek == PS_ECHO_SMEAR ? 1.0f : 0.0f) - s.e_smear) * 0.0005f;
                 s.e_tape += ((ek == PS_ECHO_TAPE ? 1.0f : 0.0f) - s.e_tape) * 0.0005f;
@@ -1828,7 +1823,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 echo_buf[1][echo_w % ECHO_N] = (int16_t)(soft(wr) * 32767.0f);
             }
             echo_w++;
-            ml = perc_g * l + ev_g * el + ll + al;     /* above the kick and the bass: THROW and DUB take it */
+            ml = perc_g * l + ev_g * el + ll + al;     /* above the kick and the bass: WASH and DUB take it */
             mr = perc_g * r + ev_g * er + lr + ar;
             if (s.hp_hz > 10.0f) {     /* FILTER: the rest thinned from under too */
                 float f = 6.2831853f * s.hp_hz / PS_SR, hl = ml - s.hp_u[0][0] - s.hp_u[0][1],
@@ -1854,7 +1849,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 s.lp_u[0][0] = s.lp_u[0][1] = s.lp_u[1][0] = s.lp_u[1][1] = 0.0f;
             s.up[0] = ml;              /* (FREEZE takes it in) */
             s.up[1] = mr;
-            {   /* THROW and FREEZE: the return lifted (fx.c) */
+            {   /* FREEZE: the return lifted (fx.c) */
                 float rg = fm_maxf(ret_g, fx.ret_lift);
                 outl[i] = c + ml + rg * xl;
                 outr[i] = c + mr + rg * xr;

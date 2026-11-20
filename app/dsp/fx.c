@@ -6,13 +6,13 @@
  *   REPEAT   1/4, a quarter triplet, 1/8, an eighth triplet: that much of the music, again and again (the quarters
  *            from the next beat, the eighths from the next sixteenth)
  *   FILTER   LOW and HIGH (the cutoff glides down, up), FLANGE (a short swept delay), BAND (a telephone's)
- *   SPACE    THROW (the music, but the kick and the bass, into the echo, its own sound gone: the echo alone heard,
- *            bright, ping-ponging from side to side, more of it; let go, the music back, the echo ringing out over a
- *            few seconds), DUB (into the echo too, the echo darker, longer, its time stretching slowly, wavering
+ *   SPACE    WASH (the music, but the kick and the bass, into a great hall: no repeats, a cloud round it, its own
+ *            sound half sunk into it; let go, the music back, the hall dying away over a few seconds), DUB (into the
+ *            echo, the echo darker, longer, its time stretching slowly, wavering
  *            like a tape's: its pitch sinking; let go, it springs back), FREEZE (the music above the kick and the bass
  *            taken into the echo for one echo's time, then looped there, no more in, its own sound sinking beneath),
- *            REVERSE (the last beat, backwards). THROW and FREEZE bring the echo's return up to most of its height
- *            (ECHO's LEVEL lower), falling back over ~2 s after
+ *            REVERSE (the last beat, backwards). FREEZE brings the echo's return up to most of its height (ECHO's
+ *            LEVEL lower), falling back over ~2 s after
  *   MOTION   TAPE (the music slows to a stop over two beats), RISER (a band of noise rising over two bars), STAIRS (a
  *            sixteenth again and again, a minor third higher each time, up to two octaves), GATE (what is above the
  *            kick and the bass cut in sixteenths; their echo goes on)
@@ -24,10 +24,10 @@
  * buffer keeps it (no more is written, and its count stands: what is behind it stays the music as it went). */
 
 enum { FX_R4, FX_R4T, FX_R8, FX_R8T, FX_LOW, FX_HIGH, FX_FLANGE, FX_BAND,
-       FX_THROW, FX_DUB, FX_FREEZE, FX_REVERSE, FX_TAPE, FX_RISER, FX_STAIRS, FX_GATE, FX_N,
+       FX_WASH, FX_DUB, FX_FREEZE, FX_REVERSE, FX_TAPE, FX_RISER, FX_STAIRS, FX_GATE, FX_N,
        FX_AUTO = FX_N };               /* (the buffer's own: a STUTTER build's repeat, auto_slice; under a key's) */
 static const char *const FX_NAME[FX_N] = {"1/4", "1/4T", "1/8", "1/8T", "LOW", "HIGH", "FLANGE", "BAND",
-                                          "THROW", "DUB", "FREEZE", "REVERSE", "TAPE", "RISER", "STAIRS", "GATE"};
+                                          "WASH", "DUB", "FREEZE", "REVERSE", "TAPE", "RISER", "STAIRS", "GATE"};
 
 #define CAP_N 45056u                   /* frames: 1.02 s (two beats at 125 bpm are 42336) */
 static PLAT_POOL int16_t cap_buf[2][CAP_N];
@@ -63,9 +63,9 @@ static struct {
     float fl_ph;
     float riser_g, riser_t, rz[2];
     float gate_g, gate_s, six_el;      /* GATE: its depth (glides), the cut heard, frames since the sixteenth */
-    float throw_g, frz_g;              /* THROW, FREEZE: how far the music above the kick and the bass has sunk (glide) */
-    float ret_lift;                    /* THROW, FREEZE: the echo's return at least this (falls back over ~2 s) */
-    float throw_t;                     /* THROW's echo: 1 held, falling away over ~2 s after (a block at a time) */
+    float wash_g, frz_g;               /* WASH, FREEZE: how far the music above the kick and the bass has sunk (glide) */
+    float ret_lift;                    /* FREEZE: the echo's return at least this (falls back over ~2 s) */
+    uint32_t wash_n;                   /* WASH's hall: frames it still sounds (0: quiet, cleared, not worked) */
     float lo_f, hi_f, bp_f, rz_f;      /* worked out as a block begins (fx_block) */
     uint8_t muted;                     /* the parts muted (PART_* bits) */
     uint8_t out;                       /* the parts out while a key is held */
@@ -199,7 +199,58 @@ static void svf(float st[2], float x, float f, float q)   /* Chamberlin: st[0] l
     st[0] += f * st[1];
 }
 
-/* the effects over the mix, a frame: l and r in place; what goes to the echo returned (THROW, DUB); n a noise */
+/* WASH's hall: four lines feeding back through a Householder matrix (each line into all), damped, the input spread by
+ * two all-passes a side first; its tail ~6 s (RT60), its lines int16 (27 KB) */
+#define WV_RT60 6.0f
+#define WASH_RET 1.3f                  /* the hall's return */
+static const uint16_t WV_LEN[4] = {2423, 3011, 3709, 4421};   /* (55 to 100 ms, prime) */
+static const uint16_t WD_LEN[4] = {223, 557, 241, 593};      /* the all-passes: left two, right two */
+static int16_t wv_buf[2423 + 3011 + 3709 + 4421];
+static float wd_buf[223 + 557 + 241 + 593], wv_lp[4], wv_fb[4];
+static uint16_t wv_pos[4], wd_pos[4];
+static void wash_clear(void)
+{
+    uint32_t k;
+    for (k = 0; k < sizeof wv_buf / sizeof wv_buf[0]; k++)
+        wv_buf[k] = 0;
+    for (k = 0; k < sizeof wd_buf / sizeof wd_buf[0]; k++)
+        wd_buf[k] = 0.0f;
+    for (k = 0; k < 4u; k++)
+        wv_lp[k] = 0.0f;
+}
+static void wash(float in_l, float in_r, float *out_l, float *out_r)
+{
+    float y[4], sum, x[2] = {in_l, in_r};
+    int16_t *b = wv_buf;
+    float *a = wd_buf;
+    int k, c;
+    if (wv_fb[0] == 0.0f)              /* (the lines' gains for the tail: once) */
+        for (k = 0; k < 4; k++)
+            wv_fb[k] = fm_exp2f(-3.0f * 3.3219281f * (float)WV_LEN[k] / (WV_RT60 * PS_SR));
+    for (c = 0; c < 2; c++)            /* the input spread */
+        for (k = c * 2; k < c * 2 + 2; k++) {
+            float d = a[wd_pos[k]], o = d - 0.6f * x[c];
+            a[wd_pos[k]] = x[c] + 0.6f * o;
+            if (++wd_pos[k] >= WD_LEN[k])
+                wd_pos[k] = 0;
+            a += WD_LEN[k];
+            x[c] = o;
+        }
+    for (k = 0, b = wv_buf; k < 4; b += WV_LEN[k], k++)
+        y[k] = (float)b[wv_pos[k]] * (1.0f / 32768.0f);
+    sum = 0.5f * (y[0] + y[1] + y[2] + y[3]);
+    for (k = 0, b = wv_buf; k < 4; b += WV_LEN[k], k++) {
+        float f = y[k] - sum;          /* (Householder: each into all, the energy kept) */
+        wv_lp[k] += (f - wv_lp[k]) * 0.42f;   /* (damped: the tail darkening, ~3 kHz) */
+        b[wv_pos[k]] = (int16_t)(fm_clampf(wv_lp[k] * wv_fb[k] + x[k & 1] * 0.5f, -1.0f, 1.0f) * 32767.0f);
+        if (++wv_pos[k] >= WV_LEN[k])
+            wv_pos[k] = 0;
+    }
+    *out_l = y[0] + y[2];
+    *out_r = y[1] + y[3];
+}
+
+/* the effects over the mix, a frame: l and r in place; what goes to the echo returned (DUB); n a noise */
 static float fx_render(float tick_len, float *l, float *r, float upper_l, float upper_r, float n)
 {
     float dl = *l, dr = *r, bl = 0.0f, br = 0.0f, send = 0.0f, g;
@@ -249,20 +300,30 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
                                                                  * and the bass, untouched unless replayed) */
         dr -= cut * (dr - (1.0f - fx.wet) * (*r - upper_r));
     }
-    /* THROW and FREEZE (its taking in is psy.c's): what is above the kick and the bass sinking beneath the echo (~10
-     * ms down, ~40 ms back; a buffer's replay, all of it, stays) */
+    /* WASH and FREEZE (its taking in is psy.c's): what is above the kick and the bass sinking beneath the hall, the
+     * echo (~10 ms down, ~40 ms back; a buffer's replay, all of it, stays) */
     {
-        int th = fx.held >> FX_THROW & 1u, fz = fx.held >> FX_FREEZE & 1u;
-        fx.throw_g += ((th ? 1.0f : 0.0f) - fx.throw_g) * (th ? 0.002f : 0.0006f);
+        int wa = fx.held >> FX_WASH & 1u, fz = fx.held >> FX_FREEZE & 1u;
+        fx.wash_g += ((wa ? 1.0f : 0.0f) - fx.wash_g) * (wa ? 0.002f : 0.0006f);
         fx.frz_g += ((fz ? 1.0f : 0.0f) - fx.frz_g) * (fz ? 0.002f : 0.0006f);
-        fx.ret_lift = th || fz ? 0.9f : fx.ret_lift * 0.999985f;   /* (~1.5 s to a third) */
-        if (fx.throw_g > 0.0005f || fx.frz_g > 0.0005f) {
-            float sink = (fx.throw_g + 0.6f * fx.frz_g) * (1.0f - fx.wet) *
-                         (1.0f - fx.gate_g * fx.gate_s);   /* (GATE's cut already gone; THROW: all of it, the echo alone) */
-            if (sink > 1.0f)
-                sink = 1.0f;
+        fx.ret_lift = fz ? 0.9f : fx.ret_lift * 0.999985f;   /* (~1.5 s to a third) */
+        if (fx.wash_g > 0.0005f || fx.frz_g > 0.0005f) {
+            float sink = (0.6f * fx.wash_g + 0.6f * fx.frz_g) * (1.0f - fx.wet) *
+                         (1.0f - fx.gate_g * fx.gate_s);   /* (GATE's cut already gone) */
+            if (sink > 0.75f)
+                sink = 0.75f;
             dl -= sink * upper_l;
             dr -= sink * upper_r;
+        }
+        if (wa)                        /* the hall: sounding while held and ~8 s after, then cleared and still */
+            fx.wash_n = 8u * (uint32_t)PS_SR;
+        if (fx.wash_n) {
+            float wl, wr;
+            wash(upper_l * fx.wash_g, upper_r * fx.wash_g, &wl, &wr);
+            dl += WASH_RET * wl;
+            dr += WASH_RET * wr;
+            if (!--fx.wash_n)
+                wash_clear();
         }
     }
     /* the filters: LOW down to 250 Hz, HIGH up to 1.6 kHz, BAND a telephone, FLANGE */
@@ -303,9 +364,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         dl *= 1.0f - 0.3f * fx.fl_g;
         dr *= 1.0f - 0.3f * fx.fl_g;
     }
-    /* THROW and DUB: what is above the kick and the bass, into the echo */
-    if (fx.held >> FX_THROW & 1u)
-        send += 1.2f * (upper_l + upper_r);
+    /* DUB: what is above the kick and the bass, into the echo */
     if (fx.held >> FX_DUB & 1u)
         send += 0.75f * (upper_l + upper_r);
     /* RISER: a band of noise, rising over two bars while held */
