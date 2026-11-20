@@ -53,8 +53,13 @@ typedef struct {
     float level;
     float hx;                          /* SHARD: the sample held, */
     uint8_t hold, hc;                  /* for hold samples (0: none), counted */
-    float cph, mph, lph;
+    uint8_t cn;                        /* samples to the next control point (0: one now; EV_CTL apart) */
+    float cph, mph;
+    /* at the control rate (EV_CTL samples), the rest straight between: the pitch (as the carrier's step a sample),
+     * the modulation, the gains left and right (the envelope, the level, the pan); now, and at the next point */
+    float fi, ix, gl, gr, fi1, ix1, gl1, gr1;
 } evoice_t;
+#define EV_CTL 16u
 
 #define EV_LOOP 64u                    /* the generator's loop: 4 bars of sixteenths */
 #define EV_MEM 8
@@ -202,7 +207,9 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
     if (r->run == RUN_STAIRS)
         f *= fm_exp2f((float)(i * (r->type <= EV_GROWL ? -3 : 3)) / 12.0f);   /* up a minor third a step (low: down) */
     v->t = 0.0f;
-    v->cph = v->mph = v->lph = 0.0f;
+    v->cph = v->mph = 0.0f;
+    v->cn = 0;
+    v->gl1 = v->gr1 = 0.0f;            /* (its first point: from silence, as its attack began from it) */
     v->glide_k = 0.0f;
     v->lfo_hz = v->lfo_pitch = v->lfo_idx = 0.0f;
     v->pan0 = 0.8f * (2.0f * a - 1.0f);
@@ -539,6 +546,28 @@ static float ev_highpass(int ch, float x)   /* ~180 Hz, 12 dB an octave: the eve
     return y2;
 }
 
+/* a voice's control point at t (seconds into it): the carrier's step a sample, the modulation, the gains */
+static void ev_ctl(evoice_t *v, float t, float dt, float wide, float law, float cross)
+{
+    float u = t < v->dur ? t / v->dur : 1.0f, g, f, lfo = 0.0f, amp, pan, p1;
+    g = v->glide_k > 0.0f ? (1.0f - fm_expf(-v->glide_k * u)) / (1.0f - fm_expf(-v->glide_k)) : u;
+    f = v->f0 * fm_exp2f(v->oct * g);
+    if (v->lfo_hz > 0.0f) {            /* (its phase from the start: the rate is fixed) */
+        float ph = v->lfo_hz * t;
+        lfo = fm_sin_turns(ph - fm_floorf(ph));
+        f *= 1.0f + v->lfo_pitch * lfo;
+    }
+    if (f > 16000.0f)
+        f = 16000.0f;
+    v->fi1 = f * dt;
+    v->ix1 = (v->idx0 + (v->idx1 - v->idx0) * u + v->lfo_idx * lfo) * 0.159155f;
+    amp = (t < 0.001f ? t / 0.001f : 1.0f) * fm_expf(-t / v->tau) * (1.0f - u * u) * v->level * 0.28f;
+    p1 = v->pan1 + (-v->pan0 - v->pan1) * cross;   /* (SPREAD past 50: crossing) */
+    pan = fm_clampf((v->pan0 + (p1 - v->pan0) * u) * wide, -1.0f, 1.0f);
+    v->gl1 = amp * (1.0f - law * pan);
+    v->gr1 = amp * (1.0f + law * pan);
+}
+
 static float ev_render(float dt, float *l, float *r)
 {
     /* SPREAD: 0 all in the middle, 50 as each event has it, 100 three times as far (to the sides), the pan's law
@@ -549,47 +578,47 @@ static float ev_render(float dt, float *l, float *r)
     int k;
     for (k = 0; k < EV_NVOICE; k++) {
         evoice_t *v = &ev.v[k];
-        float u, g, f, idx, x, amp, pan, lfo;
+        float x;
         if (v->t < 0.0f)
             continue;
         if (v->t >= v->dur) {
             v->t = -1.0f;
             continue;
         }
-        u = v->t / v->dur;
-        g = v->glide_k > 0.0f ? (1.0f - fm_expf(-v->glide_k * u)) / (1.0f - fm_expf(-v->glide_k)) : u;
-        f = v->f0 * fm_exp2f(v->oct * g);
-        lfo = 0.0f;
-        if (v->lfo_hz > 0.0f) {
-            v->lph += v->lfo_hz * dt;
-            if (v->lph >= 1.0f)
-                v->lph -= 1.0f;
-            lfo = fm_sin_turns(v->lph);
-            f *= 1.0f + v->lfo_pitch * lfo;
+        if (!v->cn) {                  /* a control point: on from where the last one aimed, to the next */
+            if (v->t == 0.0f)
+                ev_ctl(v, 0.0f, dt, wide, law, cross);
+            v->fi = v->fi1;
+            v->ix = v->ix1;
+            v->gl = v->gl1;
+            v->gr = v->gr1;
+            ev_ctl(v, v->t + (float)EV_CTL * dt, dt, wide, law, cross);
+            v->cn = EV_CTL;
         }
-        if (f > 16000.0f)
-            f = 16000.0f;
-        idx = v->idx0 + (v->idx1 - v->idx0) * u + v->lfo_idx * lfo;
-        v->mph += f * v->ratio * dt;
-        v->mph -= fm_floorf(v->mph);
-        v->cph += f * dt;
-        v->cph -= fm_floorf(v->cph);
-        x = fm_sin_turns(v->cph + idx * fm_sin_turns(v->mph) * 0.159155f);
-        amp = (v->t < 0.001f ? v->t / 0.001f : 1.0f) * fm_expf(-v->t / v->tau) * (1.0f - u * u);
-        if (v->hold) {                 /* (SHARD) held in steps */
-            if (v->hc == 0u)
-                v->hx = x;
-            if (++v->hc >= v->hold)
-                v->hc = 0;
-            x = v->hx;
-        }
-        x = fm_tanhf(1.4f * x) * amp * v->level * 0.28f;
         {
-            float p1 = v->pan1 + (-v->pan0 - v->pan1) * cross;   /* (SPREAD past 50: crossing) */
-            pan = fm_clampf((v->pan0 + (p1 - v->pan0) * u) * wide, -1.0f, 1.0f);
+            const float w = 1.0f / (float)EV_CTL, a = (float)(EV_CTL - v->cn) * w;   /* (its share of the way) */
+            float fi = v->fi + (v->fi1 - v->fi) * a, ix = v->ix + (v->ix1 - v->ix) * a;
+            v->mph += fi * v->ratio;
+            v->mph -= fm_floorf(v->mph);
+            v->cph += fi;
+            v->cph -= fm_floorf(v->cph);
+            x = fm_sin_turns(v->cph + ix * fm_sin_turns(v->mph));
+            if (v->hold) {             /* (SHARD) held in steps */
+                if (v->hc == 0u)
+                    v->hx = x;
+                if (++v->hc >= v->hold)
+                    v->hc = 0;
+                x = v->hx;
+            }
+            {                          /* tanh(1.4 x) for x in -1..1: an odd polynomial (within 2e-5), no exp, no divide */
+                float z = x * x;
+                x *= 1.39991761f + z * (-0.912032723f + z * (0.692545849f + z * (-0.466315745f + z * (0.222434431f +
+                     z * -0.0512179515f))));
+            }
+            el += x * (v->gl + (v->gl1 - v->gl) * a);
+            er += x * (v->gr + (v->gr1 - v->gr) * a);
         }
-        el += x * (1.0f - law * pan);
-        er += x * (1.0f + law * pan);
+        v->cn--;
         v->t += dt;
     }
     el = hp2(&ev_hp2[0], ev_highpass(0, el), 0.9747f);   /* (twice: 24 dB an octave, a dive's depths out) */
