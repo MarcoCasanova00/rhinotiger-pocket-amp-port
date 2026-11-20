@@ -1547,7 +1547,7 @@ static void flush_states(void)         /* as a block begins: what decays towards
     ln.lp = fm_flush(ln.lp);
     fx.wet = fm_flush(fx.wet), fx.lo_g = fm_flush(fx.lo_g), fx.hi_g = fm_flush(fx.hi_g);
     fx.band_g = fm_flush(fx.band_g), fx.fl_g = fm_flush(fx.fl_g), fx.riser_g = fm_flush(fx.riser_g), fx.gate_g = fm_flush(fx.gate_g);
-    fx.wash_g = fm_flush(fx.wash_g), fx.frz_g = fm_flush(fx.frz_g), fx.ret_lift = fm_flush(fx.ret_lift);
+    fx.wash_g = fm_flush(fx.wash_g), fx.dub_g = fm_flush(fx.dub_g), fx.frz_g = fm_flush(fx.frz_g), fx.ret_lift = fm_flush(fx.ret_lift);
 }
 
 static void coefs(const world_t *w)    /* as a block begins: what changes slowly */
@@ -1664,7 +1664,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
     if (fx.held >> FX_DUB & 1u) {      /* DUB: the echo longer and darker (its time stretching: below); FREEZE: it
                                         * takes in the music for one echo's time, then keeps it (below) */
         fb = 0.9f;
-        tone = 0.12f;
+        tone = 0.16f;
     }
     if (fx.held >> FX_FREEZE & 1u) {
         fb = 1.0f;
@@ -1769,10 +1769,10 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 dt_e = fm_minf(dt_e * (1.0f + s.e_tape * (0.005f * fm_sin_turns(s.e_wow) + 0.0015f * fm_sin_turns(s.e_flut))),
                                (float)(ECHO_N - 2u));
             }
-            if (fx.held >> FX_DUB & 1u) {  /* DUB: half again as long over ~2 s, wavering ~0.6 % at 0.7 Hz */
+            if (fx.held >> FX_DUB & 1u) {  /* DUB: half again as long over ~2 s, wavering ~0.9 % at 0.7 Hz */
                 if ((s.dub_ph += 0.7f / PS_SR) >= 1.0f)
                     s.dub_ph -= 1.0f;
-                dt_e = fm_minf(dt_e * 1.5f * (1.0f + 0.006f * fm_sin_turns(s.dub_ph)), (float)(ECHO_N - 2u));
+                dt_e = fm_minf(dt_e * 1.5f * (1.0f + 0.009f * fm_sin_turns(s.dub_ph)), (float)(ECHO_N - 2u));
                 s.echo_d += (dt_e - s.echo_d) * 0.00002f;
             } else
                 s.echo_d += (dt_e - s.echo_d) * 0.0002f;   /* ~0.1 s: a new time a short tape-like slide, no jump (DUB

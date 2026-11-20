@@ -8,7 +8,7 @@
  *   FILTER   LOW and HIGH (the cutoff glides down, up), FLANGE (a short swept delay), BAND (a telephone's)
  *   SPACE    WASH (the music, but the kick and the bass, into a great hall: no repeats, a cloud round it, its own
  *            sound half sunk into it; let go, the music back, the hall dying away over a few seconds), DUB (into the
- *            echo, the echo darker, longer, its time stretching slowly, wavering
+ *            echo, its return up, its own sound a third sunk, the echo darker, longer, its time stretching slowly, wavering
  *            like a tape's: its pitch sinking; let go, it springs back), FREEZE (the music above the kick and the bass
  *            taken into the echo for one echo's time, then looped there, no more in, its own sound sinking beneath),
  *            REVERSE (the last beat, backwards). FREEZE brings the echo's return up to most of its height (ECHO's
@@ -63,8 +63,8 @@ static struct {
     float fl_ph;
     float riser_g, riser_t, rz[2];
     float gate_g, gate_s, six_el;      /* GATE: its depth (glides), the cut heard, frames since the sixteenth */
-    float wash_g, frz_g;               /* WASH, FREEZE: how far the music above the kick and the bass has sunk (glide) */
-    float ret_lift;                    /* FREEZE: the echo's return at least this (falls back over ~2 s) */
+    float wash_g, frz_g, dub_g;        /* WASH, FREEZE, DUB: how far the music above the kick and the bass has sunk (glide) */
+    float ret_lift;                    /* FREEZE, DUB: the echo's return at least this (falls back over ~2 s) */
     uint32_t wash_n;                   /* WASH's hall: frames it still sounds (0: quiet, cleared, not worked) */
     float lo_f, hi_f, bp_f, rz_f;      /* worked out as a block begins (fx_block) */
     uint8_t muted;                     /* the parts muted (PART_* bits) */
@@ -303,12 +303,13 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     /* WASH and FREEZE (its taking in is psy.c's): what is above the kick and the bass sinking beneath the hall, the
      * echo (~10 ms down, ~40 ms back; a buffer's replay, all of it, stays) */
     {
-        int wa = fx.held >> FX_WASH & 1u, fz = fx.held >> FX_FREEZE & 1u;
+        int wa = fx.held >> FX_WASH & 1u, fz = fx.held >> FX_FREEZE & 1u, du = fx.held >> FX_DUB & 1u;
         fx.wash_g += ((wa ? 1.0f : 0.0f) - fx.wash_g) * (wa ? 0.002f : 0.0006f);
         fx.frz_g += ((fz ? 1.0f : 0.0f) - fx.frz_g) * (fz ? 0.002f : 0.0006f);
-        fx.ret_lift = fz ? 0.9f : fx.ret_lift * 0.999985f;   /* (~1.5 s to a third) */
-        if (fx.wash_g > 0.0005f || fx.frz_g > 0.0005f) {
-            float sink = (0.6f * fx.wash_g + 0.6f * fx.frz_g) * (1.0f - fx.wet) *
+        fx.dub_g += ((du ? 1.0f : 0.0f) - fx.dub_g) * (du ? 0.002f : 0.0006f);
+        fx.ret_lift = fz || du ? 0.9f : fx.ret_lift * 0.999985f;   /* (~1.5 s to a third) */
+        if (fx.wash_g > 0.0005f || fx.frz_g > 0.0005f || fx.dub_g > 0.0005f) {
+            float sink = (0.6f * fx.wash_g + 0.6f * fx.frz_g + 0.35f * fx.dub_g) * (1.0f - fx.wet) *
                          (1.0f - fx.gate_g * fx.gate_s);   /* (GATE's cut already gone) */
             if (sink > 0.75f)
                 sink = 0.75f;
@@ -366,7 +367,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     }
     /* DUB: what is above the kick and the bass, into the echo */
     if (fx.held >> FX_DUB & 1u)
-        send += 0.75f * (upper_l + upper_r);
+        send += 1.1f * (upper_l + upper_r);
     /* RISER: a band of noise, rising over two bars while held */
     fx.riser_g += ((fx.held >> FX_RISER & 1u ? 1.0f : 0.0f) - fx.riser_g) * 0.003f;
     if (fx.riser_g > 0.0005f) {
