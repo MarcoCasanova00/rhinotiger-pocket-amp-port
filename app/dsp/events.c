@@ -147,19 +147,20 @@ static const key_sound_t KEY_SOUND[16] = {
 };
 
 /* the black keys' rhythms, F#3 to F#5: the ticks between throws (24 a beat), going round, the first where the tick in
- * the beat modulo grid is phase; a pitch step a throw */
-static const struct { uint8_t n; uint8_t iv[13]; uint8_t grid, phase; int8_t step; } KEY_RHYTHM[11] = {
-    {1, {18}, 6, 0, 0},                                      /* F#3 dotted eighths */
-    {1, {12}, 6, 0, 0},                                      /* G#3 eighths */
-    {1, {8}, 6, 0, 0},                                       /* A#3 eighth triplets */
-    {3, {12, 6, 6}, 6, 0, 0},                                /* C#4 a gallop, x.xx */
-    {1, {24}, 24, 12, 0},                                    /* D#4 the offbeat eighths (once a beat, on its half) */
-    {1, {4}, 6, 0, 0},                                       /* F#4 sixteenth triplets */
-    {3, {18, 18, 12}, 6, 0, 0},                              /* G#4 3-3-2 over two beats */
-    {13, {6, 6, 6, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2}, 6, 0, 0},  /* A#4 faster and faster (two beats) */
-    {13, {2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 6, 6, 6}, 6, 0, 0},  /* C#5 slower and slower */
-    {1, {6}, 6, 0, 3},                                       /* D#5 sixteenths climbing (a minor third each, eight) */
-    {1, {6}, 6, 0, -3},                                      /* F#5 sixteenths falling */
+ * the beat modulo grid is phase; a pitch step a throw. Or a pattern of the bar's sixteenths (mask, bit i the i-th):
+ * where the bar is, from the next sixteenth (never out of step with the groove, nothing waited for) */
+static const struct { uint8_t n; uint8_t iv[13]; uint8_t grid, phase; int8_t step; uint16_t mask; } KEY_RHYTHM[11] = {
+    {1, {18}, 6, 0, 0, 0},                                   /* F#3 dotted eighths */
+    {1, {12}, 12, 0, 0, 0},                                  /* G#3 eighths (on the eighths) */
+    {1, {8}, 8, 0, 0, 0},                                    /* A#3 eighth triplets (on theirs) */
+    {0, {0}, 6, 0, 0, 0xDDDDu},                              /* C#4 a gallop, x.xx a beat */
+    {0, {0}, 6, 0, 0, 0x4444u},                              /* D#4 the offbeat eighths, ..x. a beat */
+    {0, {0}, 6, 0, 0, 0xAAAAu},                              /* F#4 SKIP: the second and fourth sixteenths, .x.x */
+    {0, {0}, 6, 0, 0, 0x4949u},                              /* G#4 3-3-2 each half bar, x..x..x. */
+    {13, {6, 6, 6, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2}, 6, 0, 0, 0},  /* A#4 faster and faster (two beats) */
+    {13, {2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 6, 6, 6}, 6, 0, 0, 0},  /* C#5 slower and slower */
+    {1, {6}, 6, 0, 3, 0},                                    /* D#5 sixteenths climbing (a minor third each, eight) */
+    {1, {6}, 6, 0, -3, 0},                                   /* F#5 sixteenths falling */
 };
 
 static int key_white(int k)            /* the white keys' index (k white) */
@@ -484,7 +485,17 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
                 ps_ui.hits[HIT_EVENT]++;
             }
     }
-    if (ev.rk >= 0 && !(ev.rstart && t % KEY_RHYTHM[key_blacki(ev.rk)].grid != KEY_RHYTHM[key_blacki(ev.rk)].phase) &&
+    if (ev.rk >= 0 && KEY_RHYTHM[key_blacki(ev.rk)].mask) {   /* a pattern's: on its sixteenths of the bar */
+        ev.rstart = 0;
+        if (t % 6u == 0u && (KEY_RHYTHM[key_blacki(ev.rk)].mask >> (pos16 % 16u) & 1u)) {
+            uint32_t whites = (ev.down | ev.pending) & ~KEY_BLACKS;
+            ev.pending = 0;
+            for (k = 0; k < 27; k++)
+                if (whites >> k & 1u)
+                    key_throw(k, 0);
+            ev.ri++;
+        }
+    } else if (ev.rk >= 0 && !(ev.rstart && t % KEY_RHYTHM[key_blacki(ev.rk)].grid != KEY_RHYTHM[key_blacki(ev.rk)].phase) &&
         (ev.rstart || --ev.rwait == 0u)) {   /* a rhythm's beat (its first on its grid) */
         int b = key_blacki(ev.rk), stepped = (int)(ev.ri % 8u) * (int)KEY_RHYTHM[b].step;
         uint32_t whites = (ev.down | ev.pending) & ~KEY_BLACKS;   /* (held, or tapped since its last beat) */

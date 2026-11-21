@@ -418,8 +418,10 @@ turning a little each time round. What you throw is remembered, and now and then
 With ALGORITHM on the EVENTS page you change the type of all of them (see 5.7).
 
 **The black keys.** There are 11, F#3 to F#5. Hold one and it becomes a rhythm: the white keys held with it throw on its
-beats instead of on every sixteenth. Held alone, it makes no sound. Let go and the sixteenths come back. The name of the
-rhythm shows to the left of the event's name.
+beats instead of on every sixteenth. The eighths and the triplets fall on their own places in the beat, and GALLOP,
+OFFBEAT, SKIP and 3-3-2 are patterns of the bar: whenever you press, they are in step with the groove, from the next
+sixteenth. Held alone, it makes no sound. Let go and the sixteenths come back. The name of the rhythm shows to the left
+of the event's name.
 
 ![A black key held with a white key: GALLOP and ZAP at the lower right](img/screen-rhythm.png "GALLOP, with ZAP")
 
@@ -428,10 +430,10 @@ rhythm shows to the left of the event's name.
 | F#3 | 3/16: dotted eighths |
 | G#3 | 1/8: eighths |
 | A#3 | 1/8T: eighth triplets |
-| C#4 | GALLOP |
-| D#4 | OFFBEAT: the offbeat eighths |
-| F#4 | 1/16T: sixteenth triplets |
-| G#4 | 3-3-2: over two beats |
+| C#4 | GALLOP: x.xx on each beat |
+| D#4 | OFFBEAT: the offbeat eighths, ..x. on each beat |
+| F#4 | SKIP: the second and fourth sixteenths, .x.x on each beat |
+| G#4 | 3-3-2: x..x..x. on each half bar |
 | A#4 | FASTER: speeding up over two beats |
 | C#5 | SLOWER: slowing down over two beats |
 | D#5 | CLIMB: sixteenths climbing a minor third each time, eight steps |
