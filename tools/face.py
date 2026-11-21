@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The boot's face (app/face.h): a rhino-tiger, front on, wide-eyed, its fur in nested spiked layers and the air round
+# The boot's face (app/face.h): a rhino-tiger, front on (a rhino's ears, horns, hide and snout; a tiger's stripes, eyes
+# and fangs), its fur in nested spiked layers and the air round
 # it in rings, all of it in bands of colour that the app turns through (each pixel a band and a level). Drawn here
 # pixel by pixel (three samples a side, the levels averaged, the band the middle one's), left-right mirrored.
-# Bands 0..13 turn (the app adds the time to their hue), 14 is white (the whiskers, the eyes' glints, the fangs),
+# Bands 0..13 turn (the app adds the time to their hue), 14 is white (the horns, the fangs, the eyes' glints),
 # 15 gold (the eyes); level 0 is black.
 # Usage: tools/face.py [preview.png]   (writes app/face.h; with a path, a look at it too: four moments side by side)
 import os, sys
@@ -14,7 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SS = 3                                   # samples a side
 N = 240 * SS
 TURN = 14                                # the bands that turn
-WHITE, GOLD = 14, 15
+WHITE, GOLD = 14, 15                     # (white: the horns, the fangs, the eyes' glints)
 
 c = (np.arange(N) + 0.5) / SS - 120.0
 X, Y = np.meshgrid(c, c)                 # (x right, y down; the middle 0)
@@ -54,26 +55,17 @@ spikes = 13.0 * tri(thh * 22 / np.pi) ** 1.6 * np.clip((thh - 0.9) / 0.6, 0.0, 1
 R = 84.0 + spikes + 10.0 * np.clip((thh - 1.2), 0, 1)
 s = rh / R                               # 0 the middle .. 1 the edge
 head = s < 1.0
-# the ears: nested triangles, tall, leaning out (from their middle, scaled: each step in a band)
-def ear_s(px, py):
-    # the ear's triangle (its right one; mirrored), in barycentric terms: s the largest scale it is inside of
-    A = np.array([44.0, -58.0]); B = np.array([106.0, -116.0]); C = np.array([104.0, -30.0])
-    G = (A + B + C) / 3
-    best = np.full(px.shape, 9.0)
-    for P0, P1 in ((A, B), (B, C), (C, A)):
-        n = np.array([P1[1] - P0[1], -(P1[0] - P0[0])])
-        n = n / np.hypot(*n)
-        if np.dot(G - P0, n) > 0:
-            n = -n
-        d0 = np.dot(P0 - G, n)
-        best = np.minimum(best, np.where(True, 1.0 / np.maximum((((px - G[0]) * n[0] + (py - G[1]) * n[1]) / d0), 1e-6), 0))
-    return 1.0 / best                    # the triangle's scale the point lies on (1: its edge)
-es = ear_s(AX, Y)
-es = es + 0.07 * tri(np.arctan2(Y + 68.0, AX - 84.7) * 14 / np.pi) * np.clip(es, 0, 1)   # (furred: its layers spiked)
+# the ears: a rhino's, tubes cupped up and leaning out, nested rings, a fringe at the tip, a dark hollow
+T = np.radians(34)
+dx, dy = AX - 86.0, Y + 84.0
+u = dx * np.sin(T) - dy * np.cos(T)          # (along the ear, up and out)
+v = dx * np.cos(T) + dy * np.sin(T)          # (across it)
+es = np.hypot(u / 36.0, v / (18.0 * (1.0 - 0.28 * np.clip(u / 36.0, -1, 1))))
+es = es - 0.16 * tri(v / 5.0) * np.clip((u - 22.0) / 14.0, 0, 1)   # (its tip fringed)
 ear = es < 1.0
-ke = np.floor(es * 5.0)
-put(ear, (9 + ke.astype(np.int16)) % TURN, np.where((es * 5.0 - ke) < 0.18, 1.0, 12.0 - 1.2 * ke))
-put(ear & (es < 0.3), np.int16(3), np.full_like(X, 2.0))      # the ear's dark hollow
+ke = np.floor(es * 4.0)
+put(ear, (9 + ke.astype(np.int16)) % TURN, np.where((es * 4.0 - ke) < 0.18, 1.0, 13.0 - 1.4 * ke))
+put(ear & (np.hypot((u - 6.0) / 22.0, v / 8.0) < 1.0), np.int16(3), np.full_like(X, 2.0))
 
 # the fur: the head's own rings, inward (scaled copies of its edge, spiked), each a band, a dark line between
 sp = s + 0.045 * tri(thh * 34 / np.pi + s * 3.0)
@@ -89,45 +81,52 @@ for a0, w, depth in ((0.30, 0.10, 0.50), (0.62, 0.08, 0.62), (1.42, 0.09, 0.50),
     stripe = head & (s > depth) & (np.abs(d) < w * (s - depth) / (1.0 - depth))
     put(stripe, band, np.full_like(X, 1.0))
 
-# the eyes: great and round, ringed out in bands, gold irises lined like rays, slit pupils, a glint
-EX, EY, ER = 81.0, -30.0, 23.0
-ex, ey = AX - EX, Y - EY
-re = np.hypot(ex, ey)
-ring = (re < ER + 16) & (re >= ER)
-kr = np.floor((re - ER) / 5.3)
-put(ring & head, (kr.astype(np.int16) + 2) % TURN, np.where((re - ER) - kr * 5.3 < 1.0, 0.0, 13.0))
-put(re < ER, np.int16(GOLD), 9.0 + 4.0 * (0.5 + 0.5 * np.cos(np.arctan2(ey, ex) * 18)) * np.clip(re / ER, 0.3, 1) + 2 * (re < ER * 0.55))
-put((re < ER) & (re > ER - 2.2), np.int16(GOLD), np.full_like(X, 4.0))
-pupil = (np.abs(ex) < 6.5 * np.sqrt(np.clip(1 - (ey / (ER * 0.9)) ** 2, 0, 1))) & (re < ER)
-put(pupil, np.int16(GOLD), np.full_like(X, 0.0))
-glint = np.hypot(ex + 9, ey + 9) < 4.2
-put(glint, np.int16(WHITE), np.full_like(X, 15.0))
+# the rhino's hide: heavy folds across the cheeks, a dark crease with a bright lip under it
+for rf in (112.0, 128.0):
+    rfd = np.hypot(X, Y + 62.0) - rf
+    fold = head & (AX > 40) & (s < 0.95) & (Y > -20)
+    put(fold & (np.abs(rfd) < 1.6), band, np.full_like(X, 0.0))
+    put(fold & (rfd >= 1.6) & (rfd < 4.0), band, np.full_like(X, 15.0))
 
-# the horn: from the nose up, ringed along its length
-hy0, hy1 = 34.0, -112.0
-hw = 15.0 * np.clip((Y - hy1) / (hy0 - hy1), 0, 1) ** 1.3
-horn = (Y < hy0) & (Y > hy1) & (AX < hw)
-kh = np.floor((Y - hy1) / 11.0)
-put(horn, (kh.astype(np.int16) + 5) % TURN, np.where(((Y - hy1) / 11.0 - kh) < 0.2, 3.0, 14.0 - 6.0 * AX / np.maximum(hw, 1)))
+# the eyes: almond, slanted, ringed out in bands under a heavy brow; gold irises lined like rays, round pupils
+EX, EY = 80.0, -30.0
+ex0, ey0 = AX - EX, Y - EY
+SL = np.radians(-14)                          # (the inner corner lower)
+ex = ex0 * np.cos(SL) + ey0 * np.sin(SL)
+ey = -ex0 * np.sin(SL) + ey0 * np.cos(SL)
+e = np.hypot(ex / 22.0, ey / 12.5)
+ring = (e >= 1.0) & (e < 1.75)
+kr = np.floor((e - 1.0) / 0.19)
+put(ring & head, (kr.astype(np.int16) + 2) % TURN, np.where((e - 1.0) - kr * 0.19 < 0.045, 0.0, 13.0))
+put(e < 1.0, np.int16(GOLD), 9.0 + 4.0 * (0.5 + 0.5 * np.cos(np.arctan2(ey, ex) * 18)) * np.clip(e, 0.3, 1) + 2 * (e < 0.5))
+put((e < 1.0) & (e > 0.9), np.int16(GOLD), np.full_like(X, 4.0))
+put(np.hypot(ex, ey) < 6.5, np.int16(GOLD), np.full_like(X, 0.0))
+put(np.hypot(ex + 5, ey + 4) < 2.6, np.int16(WHITE), np.full_like(X, 15.0))
+bl = -2.0 + 0.32 * ex                         # the brow's lower edge: down toward the middle, a scowl
+brow = (ey < bl) & (ey > bl - 7.0 - 6.0 * tri(ex / 7.0)) & (e < 1.9) & (ex > -30)   # (its top in spikes)
+put(brow, (band + 7) % TURN, np.where(ey > bl - 1.8, 1.0, 14.0))
 
-# the muzzle: two round pads, the nose, the mouth, fangs
-rp = np.hypot(AX - 15, (Y - 54) * 1.15)
-pad = (rp < 17) & ~horn
-put(pad, band, np.where(rp > 15.5, 1.0, np.where(np.hypot((AX - 15) % 6 - 3, (Y - 54) % 6 - 3) < 1.1, 4.0, 14.0)))
-nose = (Y > 30) & (Y < 42) & (AX < 13 - (Y - 30) * 0.9)
-put(nose, np.int16(0), np.full_like(X, 2.0))
-my = 70 + 5.0 * tri(AX / 30.0 + 0.5) - 5.0
-mouth = (np.abs(Y - my) < 1.3) & (AX < 30)
-put(mouth, np.int16(0), np.full_like(X, 0.0))
-fang = (Y >= my) & (Y < 69 + 14 * (1 - np.abs(AX - 14) / 4.0)) & (np.abs(AX - 14) < 4.0)
+# the snout: broad, plated, the nostrils at the horn's foot, a heavy lip, a tiger's fangs
+sw = 24.0 + 16.0 * np.sqrt(np.clip((Y - 20.0) / 62.0, 0, 1))   # (its half-width: wide at the lip)
+snout = (Y > 20) & (Y < 82) & (AX < sw)
+q = np.hypot(AX / sw, (Y - 30.0) / 52.0)      # (rings out from the horn's foot, like the ears')
+kq = np.floor(q * 4.5)
+put(snout, (kq.astype(np.int16) + 4) % TURN, np.where(q * 4.5 - kq < 0.16, 2.0, 13.0 - 1.2 * kq))
+put(snout & (AX >= sw - 1.6), np.int16(11), np.full_like(X, 1.0))
+nos = np.hypot((AX - 21.0) / 4.5, (Y - 46.0 - 0.3 * (AX - 21.0)) / 8.0) < 1.0
+put(nos, np.int16(0), np.full_like(X, 0.0))
+my = 80.0 + 0.009 * AX * AX
+put((np.abs(Y - my) < 1.5) & (AX < 44), np.int16(0), np.full_like(X, 0.0))
+fang = (Y >= my) & (Y < my + 18 * (1 - np.abs(AX - 20) / 5.0)) & (np.abs(AX - 20) < 5.0)
 put(fang, np.int16(WHITE), np.full_like(X, 14.0))
 
-# the whiskers: long and fine, from the pads out past the head, a little curved
-for i, (y0, a, bend) in enumerate(((46, -0.28, 0.0016), (54, -0.05, 0.0012), (62, 0.16, 0.0008))):
-    u = AX - 30
-    wy = y0 + a * u + bend * u * u
-    m = (u > 0) & (np.abs(Y - wy) < 0.75 + 0.004 * (120 - u))
-    put(m, np.int16(WHITE), np.full_like(X, 13.0))
+# the horns: the small one behind, the great one from the nose, ivory, grained along their length
+for hy0, hy1, w0 in ((-34.0, -104.0, 10.0), (40.0, -58.0, 21.0)):   # (ivory, ringed: they stand out of the colours)
+    hw = w0 * np.clip((Y - hy1) / (hy0 - hy1), 0, 1) ** 1.35
+    horn = (Y < hy0) & (Y > hy1) & (AX < hw)
+    put(horn & (AX > hw - 1.6), np.int16(0), np.full_like(X, 0.0))
+    grain = 1.2 * tri(AX / np.maximum(hw, 1) * 3.0)   # (its grain, lengthwise)
+    put(horn & (AX <= hw - 1.6), np.int16(WHITE), 14.5 - 7.0 * (AX / np.maximum(hw, 1)) ** 1.5 - grain)
 
 # the samples to pixels: the levels averaged, the band the middle one's
 lvl = level.reshape(240, SS, 240, SS).mean(axis=(1, 3))
