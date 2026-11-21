@@ -115,9 +115,12 @@ put(e < 1.0, np.int16(GOLD), 9.0 + 4.0 * (0.5 + 0.5 * np.cos(np.arctan2(ey, ex) 
 put((e < 1.0) & (e > 0.9), np.int16(GOLD), np.full_like(X, 4.0))
 put(np.hypot(ex, ey) < 6.5, np.int16(GOLD), np.full_like(X, 0.0))
 put(np.hypot(ex + 5, ey + 4) < 2.6, np.int16(WHITE), np.full_like(X, 15.0))
-bl = -2.0 + 0.32 * ex                         # the brow's lower edge: down toward the middle, a scowl
-brow = (ey < bl) & (ey > bl - 7.0 - 6.0 * tri(ex / 7.0)) & (e < 1.9) & (ex > -30)   # (its top in spikes)
-put(brow, np.int16(WHITE), np.where(ey > bl - 1.8, 1.0, 13.5))           # (white, as a tiger's)
+bl = -11.0 - 0.50 * ex                       # the brow's lower edge: low at the inner corner, flung up outward
+bh = 6.0 + 0.30 * (ex + 22.0) + 13.0 * tri((ex - 0.8 * (ey - bl)) / 8.0) ** 1.2 * np.clip((ex + 20.0) / 30.0, 0.3, 1.0)   # (flaring locks)
+lid = (e < 1.16) & (ey < -3.0 - 0.36 * ex)        # the upper lid, low at the inner corner: a glare
+put(lid, np.int16(0), np.full_like(X, 0.0))
+brow = (ey < bl) & (ey > bl - bh) & (ex > -22) & (ex < 40)
+put(brow, np.int16(WHITE), np.where(ey > bl - 1.8, 1.0, 14.0 - 3.0 * np.clip((bl - ey) / bh, 0, 1)))   # (white, as a tiger's)
 
 # the snout: broad, plated, the nostrils at the horn's foot, a heavy lip, a tiger's fangs
 sw = 24.0 + 16.0 * np.sqrt(np.clip((Y - 20.0) / 62.0, 0, 1))   # (its half-width: wide at the lip)
