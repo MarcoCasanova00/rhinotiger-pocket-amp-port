@@ -58,8 +58,11 @@ def render(md_text, dst, name, conf, home=False):
 
 
 def subsections(page):
-    """### 5.1 MAIN: base gives every 5.x the section's id (s5); each its own (s5-1)"""
-    return re.sub(r'<h3 id="s\d+">(\d+)\.(\d+)', r'<h3 id="s\1-\2">\1.\2', page)
+    """### 5.1 MAIN: base gives every 5.x the section's id (s5); each its own (s5-1). A heading with no letters of
+    a..z (### 世界) gets none from base: each its own (h1, h2..)"""
+    page = re.sub(r'<h3 id="s\d+">(\d+)\.(\d+)', r'<h3 id="s\1-\2">\1.\2', page)
+    n = iter(range(1, 1000))
+    return re.sub(r'<(h[23]) id="">', lambda m: f'<{m.group(1)} id="h{next(n)}">', page)
 
 
 def other_language(page, href, label, lang):
@@ -68,9 +71,10 @@ def other_language(page, href, label, lang):
     return page.replace("</nav></header>", f'<a href="{href}" lang="{lang}" hreflang="{lang}">{label}</a></nav></header>', 1)
 
 
-def main(site, version="preview", pkg="rhinotiger.fwsc"):
+def main(site, version="preview", pkg=None):
     site = Path(site)
     conf = read_conf(APP / "fm1.toml")
+    pkg = pkg or conf.get("name", APP.name).lower() + ".fwsc"
     en = (APP / "docs" / "MANUAL.md").read_text(encoding="utf-8")
     name = re.search(r"^# (.+)$", en, re.M).group(1).strip()          # RhinoTiger
     (site / "manual" / "ja").mkdir(parents=True, exist_ok=True)

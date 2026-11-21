@@ -23,7 +23,7 @@ PKG="${2:?usage: ./site.sh --preview | VERSION PACKAGE [--push]}"
 [ -f "$PKG" ] || { echo "site.sh: no package $PKG" >&2; exit 1; }
 "$PY" base/tools/build.py app --web --release "$V"
 "$PY" base/tools/make_site.py app "$PKG" "$V" "$OUT"
-"$PY" app/site/pages.py "$OUT" "$V" "$(ls "$OUT"/firmware/rhinotiger-*.fwsc | head -1 | xargs basename)"
+"$PY" app/site/pages.py "$OUT" "$V" "$(ls "$OUT"/firmware/rhinotiger-[0-9]*.fwsc | head -1 | xargs basename)"
 "$PY" app/site/theme.py "$OUT"
 [ "${3:-}" = "--push" ] || { echo "site in $OUT (./site.sh $V $PKG --push to publish it)"; exit 0; }
 REMOTE="$(git remote get-url origin)"
