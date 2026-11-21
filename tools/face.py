@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The boot's face (app/face.h): a rhino-tiger, front on (a rhino's ears, horns, hide and snout; a tiger's stripes, eyes
-# and fangs), its fur in nested spiked layers and the air round
+# The boot's face (app/face.h): a rhino-tiger, front on (a rhino's ears, horns, hide and snout; a tiger's stripes,
+# white ruff and brows, lined eyes and fangs), its fur in nested spiked layers and the air round
 # it in rings, all of it in bands of colour that the app turns through (each pixel a band and a level). Drawn here
 # pixel by pixel (three samples a side, the levels averaged, the band the middle one's), left-right mirrored.
-# Bands 0..13 turn (the app adds the time to their hue), 14 is white (the horns, the fangs, the eyes' glints),
+# Bands 0..13 turn (the app adds the time to their hue), 14 is white (the horns, the ruff, the brows, the fangs),
 # 15 gold (the eyes); level 0 is black.
 # Usage: tools/face.py [preview.png]   (writes app/face.h; with a path, a look at it too: four moments side by side)
 import os, sys
@@ -74,17 +74,29 @@ ff = sp * 9.0 - kf
 lv = np.where(ff < 0.14, 1.0, 9.5 + 3.0 * ff)
 put(head, (20 - kf.astype(np.int16)) % TURN, lv)
 
-# the tiger's stripes: wedges in from the head's edge, tapering, a little curved, dark
-for a0, w, depth in ((0.30, 0.10, 0.50), (0.62, 0.08, 0.62), (1.42, 0.09, 0.50), (1.70, 0.10, 0.42), (1.98, 0.09, 0.45),
-                     (2.30, 0.08, 0.55)):
+# the tiger's ruff: white, furred out past the head at the cheeks, in spiked locks
+lock = tri(thh * 26 / np.pi)
+ruff = (thh > 1.45) & (thh < 2.45) & (s > 0.58) & (s < 1.0 + 0.16 * lock ** 1.5 * np.clip((thh - 1.45) / 0.15, 0, 1)
+                                                       * np.clip((2.45 - thh) / 0.15, 0, 1))
+put(ruff, np.int16(WHITE), 10.5 + 3.5 * lock - 2.5 * np.clip((s - 0.9) / 0.2, 0, 1))
+put(ruff & (np.abs(s - 0.58) < 0.012), np.int16(WHITE), np.full_like(X, 1.0))
+
+# the tiger's stripes: black wedges in from the head's edge, tapering, a little curved, through the ruff too
+for a0, w, depth in ((0.24, 0.065, 0.50), (0.54, 0.055, 0.60), (1.38, 0.065, 0.50), (1.72, 0.075, 0.44), (2.06, 0.07, 0.48),
+                     (2.38, 0.06, 0.55)):
     d = thh - a0 - 0.35 * (1.0 - s) ** 2
-    stripe = head & (s > depth) & (np.abs(d) < w * (s - depth) / (1.0 - depth))
-    put(stripe, band, np.full_like(X, 1.0))
+    stripe = (head | ruff) & (s > depth) & (np.abs(d) < w * np.clip(s - depth, 0, 1) / (1.0 - depth))
+    put(stripe, band, np.full_like(X, 0.0))
+for yk in (-84.0, -71.0, -58.0):                 # the brow's: across, either side of the horns, forked at their ends
+    u = AX - 14.0
+    wy = yk + 3.0 * np.sin(u / 7.0)
+    put(head & (u > 0) & (u < 44) & (np.abs(Y - wy) < 3.2 * (1.0 - u / 44.0)) & ~((u > 30) & (np.abs(Y - wy) < 0.7)),
+        band, np.full_like(X, 0.0))
 
 # the rhino's hide: heavy folds across the cheeks, a dark crease with a bright lip under it
 for rf in (112.0, 128.0):
     rfd = np.hypot(X, Y + 62.0) - rf
-    fold = head & (AX > 40) & (s < 0.95) & (Y > -20)
+    fold = head & ~ruff & (AX > 40) & (s < 0.95) & (Y > -20)
     put(fold & (np.abs(rfd) < 1.6), band, np.full_like(X, 0.0))
     put(fold & (rfd >= 1.6) & (rfd < 4.0), band, np.full_like(X, 15.0))
 
@@ -98,13 +110,14 @@ e = np.hypot(ex / 22.0, ey / 12.5)
 ring = (e >= 1.0) & (e < 1.75)
 kr = np.floor((e - 1.0) / 0.19)
 put(ring & head, (kr.astype(np.int16) + 2) % TURN, np.where((e - 1.0) - kr * 0.19 < 0.045, 0.0, 13.0))
+put((e >= 1.0) & (e < 1.16), np.int16(0), np.full_like(X, 0.0))          # (a tiger's liner, thick and black)
 put(e < 1.0, np.int16(GOLD), 9.0 + 4.0 * (0.5 + 0.5 * np.cos(np.arctan2(ey, ex) * 18)) * np.clip(e, 0.3, 1) + 2 * (e < 0.5))
 put((e < 1.0) & (e > 0.9), np.int16(GOLD), np.full_like(X, 4.0))
 put(np.hypot(ex, ey) < 6.5, np.int16(GOLD), np.full_like(X, 0.0))
 put(np.hypot(ex + 5, ey + 4) < 2.6, np.int16(WHITE), np.full_like(X, 15.0))
 bl = -2.0 + 0.32 * ex                         # the brow's lower edge: down toward the middle, a scowl
 brow = (ey < bl) & (ey > bl - 7.0 - 6.0 * tri(ex / 7.0)) & (e < 1.9) & (ex > -30)   # (its top in spikes)
-put(brow, (band + 7) % TURN, np.where(ey > bl - 1.8, 1.0, 14.0))
+put(brow, np.int16(WHITE), np.where(ey > bl - 1.8, 1.0, 13.5))           # (white, as a tiger's)
 
 # the snout: broad, plated, the nostrils at the horn's foot, a heavy lip, a tiger's fangs
 sw = 24.0 + 16.0 * np.sqrt(np.clip((Y - 20.0) / 62.0, 0, 1))   # (its half-width: wide at the lip)

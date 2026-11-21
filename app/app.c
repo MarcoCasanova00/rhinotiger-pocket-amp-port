@@ -1311,7 +1311,7 @@ static void draw(void)
     draw_knobs(now);
 }
 
-/* the logo: the rhino-tiger's face behind (face.h: its bands of colour turning outward, a band an eighth note at the
+/* the logo: the rhino-tiger's face behind (face.h: its bands of colour turning outward, a band a sixteenth at the
  * tempo, each step landing quick and settling; its eyes gold, its whiskers white; the rest dimmer once the characters are on), 犀
  * over 虎 large on it (logo.h: LOGO_PX square, their edges smooth, a dark ring round them, a rainbow downwards: magenta
  * to acid green), and across the middle a band, RHINOTIGER in it. At boot they come one by one, LOGO_STEP ms apart
@@ -1342,8 +1342,8 @@ static void draw_logo(uint32_t layers, uint32_t ms)   /* ms: since the logo bega
     static uint16_t lut[256];
     int32_t pt, y, x;
     if (layers & LOGO_FACE) {                /* the face's colours now: a band's hue, less the flow; its levels */
-        uint32_t e8 = ms * ps_bpm() * 2u, n = e8 / 60000u;   /* (eighth notes gone by, and how far into this one) */
-        float f = (float)(e8 % 60000u) / 60000.0f, e = 1.0f - (1.0f - f) * (1.0f - f) * (1.0f - f);
+        uint32_t e16 = ms * ps_bpm() * 4u, n = e16 / 60000u;   /* (sixteenths gone by, and how far into this one) */
+        float f = (float)(e16 % 60000u) / 60000.0f, e = 1.0f - (1.0f - f) * (1.0f - f) * (1.0f - f);
         int32_t flow = (int32_t)(((float)(n % FACE_TURN) + e) * (float)HUE_FULL / (float)FACE_TURN);
         int32_t dim = layers & LOGO_CHARS ? 13 : 17, b, l;
         for (b = 0; b < 16; b++)
