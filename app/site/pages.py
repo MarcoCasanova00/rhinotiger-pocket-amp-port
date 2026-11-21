@@ -2,6 +2,7 @@
 # Copyright (C) 2026 hacha
 # The site's pages in two languages, over what fm1-base's tools/make_site.py makes (or alone, for a preview):
 #   SITE/index.html          the front page (app/site/landing.md)
+#   SITE/ja/index.html       the Japanese front page (app/site/landing.ja.md), if there is one
 #   SITE/manual/index.html   the manual (app/docs/MANUAL.md), its images in SITE/manual/img
 #   SITE/manual/ja/index.html  the Japanese manual (app/docs/MANUAL.ja.md), the same images
 # with base/tools/manual_html.py, then fixed for what it does not know: the firmware's name as the manuals write it
@@ -33,15 +34,18 @@ JA_WORDS = [                                   # base's English words on a Japan
 
 
 def join_cjk(md):
-    """a wrapped line joined to the one before without a space where either side is Japanese (a browser would show
-    the newline as a space between two characters)"""
+    """a wrapped line joined to the one before: without a space between two Japanese characters or after Japanese
+    punctuation (a browser would show the newline as a space between them), with one by a Latin word"""
     out = []
     for ln in md.splitlines():
         prev = out[-1] if out else ""
         cont = ln.strip() and prev.strip() and (ln.startswith("  ") or not BLOCK.match(ln)) \
             and not prev.startswith(("#", "|", "```", "!["))
-        if cont and (re.search(f"[{CJK}]$", prev.rstrip()) or re.match(f"[{CJK}]", ln.strip())):
-            out[-1] = prev.rstrip() + ln.strip()
+        end, start = prev.rstrip()[-1:], ln.strip()[:1]
+        if cont and (re.match(f"[{CJK}]", end) or re.match(f"[{CJK}]", start)):
+            both = re.match(f"[{CJK}]", end) and re.match(f"[{CJK}]", start)
+            punct = end in "、。）」』：；！？" or start in "（「『"
+            out[-1] = prev.rstrip() + ("" if both or punct else " ") + ln.strip()   # (Japanese by a Latin word: a space)
         else:
             out.append(ln)
     return "\n".join(out) + "\n"
@@ -82,7 +86,24 @@ def main(site, version="preview", pkg=None):
     landing = (APP / "site" / "landing.md").read_text(encoding="utf-8")
     landing = landing.replace("{{VERSION}}", version).replace("{{PKG}}", pkg)
     landing = re.sub(r"^# .+$", f"# {name}", landing, count=1, flags=re.M)
-    render(landing, site / "index.html", name, conf, home=True)
+    page = render(landing, site / "index.html", name, conf, home=True)
+    landing_ja = APP / "site" / "landing.ja.md"
+    if landing_ja.exists():                    # the front page in Japanese, at ja/ (its own links written for there)
+        page = page.replace("</nav></header>", '<a href="ja/" lang="ja" hreflang="ja">日本語</a></nav></header>', 1)
+        (site / "index.html").write_text(page, encoding="utf-8")
+        (site / "ja").mkdir(parents=True, exist_ok=True)
+        ja = landing_ja.read_text(encoding="utf-8").replace("{{VERSION}}", version).replace("{{PKG}}", pkg)
+        ja = re.sub(r"^# .+$", f"# {name}", ja, count=1, flags=re.M)
+        page = render(join_cjk(ja), site / "ja" / "index.html", name, conf, home=True)
+        for a, b in JA_WORDS:
+            page = page.replace(a, b)
+        head, sep, rest = page.partition("</header>")   # the header's links: from ja/
+        head = re.sub(r'href="(?!https?:|#|\.\./)([^"]*)"', lambda m: 'href="../' + ("" if m.group(1) == "./" else m.group(1)) + '"', head)
+        head = head.replace('href="../manual/"', 'href="../manual/ja/"')
+        head = head.replace('<a class="home" href="../"', '<a class="home" href="./"', 1)
+        page = head.replace("</nav>", '<a href="../" lang="en" hreflang="en">English</a></nav>', 1) + sep + rest
+        page = re.sub(r"<title>[^<]*</title>", f"<title>{name} · FM-1 のための自動生成サイケトランス</title>", page, count=1)
+        (site / "ja" / "index.html").write_text(page, encoding="utf-8")
     if (APP / "site" / "img").is_dir():
         shutil.copytree(APP / "site" / "img", site / "img", dirs_exist_ok=True)
 
@@ -100,6 +121,8 @@ def main(site, version="preview", pkg=None):
     page = re.sub(r"<title>Manual · ", "<title>マニュアル · ", page)
     page = page.replace('href="../', 'href="../../').replace('src="img/', 'src="../img/')
     page = page.replace('href="../../manual/" aria-current', 'href="./" aria-current')
+    if landing_ja.exists():                    # (home: the Japanese front page)
+        page = page.replace('<a class="home" href="../../"', '<a class="home" href="../../ja/"', 1)
     page = other_language(subsections(page), "../", "English", "en")
     (site / "manual" / "ja" / "index.html").write_text(page, encoding="utf-8")
     print(f"pages: {site}: index.html, manual/index.html, manual/ja/index.html")
