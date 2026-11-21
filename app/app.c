@@ -1020,8 +1020,12 @@ static void draw_header(uint32_t now)
         uint32_t tick = ps_ui.tick, beat = tick / PS_TPB % 4u;
         if (now < ui.world_until)            /* just turned to */
             cv_text(10, 6, &FONT_B, ps_world_name(set.world), C_WHITE);
-        else if (ps_playing())               /* the world's name, a rainbow drifting with the hues */
-            text_rainbow(10, 6, &FONT_B, ps_world_name(set.world), HUE_MAGENTA + hue.shift, -70, 150, 255);
+        else if (ps_playing()) {             /* the world's name, a rainbow drifting with the hues and flowing to the
+                                              * right with the beat: a sextant a beat, most of it as the beat lands */
+            float f = (float)(tick % PS_TPB) / (float)PS_TPB, e = 1.0f - (1.0f - f) * (1.0f - f) * (1.0f - f);
+            int32_t flow = (int32_t)(((float)(tick / PS_TPB % 6u) + e) * (float)(HUE_FULL / 6));   /* (round in six) */
+            text_rainbow(10, 6, &FONT_B, ps_world_name(set.world), HUE_MAGENTA + hue.shift - flow, -70, 150, 255);
+        }
         else
             cv_text(10, 6, &FONT_B, ps_world_name(set.world), C_GRAY);
         int_text(ps_bpm(), t);

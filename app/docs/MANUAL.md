@@ -70,8 +70,8 @@ Press PLAY again and it rests at once. Press it once more and it begins again fr
 
 ## 3. The screen
 
-At the top is the header. It holds the name of the world (see 9. Worlds), which drifts through colours while the
-music plays and turns grey while it rests; the tempo in beats per minute; and a small lamp that blinks on the beat,
+At the top is the header. It holds the name of the world (see 9. Worlds), whose colours flow to the right with each beat
+while the music plays and turns grey while it rests; the tempo in beats per minute; and a small lamp that blinks on the beat,
 white on the first beat of a bar. For a moment after you do something (turn a knob, press a button), the header says
 what happened instead.
 
