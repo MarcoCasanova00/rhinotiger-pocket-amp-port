@@ -130,7 +130,8 @@ ALGORITHM does something different on each page. On MAIN it takes the kit: forwa
 that are sounding, take another type from the next bar, and the more you turn in a bar the more change (up to three
 parts); back, the kit before, up to eight steps. On GROOVE it picks the shape of the bass. On PHASE it picks the kind
 of build. On ECHO it picks the kind of echo. On KICK, BASS, PERC, EVENTS, LINE, LINE SEQ and ATMOS it picks the type of
-that part, one of four, and the new type begins from the part's next note. On MIX and GLOBAL it does nothing. The name
+that part, one of four to six, and the new type begins from the part's next note. On MIX it picks the type of the
+track TRACK has chosen. On GLOBAL it does nothing. The name
 of the choice shows at the left of the rule. Types and shapes are listed on the pages they belong to. They are not
 saved (see 10. Saving).
 
@@ -229,7 +230,8 @@ SEL.
 - DECAY: the length of its body, from short and tight to long and full. It never runs into the bass's first note. 50.
 
 ALGORITHM picks the type: SOLID is the world's own; HARD falls faster, with a louder click and more drive; KNOCK is shorter,
-with wood under the boom; ZIP falls from higher and slower, the zip of a dark kick.
+with wood under the boom; ZIP falls from higher and slower, the zip of a dark kick; CRACK falls fast and tight, with a
+burst of bright noise on top, the snap of a hi-tech kick.
 
 ### 5.5 BASS
 
@@ -242,7 +244,8 @@ SEL again.
 - LENGTH: how long each note is, from short stabs (a quarter of the world's) to as long as a note can be. 50.
 - DRIVE: how hard the bass is driven. 50.
 
-ALGORITHM picks the type, the bass's colour: ROUND, BITTEN, METAL or HOLLOW. Most drops pick another on its own; with DRIFT lower, more of them keep it.
+ALGORITHM picks the type, the bass's colour: ROUND, BITTEN, METAL, HOLLOW, SNAP (a hard click on each note, round under
+it) or NASAL (a hollow, reedy buzz). Most drops pick another on its own; with DRIFT lower, more of them keep it.
 
 ### 5.6 PERC
 
@@ -274,7 +277,9 @@ offbeats, and some of them change each phrase. What you throw from the keys goes
   100 they go far to the sides, and each one crosses from one side to the other. 50.
 
 ALGORITHM picks the type: ALIVE is the sounds as they are; METAL is struck sheet and wire; LIQUID is things under water,
-wobbling slower and deeper; SHARD is short and harsh, broken glass or a machine's fault.
+wobbling slower and deeper; SHARD is short and harsh, broken glass or a machine's fault; GHOST plays them backwards,
+swelling out of nothing and cut at their height, a sound sucked in; RATCHET chops them on and off twenty to thirty times
+a second and lets them last longer, a machine's teeth.
 
 ### 5.8 LINE
 
@@ -290,7 +295,8 @@ drawn at random from the world's scale, and its movement is on LINE SEQ.
 - DRIVE: how hard it is driven. At 0 it is clean. 0.
 
 ALGORITHM picks the type: ACID is the world's own; GLASS is softer and rings, a struck glass; GROWL is deeper, swinging
-and driven, a throat; REED buzzes steadily, with a bite that does not fall.
+and driven, a throat; REED buzzes steadily, with a bite that does not fall; BEND drops into each note from a fifth or
+so above, rubbery; CRUSH breaks the sound into coarse steps, a broken machine.
 
 Hold LFO on this page and the phrase is drawn anew from the next bar. The message is `NEW PHRASE`.
 
@@ -322,15 +328,17 @@ down again after the drop.
 - DEPTH: how far it sways. 50.
 
 ALGORITHM picks the type: MIST is the world's own, soft; CHIME is brighter, bells far off; DRONE is deeper and darker, a
-slow beating hum; GRAIN breaks the chord into grains with more air, a forest's crackle.
+slow beating hum; GRAIN breaks the chord into grains with more air, a forest's crackle; PULSE cuts the chord in time
+with the music, in a pattern of sixteenths, a pad that breathes with the groove.
 
 ### 5.11 MIX
 
-![The MIX page: six strips KICK, BASS, PERC, EVT, LINE and ATM with their meters, PERC framed, and the knobs Track PERC, Level 80, Send 0, Mute OFF](img/screen-mix.png "MIX")
+![The MIX page: six strips KICK, BASS, PERC, EVT, LINE and ATM with their meters, PERC framed, HISS at the left of the rule, and the knobs Track PERC, Level 80, Send 0, Mute OFF](img/screen-mix.png "MIX")
 
 EDIT. A strip for each of the six parts. A strip's meter lights as the part sounds. Beside it is its level, a thin slot
 with a cap, and under its name is a short bar for its send into the echo. The track the knobs act on is framed. A
-muted part is dark.
+muted part is dark. ALGORITHM picks that track's type, as on the part's own page, and its name shows at the left of the
+rule.
 
 - TRACK: which part the next three knobs act on: KICK, BASS, PERC, EVENTS, LINE, ATMOS. KICK.
 - LEVEL: its level. 80 for the kick, bass, percussion and events; 70 for the line and the atmosphere.
@@ -509,7 +517,7 @@ A muted part's name is struck through on the screen, and its black key goes dark
 The music moves through sections by itself, and you can call them. There are three. The groove is the main part. A
 break takes the kick, the bass and the percussion out, brings the atmosphere up and thins the events, and the line goes
 softer. A build comes after it, a roll and a rising noise, for a few bars. Then the drop: on a bar's first beat
-everything is back, with a crash. After a drop the bass is most often another of its four types, the events' loop and the line's
+everything is back, with a crash. After a drop the bass is most often another of its types, the events' loop and the line's
 phrase are drawn anew, and the colours jump. The music never comes back exactly as it was.
 
 **By itself.** If BREAKS is above 0 and DRIFT is above 0, a break may come as a block of 32 bars begins, and not

@@ -18,12 +18,16 @@
  *   ACID   the world's own
  *   GLASS  an inharmonic modulator, softer, its modulation falling slowly: a struck glass
  *   GROWL  the modulator an octave under, deeper, swinging, driven: a throat
- *   REED   the modulator on a whole ratio, its modulation held: a buzz that does not fall */
+ *   REED   the modulator on a whole ratio, its modulation held: a buzz that does not fall
+ *   BEND   each note falling into its pitch from a fifth or so over it, in ~40 ms (a slide's notes too): rubber
+ *   CRUSH  the world's voice held in steps (about 8 kHz) and its level in few steps, brighter: a broken machine */
 
 #define LN_STEPS 32u
 #define LN_GAIN_GLASS 0.72f           /* the types' levels, matched to ACID's by ear-equal RMS (tools: a render each) */
 #define LN_GAIN_GROWL 1.0f
 #define LN_GAIN_REED 0.87f
+#define LN_GAIN_BEND 1.0f
+#define LN_GAIN_CRUSH 0.8f
 static struct {
     int8_t note[LN_STEPS];             /* semitones over the register, as drawn (ln_note: as heard) */
     uint16_t r_on[LN_STEPS];           /* 0..999: on while under Density's share (ln_on) */
@@ -39,6 +43,9 @@ static struct {
     float idx_s;                       /* the modulation heard: following idx (a new note's height, no step) */
     float wah_ph;
     float ratio, wah, drive, gain;     /* the note's type, taken at its start (drive 0: none) */
+    float bend;                        /* BEND: octaves over the note now, falling to none */
+    uint8_t crush, hc;                 /* CRUSH: on; its samples counted */
+    float hx;                          /* (the sample held) */
     float lp;
     float pan, pan_to;                 /* left and right now, gliding to the note's (over a sounding note: no step) */
     hp2_t hp[2];                       /* over 150 Hz, 24 dB an octave: under it the kick's and the bass's */
@@ -157,6 +164,8 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
         ln.wah = w->line_wah;
         ln.drive = 0.0f;
         ln.gain = 1.0f;
+        ln.bend = 0.0f;
+        ln.crush = 0;
         switch (s.type[PART_LINE]) {
         case 1:                        /* GLASS */
             ln.ratio = w->line_ratio + 2.41f;
@@ -180,6 +189,17 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
             ln.idx_floor = ln.idx * 0.7f;
             ln.wah = 0.0f;
             ln.gain = LN_GAIN_REED;
+            break;
+        case 4:                        /* BEND */
+            ln.bend = 0.55f;
+            ln.idx *= 1.1f;
+            ln.gain = LN_GAIN_BEND;
+            break;
+        case 5:                        /* CRUSH */
+            ln.crush = 1;
+            ln.idx *= 1.2f;
+            ln.wah = 0.0f;
+            ln.gain = LN_GAIN_CRUSH;
             break;
         }
         ln.pan_to = (i % 2u) ? 0.15f : -0.15f;
@@ -220,10 +240,22 @@ static float ln_render(const world_t *w, float dt, float *l, float *r)   /* retu
     }
     mo = fm_sin_turns(ln.mph);
     x = fm_sin_turns(ln.cph + idx * mo * 0.159155f) * env;
-    if ((ln.cph += ln.inc) >= 1.0f)
-        ln.cph -= 1.0f;
-    if ((ln.mph += ln.inc * ln.ratio) >= 1.0f)
-        ln.mph -= 1.0f;
+    {
+        float inc = ln.inc;
+        if (ln.bend > 0.0005f) {       /* BEND: falling into the note (~40 ms) */
+            inc *= fm_exp2f(ln.bend);
+            ln.bend *= 0.99943f;
+        }
+        if ((ln.cph += inc) >= 1.0f)
+            ln.cph -= 1.0f;
+        if ((ln.mph += inc * ln.ratio) >= 1.0f)
+            ln.mph -= 1.0f;
+    }
+    if (ln.crush) {                    /* CRUSH: held five samples, its level in 12 steps a side */
+        if (ln.hc++ % 5u == 0u)
+            ln.hx = (float)(int)(x * 12.0f + (x < 0.0f ? -0.5f : 0.5f)) * (1.0f / 12.0f);
+        x = ln.hx;
+    }
     if (ln.drive > 0.0f)               /* (GROWL) */
         x = fm_tanhf(x * ln.drive) * (1.0f / 0.987f);
     if (cf.l_drive > 0.0f)             /* DRIVE: over the type's, the peaks kept and a little under (denser) */

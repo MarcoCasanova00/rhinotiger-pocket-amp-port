@@ -22,7 +22,7 @@
  * The sections (psy.h): the groove; a break, the kick, the bass and the percussion out, the atmos up and the events
  * fewer; its build, a clap roll quickening (quarters, eighths, sixteenths, and the last beat silent: a breath) under a
  * noise rising, over BUILD's bars (4 unless moved); the drop, on a bar's first beat: a crash, the phrases counted from
- * it, the events' loop drawn anew, and the bass a shade other (another of four colours: its ratio and its bite). A cue
+ * it, the events' loop drawn anew, and the bass a shade other (another of its colours: its ratio, its bite). A cue
  * (SAVE) acts as the next bar begins; a break on its own comes as a 32-bar block begins (how likely: Drift and
  * BREAKS), GAP bars after the last drop at least, and lasts BREAK's bars or the world's (then builds and drops on its
  * own); a cued one waits for a build's cue.
@@ -215,6 +215,8 @@ static struct {
     float r_ph[3];                     /* the ride's partials */
     const float *k_ty;                 /* the kick's type, taken as it strikes (KICK_TYPE) */
     float k_mph;                       /* KNOCK's modulator */
+    uint32_t k_nz;                     /* CRACK's noise: its own dice */
+    float k_nl;                        /* (its last sample: the lows taken off) */
     float k_dr, k_cmp;                 /* its drive (the type's, DRIVE's), and the level keeping its peak */
     float h_k, o_k, c_k, r_k;          /* each one's decay, of the world's: its type's, taken as it strikes */
     float p_w[4];                      /* the percussion's source, moving to its type's: noise, metal, grit; its level */
@@ -260,7 +262,8 @@ static struct {
     /* the atmos */
     float a_lvl;                       /* its level now (glides between the sections) */
     float a_ph[3][2], a_mph[3];        /* the chord's notes, left and right; each note's modulator */
-    float a_m[6];                      /* the atmos's type, moving to it: AM_* */
+    float a_m[7];                      /* the atmos's type, moving to it: AM_* */
+    float a_pg;                        /* PULSE's gate, following its pattern (~4 ms) */
     float a_genv, a_gtar;              /* GRAIN: the chord's gate now, the grain's level */
     uint32_t a_gn, a_rng;              /* samples to the next grain, its own dice (the music's stay as they were) */
     float a_vg[3];                     /* the chord's notes' gains (lighter: the upper two fade, and back) */
@@ -398,26 +401,36 @@ static int build_breath(uint32_t beat);
 
 /* the queue's commands: bits 16.. the kind (0 a key, 1 an effect, 2 a mute, 3 out, 4 a fill) */
 enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE, CMD_REC, CMD_HALF, CMD_GAP };
-static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; 0: none yet beyond the world's own */
-    [PART_KICK] = {"SOLID", "HARD", "KNOCK", "ZIP"},
-    [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW"},
-    [PART_LINE] = {"ACID", "GLASS", "GROWL", "REED"},
+static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; as many as each has */
+    [PART_KICK] = {"SOLID", "HARD", "KNOCK", "ZIP", "CRACK"},
+    [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW", "SNAP", "NASAL"},
+    [PART_LINE] = {"ACID", "GLASS", "GROWL", "REED", "BEND", "CRUSH"},
     [PART_PERC] = {"HISS", "TIN", "TICK", "GRIT"},
-    [PART_EVENTS] = {"ALIVE", "METAL", "LIQUID", "SHARD"},
-    [PART_ATMOS] = {"MIST", "CHIME", "DRONE", "GRAIN"},
+    [PART_EVENTS] = {"ALIVE", "METAL", "LIQUID", "SHARD", "GHOST", "RATCHET"},
+    [PART_ATMOS] = {"MIST", "CHIME", "DRONE", "GRAIN", "PULSE"},
 };
+static uint32_t ntypes(int part)
+{
+    uint32_t n = 0;
+    while (n < PS_NTYPE && TYPE_NAME[part][n])
+        n++;
+    return n;
+}
 /* the atmos's types (ALGORITHM on the ATMOS page), its values moving from one to the next:
  *   MIST   the world's own: soft, a fifth's shimmer
  *   CHIME  the modulator off the harmonics, brighter, the notes closer: bells far off
  *   DRONE  the modulator on the note, deeper, darker, the notes apart: a slow beating hum
- *   GRAIN  the chord broken into grains, more air: a forest's crackle */
-enum { AM_RATIO, AM_IDX, AM_DET, AM_LP, AM_AIR, AM_GRAIN, AM_N };
+ *   GRAIN  the chord broken into grains, more air: a forest's crackle
+ *   PULSE  the chord cut in time with the music, sixteenths in a pattern of the bar, brighter, less air: a pad that
+ *          breathes with the groove */
+enum { AM_RATIO, AM_IDX, AM_DET, AM_LP, AM_AIR, AM_GRAIN, AM_PULSE, AM_N };
 static const float ATMOS_TYPE[PS_NTYPE][AM_N] = {
     /* ratio  index  detune   lowpass  air    grain   (levels matched to MIST's: the index and the lowpass) */
     {2.0f, 1.0f, 0.0016f, 1.0f, 1.0f, 0.0f},
     {3.5f, 0.7f, 0.0008f, 1.6f, 0.6f, 0.0f},
     {1.0f, 1.8f, 0.006f, 0.5f, 0.5f, 0.0f},
     {2.0f, 1.2f, 0.0016f, 1.2f, 1.6f, 1.0f},
+    {2.0f, 1.3f, 0.003f, 1.5f, 0.4f, 0.0f, 1.0f},
 };
 
 /* the percussion's types (ALGORITHM on the PERC page): the hats' source (moving to it) and each one's decay (taken as
@@ -440,20 +453,23 @@ static const float PERC_TYPE[PS_NTYPE][PT_N] = {
  *   SOLID  the world's own
  *   HARD   the pitch falling faster, the click louder, driven: a harder edge
  *   KNOCK  a modulator a little off the note, gone in a few ms, the body shorter: wood under the boom
- *   ZIP    the pitch falling from higher and slower, the body shorter: the zip of a dark kick */
-enum { KT_FALL, KT_SWEEP, KT_BODY, KT_CLICK, KT_DRIVE, KT_FM, KT_LEVEL, KT_N };
+ *   ZIP    the pitch falling from higher and slower, the body shorter: the zip of a dark kick
+ *   CRACK  a burst of bright noise on its first ms, driven with it, the fall fast, the body tight: the snap of a
+ *          hi-tech kick */
+enum { KT_FALL, KT_SWEEP, KT_BODY, KT_CLICK, KT_DRIVE, KT_FM, KT_LEVEL, KT_NOISE, KT_N };
 static const float KICK_TYPE[PS_NTYPE][KT_N] = {
     /* fall (s)  sweep  body   click  drive  fm     level (matched to SOLID's) */
     {0.011f, 1.0f, 0.45f, 1.0f, 1.8f, 0.0f, 1.0f},
     {0.008f, 1.2f, 0.40f, 1.6f, 3.2f, 0.0f, 0.77f},
     {0.011f, 0.9f, 0.35f, 0.6f, 1.8f, 2.5f, 1.08f},
     {0.022f, 1.6f, 0.40f, 0.8f, 2.0f, 0.0f, 1.0f},
+    {0.007f, 1.1f, 0.36f, 0.4f, 2.4f, 0.0f, 0.92f, 1.0f},
 };
 
-int ps_ntypes(int part) { return part >= 0 && part < NPART && TYPE_NAME[part][1] ? PS_NTYPE : 1; }
+int ps_ntypes(int part) { return part >= 0 && part < NPART ? (int)ntypes(part) : 1; }
 const char *ps_type_name(int part, int t)
 {
-    return part >= 0 && part < NPART && TYPE_NAME[part][t & 3] ? TYPE_NAME[part][t & 3] : "WORLD";
+    return part >= 0 && part < NPART && t >= 0 && t < PS_NTYPE && TYPE_NAME[part][t] ? TYPE_NAME[part][t] : "WORLD";
 }
 void ps_type(int part, int t)
 {
@@ -461,7 +477,7 @@ void ps_type(int part, int t)
         cmd_post((uint32_t)CMD_TYPE << 16 | (uint32_t)part << 8 | (uint32_t)t);
 }
 int ps_type_now(int part) { return part >= 0 && part < NPART ? s.type[part] : 0; }
-void ps_colour(int c) { ps_type(PART_BASS, c & 3); }
+void ps_colour(int c) { ps_type(PART_BASS, c); }
 int ps_colour_now(void) { return s.type[PART_BASS]; }
 void ps_line_new(void) { line_new = 1; }
 static volatile int shape_want;        /* PS_SHAPE_* (AUTO: the world's) */
@@ -562,7 +578,7 @@ static void kit_step(void)
             kit.depth++;
         for (p = 0; p < NPART; p++)
             if (pick >> p & 1u)
-                s.type[p] = (uint8_t)((s.type[p] + 1u + rnd() % 3u) % PS_NTYPE);
+                s.type[p] = (uint8_t)((s.type[p] + 1u + rnd() % (ntypes((int)p) - 1u)) % ntypes((int)p));
         if (pick >> KIT_GROOVE & 1u) { /* the groove: another shape than this bar's, four bars */
             static const uint8_t SHAPE[3] = {0, 1, 3};
             uint32_t now = (s.tick / TPBAR - s.origin) % 8u == s.trip_at ? 2u : s.pat, j = rnd() % 3u;
@@ -645,8 +661,8 @@ static void cmd_do(uint32_t c)         /* (render, as a block begins) */
         fx.gap_req = 1;
         break;
     case CMD_TYPE:
-        if ((c >> 8 & 7u) < NPART)
-            s.type[c >> 8 & 7u] = (uint8_t)(c & 3u);
+        if ((c >> 8 & 7u) < NPART && (c & 7u) < ntypes((int)(c >> 8 & 7u)))
+            s.type[c >> 8 & 7u] = (uint8_t)(c & 7u);
         break;
     case CMD_REC:                      /* pressed: a take anew; let go: it plays on */
         if (c & 1u)
@@ -1132,10 +1148,10 @@ static void drop(uint32_t bar)         /* on this bar's first tick: the groove a
     enter(SEC_MAIN, 0);
     s.origin = s.last_drop = bar;
     s.drops++;
-    {                                  /* another of the bass's four colours; or, less often the higher DRIFT, the same */
-        uint32_t r = rnd() % 3u;
+    {                                  /* another of the bass's colours; or, less often the higher DRIFT, the same */
+        uint32_t n = ntypes(PART_BASS), r = rnd() % (n - 1u);
         if (vary_u(0u, 0xBA55u) >= 0.4f * (1.0f - m.drift))
-            s.type[PART_BASS] = (uint8_t)((s.type[PART_BASS] + 1u + r) % 4u);
+            s.type[PART_BASS] = (uint8_t)((s.type[PART_BASS] + 1u + r) % n);
     }
     s.out = 0;
     ps_ui.sitting_out = 0;
@@ -1328,12 +1344,26 @@ static float kick(float dt)
         x = fm_sin_turns(s.k_ph) * env;
     x += (t < 0.002f ? 0.35f * punch * ty[KT_CLICK] * (1.0f - t / 0.002f) : 0.0f) * fm_sin_turns(s.k_ph * 7.0f) *   /* the click */
          (t < 0.0002f ? t / 0.0002f : 1.0f);
+    if (ty[KT_NOISE] > 0.0f && t < 0.012f) {       /* CRACK: noise, its lows taken off, gone in a few ms (its own dice) */
+        float n;
+        s.k_nz = s.k_nz * 1664525u + 1013904223u;
+        n = (float)(int32_t)s.k_nz * (1.0f / 2147483648.0f);
+        x += 0.45f * ty[KT_NOISE] * (0.6f + 0.4f * punch) * (n - s.k_nl) * fm_expf(-t / 0.0022f) *
+             (t < 0.0002f ? t / 0.0002f : 1.0f);
+        s.k_nl = n;
+    }
     s.k_t = t + dt;
     x = fm_tanhf(x * s.k_dr) * ty[KT_LEVEL] * s.k_cmp;
     return cf.k_cut > 0.0f ? x * fm_expf(-t * cf.k_cut) : x;   /* (DECAY under 50: cut short after the drive) */
 }
 
-static const float COLOUR[4][2] = {{1.0f, 1.0f}, {1.0f, 1.35f}, {1.5f, 0.8f}, {0.5f, 1.25f}};   /* ratio, bite */
+/* the bass's colours: ratio, bite, how fast the bite closes, and a blip of pitch as it strikes (octaves, gone in ~3 ms)
+ *   ROUND BITTEN METAL HOLLOW  as they were
+ *   SNAP   bitten hard and closing four times as fast, the pitch knocked up an instant: a click on each note, round
+ *          under it
+ *   NASAL  the modulator an octave over the note: odd harmonics only, a hollow buzz */
+static const float COLOUR[PS_NTYPE][4] = {{1.0f, 1.0f, 1.0f, 0.0f}, {1.0f, 1.35f, 1.0f, 0.0f}, {1.5f, 0.8f, 1.0f, 0.0f},
+                                          {0.5f, 1.25f, 1.0f, 0.0f}, {1.0f, 1.9f, 4.0f, 0.6f}, {2.0f, 0.95f, 1.0f, 0.0f}};
 
 static float bass(const world_t *w, float dt)
 {
@@ -1351,13 +1381,19 @@ static float bass(const world_t *w, float dt)
         }
     }
     idx = w->index * bite * (1.0f - 0.5f * depth + depth * s.drift);   /* the slow movement opens and closes it */
-    idx = idx * fm_expf(-t * cf.b_idx_k) + w->floor * bite * cf.b_floor;   /* (DECAY: how fast it closes) */
+    idx = idx * fm_expf(-t * cf.b_idx_k * COLOUR[s.type[PART_BASS]][2]) + w->floor * bite * cf.b_floor;   /* (DECAY: how
+                                                                                                      * fast it closes) */
     mo = fm_sin_turns(s.b_mph);
     x = fm_sin_turns(s.b_cph + idx * mo * 0.159155f) * env;
-    s.b_cph += s.b_inc;
-    if (s.b_cph >= 1.0f)
-        s.b_cph -= 1.0f;
-    s.b_mph += s.b_inc * w->ratio * COLOUR[s.type[PART_BASS]][0];
+    {
+        float inc = s.b_inc, blip = COLOUR[s.type[PART_BASS]][3];
+        if (blip > 0.0f && t < 0.015f)             /* SNAP: the pitch knocked up as it strikes */
+            inc *= fm_exp2f(blip * fm_expf(-t / 0.003f));
+        s.b_cph += inc;
+        if (s.b_cph >= 1.0f)
+            s.b_cph -= 1.0f;
+        s.b_mph += inc * w->ratio * COLOUR[s.type[PART_BASS]][0];
+    }
     if (s.b_mph >= 1.0f)
         s.b_mph -= 1.0f;
     if (s.b_t >= 0.0f)
@@ -1564,6 +1600,12 @@ static float atmos(const world_t *w, float n, float *l, float *r)
             s.a_genv += (s.a_gtar - s.a_genv) * 0.01f;
         }
         gate = 1.0f - g + g * s.a_genv;
+        if (s.a_m[AM_PULSE] > 0.0005f) {   /* PULSE: on the sixteenths of 1101 1010 1101 1011, each its first 60% */
+            uint32_t q = s.tick % TPBAR, st = q * 16u / TPBAR, in = q * 16u % TPBAR;
+            float on = (0xDADBu >> (15u - st) & 1u) && in < TPBAR * 6u / 10u ? 1.0f : 0.0f;
+            s.a_pg += (on - s.a_pg) * 0.006f;
+            gate *= 1.0f - s.a_m[AM_PULSE] + s.a_m[AM_PULSE] * 1.7f * s.a_pg;   /* (the gaps' level back) */
+        }
         al = s.a_lp[0] * 0.10f * gate + x * (0.6f + fm_clampf(0.35f * wob, -0.6f, 0.6f));
         ar = s.a_lp[1] * 0.10f * gate + x * (0.6f - fm_clampf(0.35f * wob, -0.6f, 0.6f));
     }

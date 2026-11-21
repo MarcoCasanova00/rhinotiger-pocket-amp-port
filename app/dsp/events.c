@@ -22,12 +22,16 @@
  *   ALIVE   the recipes as they are
  *   METAL   the modulator off the harmonics, the glides shorter, ringing longer: struck sheet and wire
  *   LIQUID  wobbling slower and deeper, the glides even, longer: things under water
- *   SHARD   short, harsh, the sound held in steps (a lower rate, its aliasing): broken glass, a machine's fault */
+ *   SHARD   short, harsh, the sound held in steps (a lower rate, its aliasing): broken glass, a machine's fault
+ *   GHOST   backwards: swelling from nothing, cut at its height, the glide turned round: a sound sucked in
+ *   RATCHET chopped on and off 20..30 times a second, longer: a machine's teeth */
 /* the types' levels, matched to ALIVE's by the RMS of the events alone (LIQUID's last longer, SHARD's are brighter: a
  * little over and under it). SHARD's steps are its sound: tools/clicks.py counts them. */
 #define EV_GAIN_METAL 0.72f
 #define EV_GAIN_LIQUID 0.85f
 #define EV_GAIN_SHARD 1.0f
+#define EV_GAIN_GHOST 1.0f
+#define EV_GAIN_RATCHET 1.0f
 
 enum { EV_DIVE, EV_GROWL, EV_ZAP, EV_GURGLE, EV_CHIRP, EV_LASER, EV_NTYPE };
 static const char *const EV_NAME[EV_NTYPE] = {"DIVE", "GROWL", "ZAP", "GURGLE", "CHIRP", "LASER"};
@@ -53,6 +57,8 @@ typedef struct {
     float level;
     float hx;                          /* SHARD: the sample held, */
     uint8_t hold, hc;                  /* for hold samples (0: none), counted */
+    uint8_t rev;                       /* GHOST: the envelope backwards */
+    float chop;                        /* RATCHET: on and off so many times a second (0: none) */
     uint8_t cn;                        /* samples to the next control point (0: one now; EV_CTL apart) */
     float cph, mph;
     /* at the control rate (EV_CTL samples), the rest straight between: the pitch (as the carrier's step a sample),
@@ -258,6 +264,8 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
         v->level *= ks->level;
     }
     v->hold = 0;
+    v->rev = 0;
+    v->chop = 0.0f;
     switch (s.type[PART_EVENTS]) {
     case 1:                            /* METAL */
         v->ratio += 1.41f;
@@ -296,6 +304,20 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
         v->hold = (uint8_t)(5u + (uint32_t)(4.0f * b));   /* about 9..5 kHz */
         v->hc = 0;
         v->level *= EV_GAIN_SHARD;
+        break;
+    case 4:                            /* GHOST */
+        v->rev = 1;
+        v->f0 *= fm_exp2f(v->oct);     /* (the glide from where it would end, back to where it would start) */
+        v->oct = -v->oct;
+        v->dur *= 1.3f;
+        v->lfo_pitch *= 0.5f;
+        v->level *= EV_GAIN_GHOST;
+        break;
+    case 5:                            /* RATCHET */
+        v->chop = 20.0f + 10.0f * b;
+        v->dur *= 1.4f;
+        v->tau *= 2.0f;
+        v->level *= EV_GAIN_RATCHET;
         break;
     }
     if (r->cyc) {                      /* a held key's repeat: the sound turning through a cycle of eight */
@@ -561,7 +583,14 @@ static void ev_ctl(evoice_t *v, float t, float dt, float wide, float law, float 
         f = 16000.0f;
     v->fi1 = f * dt;
     v->ix1 = (v->idx0 + (v->idx1 - v->idx0) * u + v->lfo_idx * lfo) * 0.159155f;
-    amp = (t < 0.001f ? t / 0.001f : 1.0f) * fm_expf(-t / v->tau) * (1.0f - u * u) * v->level * 0.28f;
+    if (v->rev)                        /* GHOST: swelling, cut at its height (~6% of it) */
+        amp = u * u * (u < 0.94f ? 1.0f : (1.0f - u) / 0.06f) * v->level * 0.28f;
+    else
+        amp = (t < 0.001f ? t / 0.001f : 1.0f) * fm_expf(-t / v->tau) * (1.0f - u * u) * v->level * 0.28f;
+    if (v->chop > 0.0f) {              /* RATCHET: on the first 55% of each turn (its edges the control points' ramps) */
+        float c = v->chop * t;
+        amp *= c - fm_floorf(c) < 0.55f ? 1.0f : 0.0f;
+    }
     p1 = v->pan1 + (-v->pan0 - v->pan1) * cross;   /* (SPREAD past 50: crossing) */
     pan = fm_clampf((v->pan0 + (p1 - v->pan0) * u) * wide, -1.0f, 1.0f);
     v->gl1 = amp * (1.0f - law * pan);

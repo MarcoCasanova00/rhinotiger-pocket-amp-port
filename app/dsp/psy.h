@@ -100,13 +100,13 @@ void ps_shed(int on);                  /* lighter (the render near its time): th
                                         * voices, no FLANGE */
 int ps_shedding(void);
 
-/* the bass's colour (one of four: its ratio and bite), chosen now (each drop chooses another on its own) */
-#define PS_NCOLOUR 4
+/* the bass's colour (its type: PS_NTYPE at most), chosen now (most drops choose another on their own) */
+#define PS_NCOLOUR PS_NTYPE
 void ps_colour(int c);
 int ps_colour_now(void);
-/* each part's type (ALGORITHM on its page): four sounds of it, 0 the world's own. A type takes from a part's next
- * note. The bass's are its colours. A part without types yet has one (ps_ntypes 1). */
-#define PS_NTYPE 4
+/* each part's type (ALGORITHM on its page, or on MIX its track's): a few sounds of it (ps_ntypes, up to PS_NTYPE), 0
+ * the world's own. A type takes from a part's next note. The bass's are its colours. */
+#define PS_NTYPE 6
 void ps_type(int part, int t);
 int ps_type_now(int part);
 int ps_ntypes(int part);

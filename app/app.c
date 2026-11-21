@@ -246,7 +246,10 @@ static int page_part(int p)              /* the part a page shows (PART_*), or -
     default: return -1;
     }
 }
-static int algo_part(void) { return page_part(ui.page); }   /* ALGORITHM's part: the page's (-1: none) */
+static int algo_part(void)              /* ALGORITHM's part: the page's; on MIX, the track's (-1: none) */
+{
+    return ui.page == PG_MIX ? TRACK_PART[mix_track % NTRACK] : page_part(ui.page);
+}
 
 static int grid_mode(void) { return ui.page == PG_ECHO; }   /* the keys the performance's */
 
@@ -1249,7 +1252,8 @@ static void draw_rule(void)
         xs = 6;
         xs = cv_text(xs, 0, &FONT_XS, ui.page == PG_GROOVE ? ps_bass_shape_name(ps_bass_shape_now())
                                                            : ps_echo_kind_name(ps_echo_kind_now()), C_HI) + 6;
-    } else if (ui.page >= PG_KICK && ui.page <= PG_ATMOS && ps_ntypes(algo_part()) > 1) {   /* a part's page: its type */
+    } else if (((ui.page >= PG_KICK && ui.page <= PG_ATMOS) || ui.page == PG_MIX) && ps_ntypes(algo_part()) > 1) {
+        /* a part's page, or MIX's track: its type */
         int part = algo_part();
         xs = 6;
         xs = cv_text(xs, 0, &FONT_XS, ps_type_name(part, ps_type_now(part)), part_txt(PART_HUE[part], 255)) + 6;
@@ -1482,15 +1486,15 @@ int app_expect(const char *what, int *got)
         *got = ps_ui.drops;
     else if (!strcmp(what, "colour"))        /* the bass's colour, 0..3 */
         *got = ps_colour_now();
-    else if (!strcmp(what, "line_type"))     /* the line's type, 0..3 */
+    else if (!strcmp(what, "line_type"))     /* the line's type, 0.. (ps_ntypes) */
         *got = ps_type_now(PART_LINE);
-    else if (!strcmp(what, "events_type"))   /* the events' type, 0..3 */
+    else if (!strcmp(what, "events_type"))   /* the events' type, 0.. (ps_ntypes) */
         *got = ps_type_now(PART_EVENTS);
-    else if (!strcmp(what, "atmos_type"))    /* the atmos's type, 0..3 */
+    else if (!strcmp(what, "atmos_type"))    /* the atmos's type, 0.. (ps_ntypes) */
         *got = ps_type_now(PART_ATMOS);
-    else if (!strcmp(what, "perc_type"))     /* the percussion's type, 0..3 */
+    else if (!strcmp(what, "perc_type"))     /* the percussion's type, 0.. (ps_ntypes) */
         *got = ps_type_now(PART_PERC);
-    else if (!strcmp(what, "kick_type"))     /* the kick's type, 0..3 */
+    else if (!strcmp(what, "kick_type"))     /* the kick's type, 0.. (ps_ntypes) */
         *got = ps_type_now(PART_KICK);
     else if (!strcmp(what, "rhythm"))        /* the black key held whose rhythm leads (-1: none) */
         *got = ps_rhythm();

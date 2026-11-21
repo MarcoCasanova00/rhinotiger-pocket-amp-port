@@ -43,7 +43,7 @@ expect colour 2
 said BASS
 turn ALGO -3
 wait 100
-expect colour 3
+expect colour 5   # (round the six)
 # on the LINE page: the line's type (the bass's colour stays)
 tap LFO
 wait 30
@@ -54,8 +54,8 @@ expect line_type 1
 said LINE
 turn ALGO -2
 wait 100
-expect line_type 3
-expect colour 3
+expect line_type 5   # (round the six)
+expect colour 5
 # on the EVENTS page: the events' type
 tap ENV
 wait 30
@@ -66,7 +66,7 @@ turn ALGO 3
 wait 100
 expect events_type 3
 said EVENTS
-expect line_type 3
+expect line_type 5
 # on the ATMOS page: the atmos's type
 tap LFO
 wait 30
@@ -137,3 +137,19 @@ expect page 2
 turn K1 5
 wait 30
 expect auto 1
+# on MIX: ALGORITHM the type of K1's track (its name on the rule)
+tap EDIT
+wait 30
+expect page 10
+turn K1 -10
+wait 30
+turn ALGO 1
+wait 100
+expect kick_type 2
+said KICK
+turn K1 4
+wait 30
+turn ALGO -1
+wait 100
+expect line_type 4
+said LINE
