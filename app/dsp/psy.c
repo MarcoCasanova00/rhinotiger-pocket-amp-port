@@ -247,6 +247,7 @@ static struct {
     uint8_t type[NPART];                 /* each part's type (PART_*: the bass's is its colour) */
     uint32_t origin;                   /* the bar the phrases count from: the last drop's */
     uint32_t last_drop;
+    uint32_t builds;                   /* builds so far (their lengths' dice) */
     uint32_t sec_bar, sec_len;         /* bars into the section; a break's length (0: until cued), a build's */
     uint8_t bk;                        /* the build's kind (PS_BUILD_ROLL ..), taken as it begins */
     float hp_hz, hp_b[2], hp_u[2][2];  /* FILTER's high-pass: its cutoff (glides; 0 none), the bass's, the upper's */
@@ -1061,11 +1062,38 @@ static void perc_step(const world_t *w, uint32_t t, uint32_t beat, uint32_t bar,
     }
 }
 
-static int fill_now(uint32_t bar, uint32_t beat)   /* this beat a fill's (the bass rests) */
+/* The lengths' sway: FILLS, BUILD and GAP give the usual length, DRIFT how often it is the next one down or up
+ * instead. Dice of their own, a hash of where and which (the music's own dice stay as they were): at DRIFT 0 the
+ * lengths are the knobs' exactly. */
+static float vary_u(uint32_t at, uint32_t salt)   /* 0..1, the same for the same place */
 {
-    static const uint8_t EVERY[5] = {0, 32, 16, 8, 4};
-    uint32_t e = EVERY[clampi(par[P_FILLS], 0, 4)];
-    return e && bar % e == e - 1u && beat == 3u;
+    uint32_t x = at * 0x9E3779B9u ^ salt ^ s.drops * 0x85EBCA6Bu;
+    x ^= x >> 16;
+    x *= 0x7FEB352Du;
+    x ^= x >> 15;
+    x *= 0x846CA68Bu;
+    x ^= x >> 16;
+    return (float)(x >> 8) / 16777216.0f;
+}
+
+static int vary_step(uint32_t at, uint32_t salt, float p)   /* -1, 0 or +1: down or up with p/2 each */
+{
+    float u = vary_u(at, salt);
+    return u < 0.5f * p ? -1 : u < p ? 1 : 0;
+}
+
+#define VARY_P (0.6f * m.drift)        /* (DRIFT 50: three lengths in ten another) */
+
+static int fill_now(uint32_t bar, uint32_t beat)   /* this beat a fill's (the bass rests) */
+{                                      /* FILLS' period, each 32 bars: its own, or half or twice it */
+    static const uint8_t EVERY[6] = {0, 32, 16, 8, 4, 4};
+    int k = clampi(par[P_FILLS], 0, 4);
+    uint32_t e;
+    if (!k || beat != 3u)
+        return 0;
+    k += vary_step(bar / 32u, 0xF111u, VARY_P);   /* (a longer period: a step down the list) */
+    e = k <= 0 ? 64u : EVERY[k];
+    return bar % e == e - 1u;
 }
 
 static void enter(int sec, uint32_t len)
@@ -1095,7 +1123,8 @@ static void enter_build(const world_t *w)   /* a build: BUILD's bars, its kind (
     }
     s.bk = (uint8_t)k;
     ps_ui.build_kind = (int8_t)k;
-    enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN], 0, 2)] + (k == PS_BUILD_FAKE));   /* (FAKE: its false drop's bar) */
+    enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN] + vary_step(s.builds++, 0xB111u, VARY_P), 0, 2)] +
+                     (k == PS_BUILD_FAKE));   /* (FAKE: its false drop's bar) */
 }
 
 static void drop(uint32_t bar)         /* on this bar's first tick: the groove again, a shade other */
@@ -1128,7 +1157,7 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
             enter_build(w);
         else if (brk)
             enter(SEC_BREAK, 0);
-        else if (par[P_BREAKS] > 0 && rb && rb % 32u == 0u && bar - s.last_drop >= GAP_BARS[clampi(par[P_GAP], 0, 3)] &&
+        else if (par[P_BREAKS] > 0 && rb && rb % 32u == 0u && bar - s.last_drop >= GAP_BARS[clampi(par[P_GAP] + vary_step(0u, 0x6A90u, VARY_P), 0, 3)] &&
                  (float)(rnd() % 100u) < 70.0f * m.drift * ((float)par[P_BREAKS] / 50.0f)) {
             uint32_t len = BREAK_BARS[clampi(par[P_BREAK_LEN], 0, 4)];
             enter(SEC_BREAK, len ? len : w->brk);
@@ -1643,6 +1672,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.drop_seen = drop_n;
         s.build_seen = build_n;
         s.drops = 0;                   /* (the intro again: the events quiet its first bars) */
+        s.builds = 0;
         s.out = s.pat = s.fill_beat = s.gap = 0;   /* (a GAP cued or sounding: forgotten) */
         fx.gap_req = 0;
         s.trip_at = 255;

@@ -58,7 +58,7 @@ wait 1579
 expect section 1
 wait 4737
 expect section 2
-wait 6316
+wait 12632   # BUILD 4, DRIFT swaying it now and then to 2 or 8: over by 8 bars
 expect section 0
 expect drops 1
 shot phase.png

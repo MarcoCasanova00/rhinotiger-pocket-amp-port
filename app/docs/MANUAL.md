@@ -155,8 +155,9 @@ world is as it is.
 - DARK: darker and stranger, or brighter and plainer. Higher darkens the bass, leans the one-shot sounds to the low and
   the middle, brings in harsher notes and lets the line creep and reach higher. Lower is lighter and more open. 50.
 - DRIFT: how much changes by itself. Higher redraws more of the one-shot sounds at each phrase, lets the bass open and
-  close further, rewrites more of the line, and lets breaks come on their own more often (see 8. Sections). At 0 nothing
-  moves by itself and no break comes on its own. 50.
+  close further, rewrites more of the line, lets breaks come on their own more often (see 8. Sections), and lets FILLS,
+  BUILD and GAP stray more often from their lengths to the next one down or up (see GROOVE and PHASE). At 0 nothing
+  moves by itself, no break comes on its own, and those lengths are exact. 50.
 
 ALGORITHM turns the kit. What it changed shows in the header for a moment, each type in the colour of its part.
 
@@ -173,7 +174,9 @@ HOME again.
 - ROOT: the note the bass and the kick are built on, shown by name. It moves it up to five semitones down and six up.
   The world's own.
 - FILLS: how often the last beat of a bar turns into a fill, with the bass resting and a clap rolling up, and how often a
-  phrase ends in a twist of the kick. OFF, or every 32, 16, 8 or 4 bars. 8.
+  phrase ends in a twist of the kick. OFF, or every 32, 16, 8 or 4 bars. That is the usual distance: every 32 bars it
+  may become half or twice as long for a while, more often with DRIFT higher, and the fills still fall on the ends of
+  4, 8, 16 or 32 bars. 8.
 - SIT OUT: how often one of the percussion (the hats, the open hat, the clap, the ride) rests for a whole phrase.
   At 0 never. 25.
 
@@ -191,8 +194,10 @@ Sections).
 - BREAKS: how often a break comes on its own. At 0 it says CUED: a break comes only when you call it. Higher is more
   often, and DRIFT scales it. 50.
 - BREAK: how long a break that comes on its own lasts. WORLD leaves it to the world; or 4, 8, 16 or 32 bars. WORLD.
-- BUILD: how long a build lasts: 2, 4 or 8 bars. 4.
-- GAP: the fewest bars between a drop and the next break that comes on its own: 32, 64, 96 or 128. 64.
+- BUILD: how long a build usually lasts: 2, 4 or 8 bars. Now and then a build is one step shorter or longer, more often
+  with DRIFT higher. 4.
+- GAP: the fewest bars between a drop and the next break that comes on its own: 32, 64, 96 or 128. After some drops it
+  is one step shorter or longer, more often with DRIFT higher. 64.
 
 ALGORITHM picks the kind of build. AUTO chooses one of the others each time, leaning on the world's habits and never the
 same one twice running; in a build, the rule also shows the one it chose.
@@ -505,8 +510,8 @@ softer. A build comes after it, a roll and a rising noise, for a few bars. Then 
 everything is back, with a crash. After a drop the bass is another of its four types, the events' loop and the line's
 phrase are drawn anew, and the colours jump. The music never comes back exactly as it was.
 
-**By itself.** If BREAKS is above 0 and DRIFT is above 0, a break may come as a block of 32 bars begins, and never
-sooner than GAP bars after the last drop. It lasts BREAK bars (or the world's own), then a build, then the drop come on
+**By itself.** If BREAKS is above 0 and DRIFT is above 0, a break may come as a block of 32 bars begins, and not
+sooner than about GAP bars after the last drop. It lasts BREAK bars (or the world's own), then a build, then the drop come on
 their own. How likely it is depends on BREAKS and DRIFT together: at the defaults, about once in three blocks. See PHASE, 5.3.
 
 **You call them.** All of them wait for the next bar, and they work only while the music is playing.
