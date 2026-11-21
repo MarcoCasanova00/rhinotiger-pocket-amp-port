@@ -1,6 +1,6 @@
 # RhinoTiger
 
-[日本語](https://github.com/hacha/rhinotiger/blob/main/app/docs/MANUAL.ja.md)
+[日本語](MANUAL.ja.md)
 
 RhinoTiger is a generative psytrance firmware for the M-VAVE FM-1, from dark psy to hi-tech. It plays by itself. You
 steer it: four macro knobs, a mix with mutes, and a keyboard that throws one-shot sounds into the music. A kick, a

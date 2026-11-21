@@ -1,6 +1,6 @@
 # RhinoTiger（犀虎）
 
-[English](https://github.com/hacha/rhinotiger/blob/main/app/docs/MANUAL.md)
+[English](MANUAL.md)
 
 RhinoTiger は、M-VAVE FM-1 のための、ダークサイからハイテックまでの自動生成サイケトランス・ファームウェアです。音楽はひとりで鳴ります。
 あなたは舵を取ります。4つのマクロノブ、ミュート付きのミックス、そして音楽に一発ものの音を投げ込む鍵盤で。
