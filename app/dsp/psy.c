@@ -220,7 +220,8 @@ static struct {
     float k_dr, k_cmp;                 /* its drive (the type's, DRIVE's), and the level keeping its peak */
     float h_k, o_k, c_k, r_k;          /* each one's decay, of the world's: its type's, taken as it strikes */
     float h_a, o_a;                    /* the hats' attack (s; SEED's), taken as they strike */
-    float p_bead, p_bt;                /* SEED's grain: the noise's size now and then, smoothed to it */
+    float p_bead, p_bt;                /* SEED's grain: on or low now and then, smoothed to it */
+    float p_sw, p_slow, p_sband;       /* SEED's band: its weight (moving to it), its filter */
     uint32_t p_bc;
     float p_w[4];                      /* the percussion's source, moving to its type's: noise, metal, grit; its level */
     float p_ph[6], p_nh;               /* TIN's six squares; GRIT's noise held, */
@@ -442,7 +443,8 @@ static const float ATMOS_TYPE[PS_NTYPE][AM_N] = {
  *   TIN   six squares, inharmonic, a little noise, ringing longer: a small cheap cymbal
  *   TICK  short and thin, the clap's tail clipped: dry ticks
  *   GRIT  the noise held in steps (a lower rate), the clap too: dust in the machine
- *   SEED  the hats swelling in over a few ms, fuller, a little longer, their noise grainy: a shaker's seeds */
+ *   SEED  the hats a narrow band of noise round 4.5 kHz (not all of its top), swelling in over ~15 ms, longer, crackling in
+ *         sparse grains: a shaker's seeds */
 enum { PT_HAT, PT_OPEN, PT_CLAP, PT_RIDE, PT_THIN, PT_NOISE, PT_METAL, PT_GRIT, PT_LEVEL, PT_ATTACK, PT_N };
 static const float PERC_TYPE[PS_NTYPE][PT_N] = {
     /* decays: hat  open   clap   ride   thin   noise  metal  grit   level (matched to HISS's) */
@@ -450,7 +452,7 @@ static const float PERC_TYPE[PS_NTYPE][PT_N] = {
     {1.4f, 1.3f, 1.0f, 1.3f, 0.0f, 0.3f, 1.0f, 0.0f, 1.15f},
     {0.45f, 0.5f, 0.4f, 0.5f, 0.06f, 1.0f, 0.0f, 0.0f, 1.25f},
     {1.1f, 1.1f, 1.2f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.55f},
-    {1.7f, 0.75f, 0.9f, 1.0f, -0.10f, 1.0f, 0.0f, 0.0f, 1.13f, 0.007f},   /* (attack: s) */
+    {2.2f, 0.8f, 0.9f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.13f, 0.015f},   /* (attack: s) */
 };
 
 /* the kick's types (ALGORITHM on the KICK page), taken as it strikes. None longer than the world's: after it is the
@@ -1455,6 +1457,13 @@ static void perc(const world_t *w, float dt, float *l, float *r)
     s.h_hp2 = a * (s.h_hp2 + s.h_hp1 - s.h_x2);
     s.h_x2 = s.h_hp1;
     hp = s.h_hp2;
+    s.p_sw += ((pt[PT_ATTACK] > 0.0f ? 1.0f : 0.0f) - s.p_sw) * 0.008f;
+    if (s.p_sw > 0.0005f) {            /* SEED: the hats from a band round 4.5 kHz instead */
+        float hi = src - s.p_slow - 0.4f * s.p_sband;   /* (~4.5 kHz, narrow) */
+        s.p_sband += 0.63f * hi;
+        s.p_slow += 0.63f * s.p_sband;
+        hp += s.p_sw * (0.6f * s.p_sband - hp);
+    }
     if (s.h_t == 0.0f) {               /* (each takes its type's decay as it strikes) */
         s.h_k = pt[PT_HAT];
         s.h_a = fm_maxf(pt[PT_ATTACK], 0.0001f);
@@ -1463,17 +1472,18 @@ static void perc(const world_t *w, float dt, float *l, float *r)
         s.o_k = pt[PT_OPEN] * cf.o_len;  /* (OPEN: longer or shorter) */
         s.o_a = fm_maxf(pt[PT_ATTACK], 0.0001f);
     }
-    if (s.p_bc++ % 48u == 0u)          /* SEED's grain: the noise's size every ~1 ms (the music's dice as they are), */
-        s.p_bt = fm_fabsf(n);
-    s.p_bead += (s.p_bt - s.p_bead) * 0.08f;   /* reached in ~0.3 ms */
+    if (s.p_bc++ % 40u == 0u)          /* SEED's grain: each ~0.9 ms a seed or nearly none, by the noise's size (the
+                                        * music's dice as they are), */
+        s.p_bt = fm_fabsf(n) > 0.55f ? 1.7f : 0.2f;
+    s.p_bead += (s.p_bt - s.p_bead) * 0.03f;   /* reached in ~0.8 ms */
     if (s.c_t == 0.0f)
         s.c_k = pt[PT_CLAP];
     if (s.r_t == 0.0f)
         s.r_k = pt[PT_RIDE];
     if (s.h_t >= 0.0f) {
         x = hp * s.h_v * fm_expf(-s.h_t * 1000.0f / (w->hat_ms * s.h_k)) * 0.20f * (s.h_t < s.h_a ? s.h_t / s.h_a : 1.0f);
-        if (s.h_a > 0.001f)            /* (SEED: grainy) */
-            x *= 0.5f + s.p_bead;
+        if (s.h_a > 0.001f)            /* (SEED: swelling slower at first, grainy) */
+            x *= (s.h_t < s.h_a ? s.h_t / s.h_a : 1.0f) * s.p_bead;
         *l += 0.8f * x;
         *r += 1.1f * x;
         if ((s.h_t += dt) > w->hat_ms * s.h_k * 0.008f)
@@ -1482,7 +1492,7 @@ static void perc(const world_t *w, float dt, float *l, float *r)
     if (s.o_t >= 0.0f) {
         x = hp * s.o_v * fm_expf(-s.o_t * 1000.0f / (w->open_ms * s.o_k)) * 0.22f * (s.o_t < s.o_a ? s.o_t / s.o_a : 1.0f);
         if (s.o_a > 0.001f)
-            x *= 0.5f + s.p_bead;
+            x *= (s.o_t < s.o_a ? s.o_t / s.o_a : 1.0f) * s.p_bead;
         *l += 1.05f * x;
         *r += 0.85f * x;
         if ((s.o_t += dt) > w->open_ms * s.o_k * 0.008f)
