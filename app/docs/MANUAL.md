@@ -457,8 +457,8 @@ Each fades in and out in a few milliseconds.
 
 *SPACE.*
 - WASH: everything but the kick and the bass goes into a great hall. It has no repeats, only a cloud, and their own
-  sound sinks half away. Let go and the music is back, and the hall dies away over a few seconds.
-- DUB: everything goes into the echo, its return lifted, its own sound sunk by a third. The echo is darker and longer, its
+  sound sinks to less than half. Let go and the music is back, and the hall dies away over a few seconds.
+- DUB: everything but the kick and the bass goes into the echo, its return lifted, its own sound sunk by a third. The echo is darker and longer, its
   time stretching slowly and wavering like a tape, its pitch sinking. Let go and it springs back.
 - FREEZE: the music above the kick and the bass is taken into the echo for one echo's time, then looped there, with
   nothing more going in and its own sound sinking beneath. It lifts the echo's return to most of its height, even if
@@ -593,8 +593,8 @@ recorder.
 
 ## 13. Troubleshooting
 
-If you hear nothing, check that PLAY is lit and that MASTER is up. The logo is silent while it shows, and a mute may be
-on (see 7. The performance). A break takes the kick and the bass away for a while (see 8. Sections).
+If you hear nothing, check that PLAY is lit and that MASTER is up. The logo is silent while it shows. A part may be muted
+(see 7. The performance). A break takes the kick, the bass and the percussion away for a while (see 8. Sections).
 
 If the colours seem lost, check THEME on GLOBAL: MONO has no colour.
 
@@ -611,7 +611,7 @@ start after an install, it starts in a safe mode after two failed starts, and th
 ## 14. Licence
 
 RhinoTiger is GPL-3.0-only. It is built on fm1-base (MPL-2.0) and felucca-bsp, which come from Felucca by Leo
-Kuroshita, Hügelton Instruments, and it was started from fm1-base's template by Charles Vestal. The dots of the logo's
+Kuroshita, Hügelton Instruments, and it was started from fm1-base's template by Charles Vestal. The logo's
 characters were drawn from Noto Sans JP Black (SIL Open Font License 1.1). The source is at
 https://github.com/hacha/rhinotiger.
 
