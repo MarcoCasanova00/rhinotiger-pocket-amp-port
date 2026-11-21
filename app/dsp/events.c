@@ -147,9 +147,12 @@ static const key_sound_t KEY_SOUND[16] = {
 };
 
 /* the black keys' rhythms, F#3 to F#5: the ticks between throws (24 a beat), going round, the first where the tick in
- * the beat modulo grid is phase; a pitch step a throw. Or a pattern of the bar's sixteenths (mask, bit i the i-th):
- * where the bar is, from the next sixteenth (never out of step with the groove, nothing waited for) */
-static const struct { uint8_t n; uint8_t iv[13]; uint8_t grid, phase; int8_t step; uint16_t mask; } KEY_RHYTHM[11] = {
+ * the beat modulo grid is phase; a pitch step a throw. Or a pattern of the bar's sixteenths (mask, bit i the i-th), or
+ * of its ticks (bar: iv the n ticks of the bar, 96 to it): where the bar is, from the next (never out of step with the
+ * groove, nothing waited for) */
+static const struct {
+    uint8_t n; uint8_t iv[13]; uint8_t grid, phase; int8_t step; uint16_t mask; uint8_t bar;
+} KEY_RHYTHM[11] = {
     {1, {18}, 6, 0, 0, 0},                                   /* F#3 dotted eighths */
     {1, {12}, 12, 0, 0, 0},                                  /* G#3 eighths (on the eighths) */
     {1, {8}, 8, 0, 0, 0},                                    /* A#3 eighth triplets (on theirs) */
@@ -158,7 +161,9 @@ static const struct { uint8_t n; uint8_t iv[13]; uint8_t grid, phase; int8_t ste
     {0, {0}, 6, 0, 0, 0xAAAAu},                              /* F#4 SKIP: the second and fourth sixteenths, .x.x */
     {0, {0}, 6, 0, 0, 0x4949u},                              /* G#4 3-3-2 each half bar, x..x..x. */
     {13, {6, 6, 6, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2}, 6, 0, 0, 0},  /* A#4 faster and faster (two beats) */
-    {13, {2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 6, 6, 6}, 6, 0, 0, 0},  /* C#5 slower and slower */
+    {13, {0, 4, 8, 12, 17, 22, 28, 34, 41, 49, 58, 68, 80}, 6, 0, 0, 0, 1},   /* C#5 slower and slower over the bar:
+                                                             * from sixteenth triplets to nearly quarters, the bar's
+                                                             * first quick again */
     {1, {6}, 6, 0, 3, 0},                                    /* D#5 sixteenths climbing (a minor third each, eight) */
     {1, {6}, 6, 0, -3, 0},                                   /* F#5 sixteenths falling */
 };
@@ -485,9 +490,17 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
                 ps_ui.hits[HIT_EVENT]++;
             }
     }
-    if (ev.rk >= 0 && KEY_RHYTHM[key_blacki(ev.rk)].mask) {   /* a pattern's: on its sixteenths of the bar */
+    if (ev.rk >= 0 && (KEY_RHYTHM[key_blacki(ev.rk)].mask || KEY_RHYTHM[key_blacki(ev.rk)].bar)) {
+        /* a pattern's: on its sixteenths of the bar, or its ticks */
+        int b = key_blacki(ev.rk), on = 0;
+        uint32_t i, tb = pos16 % 16u * 6u + t % 6u;   /* (the tick in the bar) */
+        if (KEY_RHYTHM[b].bar) {
+            for (i = 0; i < KEY_RHYTHM[b].n; i++)
+                on |= KEY_RHYTHM[b].iv[i] == tb;
+        } else
+            on = t % 6u == 0u && (KEY_RHYTHM[b].mask >> (pos16 % 16u) & 1u);
         ev.rstart = 0;
-        if (t % 6u == 0u && (KEY_RHYTHM[key_blacki(ev.rk)].mask >> (pos16 % 16u) & 1u)) {
+        if (on) {
             uint32_t whites = (ev.down | ev.pending) & ~KEY_BLACKS;
             ev.pending = 0;
             for (k = 0; k < 27; k++)
