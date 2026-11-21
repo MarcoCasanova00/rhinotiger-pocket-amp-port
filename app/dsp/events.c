@@ -587,9 +587,10 @@ static void ev_ctl(evoice_t *v, float t, float dt, float wide, float law, float 
         amp = u * u * (u < 0.94f ? 1.0f : (1.0f - u) / 0.06f) * v->level * 0.28f;
     else
         amp = (t < 0.001f ? t / 0.001f : 1.0f) * fm_expf(-t / v->tau) * (1.0f - u * u) * v->level * 0.28f;
-    if (v->chop > 0.0f) {              /* RATCHET: on the first 55% of each turn (its edges the control points' ramps) */
-        float c = v->chop * t;
-        amp *= c - fm_floorf(c) < 0.55f ? 1.0f : 0.0f;
+    if (v->chop > 0.0f) {              /* RATCHET: on the first 55% of each turn, its edges ~1.8 ms slopes */
+        float c = v->chop * t, e = 0.0018f * v->chop;
+        c -= fm_floorf(c);
+        amp *= fm_clampf(fm_minf(c, 0.55f - c) / e, 0.0f, 1.0f);
     }
     p1 = v->pan1 + (-v->pan0 - v->pan1) * cross;   /* (SPREAD past 50: crossing) */
     pan = fm_clampf((v->pan0 + (p1 - v->pan0) * u) * wide, -1.0f, 1.0f);

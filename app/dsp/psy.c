@@ -216,7 +216,7 @@ static struct {
     const float *k_ty;                 /* the kick's type, taken as it strikes (KICK_TYPE) */
     float k_mph;                       /* KNOCK's modulator */
     uint32_t k_nz;                     /* CRACK's noise: its own dice */
-    float k_nl;                        /* (its last sample: the lows taken off) */
+    float k_nb, k_nl;                  /* (rounded, and its last sample: the lows taken off) */
     float k_dr, k_cmp;                 /* its drive (the type's, DRIVE's), and the level keeping its peak */
     float h_k, o_k, c_k, r_k;          /* each one's decay, of the world's: its type's, taken as it strikes */
     float p_w[4];                      /* the percussion's source, moving to its type's: noise, metal, grit; its level */
@@ -1348,9 +1348,10 @@ static float kick(float dt)
         float n;
         s.k_nz = s.k_nz * 1664525u + 1013904223u;
         n = (float)(int32_t)s.k_nz * (1.0f / 2147483648.0f);
-        x += 0.45f * ty[KT_NOISE] * (0.6f + 0.4f * punch) * (n - s.k_nl) * fm_expf(-t / 0.0022f) *
-             (t < 0.0002f ? t / 0.0002f : 1.0f);
-        s.k_nl = n;
+        s.k_nb += 0.45f * (n - s.k_nb);           /* (its very top rounded: ~4 kHz up, not a sample's steps) */
+        x += 0.6f * ty[KT_NOISE] * (0.6f + 0.4f * punch) * (s.k_nb - s.k_nl) * fm_expf(-t / 0.0022f) *
+             (t < 0.0005f ? t / 0.0005f : 1.0f);
+        s.k_nl = s.k_nb;
     }
     s.k_t = t + dt;
     x = fm_tanhf(x * s.k_dr) * ty[KT_LEVEL] * s.k_cmp;
