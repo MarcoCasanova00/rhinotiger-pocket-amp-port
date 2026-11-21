@@ -163,7 +163,7 @@ world is as it is.
 
 ALGORITHM turns the kit. What it changed shows in the header for a moment, each type in the colour of its part.
 
-![The header after a kit change: KIT TICK OFFBEAT, the percussion's new type and the bass's new shape](img/screen-kit.png "A kit, taken")
+![The header after a kit change: KIT GLASS K-B-B-B, the line's new type and the bass's new shape](img/screen-kit.png "A kit, taken")
 
 ### 5.2 GROOVE
 
@@ -536,7 +536,7 @@ their own. How likely it is depends on BREAKS and DRIFT together: at the default
 
 ![In the break: the lanes nearly bare, BREAK under them](img/screen-break.png "In the break")
 
-![In a build, on the PHASE page: BUILD under the lanes, AUTO and FILTER at the left of the rule](img/screen-build.png "In a build")
+![In a build, on the PHASE page: BUILD under the lanes, AUTO and FAKE at the left of the rule](img/screen-build.png "In a build")
 
 ---
 

@@ -154,7 +154,7 @@ HOME。4つのマクロです。それぞれが音楽のいくつかのことを
 
 ALGORITHM でキットが回ります。変わったものは、ヘッダーにしばらく出て、それぞれの種類がそのパートの色で出ます。
 
-![キットが変わったあとのヘッダー。KIT TICK OFFBEAT と、パーカッションの新しい種類とベースの新しい形](img/screen-kit.png "キットが変わったところ")
+![キットが変わったあとのヘッダー。KIT GLASS K-B-B-B と、ラインの新しい種類とベースの新しい形](img/screen-kit.png "キットが変わったところ")
 
 ### 5.2 GROOVE
 
@@ -486,7 +486,7 @@ ECHO ページ（FX）では、鍵盤はイベントではなくパフォーマ�
 
 ![ブレイクの中。レーンはほとんど空で、その下に BREAK](img/screen-break.png "ブレイクの中")
 
-![ビルドの中、PHASE ページ。レーンの下に BUILD、ルールの左に AUTO と FILTER](img/screen-build.png "ビルドの中")
+![ビルドの中、PHASE ページ。レーンの下に BUILD、ルールの左に AUTO と FAKE](img/screen-build.png "ビルドの中")
 
 ---
 
