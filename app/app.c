@@ -1311,7 +1311,8 @@ static void draw(void)
     draw_knobs(now);
 }
 
-/* the logo: the rhino-tiger's face behind (face.h, its greys tinted dim, cyan above to violet below, its eyes gold), 犀
+/* the logo: the rhino-tiger's face behind (face.h: its bands of colour turning outward, a band an eighth note at the
+ * tempo, each step landing quick and settling; its eyes gold, its whiskers white; the rest dimmer once the characters are on), 犀
  * over 虎 large on it (logo.h: LOGO_PX square, their edges smooth, a dark ring round them, a rainbow downwards: magenta
  * to acid green), and across the middle a band, RHINOTIGER in it. At boot they come one by one, LOGO_STEP ms apart
  * (the face alone, then the characters on it, then the band), and all of them stay LOGO_HOLD ms. Drawn in two parts
@@ -1335,29 +1336,32 @@ static void cv_mix(int32_t x, int32_t y, uint16_t c, uint32_t a)   /* c over wha
     b = ((o & 31u) * (15u - a) + ((uint32_t)c & 31u) * a) / 15u;
     cv_px[i] = swap16(r << 11 | g << 5 | b);
 }
-static void draw_logo(uint32_t layers)
+static void draw_logo(uint32_t layers, uint32_t ms)   /* ms: since the logo began */
 {
     static const int32_t PART[3] = {0, 104, 240};
-    uint32_t k = 0, run = 0, lv = 0;
+    static uint16_t lut[256];
     int32_t pt, y, x;
+    if (layers & LOGO_FACE) {                /* the face's colours now: a band's hue, less the flow; its levels */
+        uint32_t e8 = ms * ps_bpm() * 2u, n = e8 / 60000u;   /* (eighth notes gone by, and how far into this one) */
+        float f = (float)(e8 % 60000u) / 60000.0f, e = 1.0f - (1.0f - f) * (1.0f - f) * (1.0f - f);
+        int32_t flow = (int32_t)(((float)(n % FACE_TURN) + e) * (float)HUE_FULL / (float)FACE_TURN);
+        int32_t dim = layers & LOGO_CHARS ? 13 : 17, b, l;
+        for (b = 0; b < 16; b++)
+            for (l = 0; l < 16; l++)
+                lut[b << 4 | l] = !l ? RGB(0, 0, 0)
+                                : b == 15 ? hsv(HUE_GOLD, 200, l * 17)   /* (the eyes: never dimmed) */
+                                : b == 14 ? hsv(0, 0, l * dim)
+                                : hsv(HUE_MAGENTA + b * HUE_FULL / FACE_TURN - flow, 225, l * dim);
+    }
     for (pt = 0; pt < 2; pt++) {
         int32_t y0 = PART[pt], h = PART[pt + 1] - y0;
         cv_begin(240, (uint32_t)h, RGB(0, 0, 0));
-        for (y = 0; y < h; y++)              /* the face (its runs read on from the part before) */
-            for (x = 0; x < 240; x++) {
-                if (!run && k < FACE_N) {
-                    lv = FACE[k] >> 4;
-                    run = (FACE[k] & 15u) + 1u;
-                    k++;
-                }
-                if (run)
-                    run--;
-                if (!(layers & LOGO_FACE))
-                    continue;
-                if (lv >= 14u)               /* the brightest (its eyes alone): glowing gold */
-                    cv_pset(x, y, hsv(HUE_GOLD, 190, (int32_t)lv * 16));
-                else if (lv)
-                    cv_pset(x, y, hsv(HUE_CYAN + (y0 + y) * (HUE_VIOLET - HUE_CYAN) / 240, 170, (int32_t)lv * 11));
+        if (layers & LOGO_FACE)
+            for (y = 0; y < h; y++) {
+                const uint8_t *row = FACE + (uint32_t)(y0 + y) * FACE_W;
+                for (x = 0; x < 240; x++)
+                    if (row[x])
+                        cv_pset(x, y, lut[row[x]]);
             }
         if (layers & LOGO_CHARS) {           /* the characters: their ring, then them, over what is there */
             uint32_t i = 0, n = 0, v = 0, p, row = 0xFFFFFFFFu;
@@ -1406,7 +1410,7 @@ static void draw_logo(uint32_t layers)
 static uint8_t splashed;                 /* the device's splash showed the face already (through the boot's waits) */
 void app_splash(void)
 {
-    draw_logo(LOGO_FACE);
+    draw_logo(LOGO_FACE, 0);
     splashed = 1;
 }
 #endif
@@ -1421,8 +1425,9 @@ void app_ui_init(void)
     }
 #endif
     ui.logo_layers = skip ? LOGO_FACE | LOGO_CHARS : LOGO_FACE;
-    draw_logo(ui.logo_layers);               /* (the host: no splash, the face first here) */
+    draw_logo(ui.logo_layers, skip);         /* (the host: no splash, the face first here) */
     ui.logo_at = plat_ms() - skip;
+    ui.last_draw = plat_ms();
     ui.logo_until = ui.logo_at + 2u * LOGO_STEP + LOGO_HOLD;
     ui.thrown_type = -1;
     ui.redraw = 1;
@@ -1451,9 +1456,10 @@ void app_frame(void)
         if ((int32_t)(now - ui.logo_until) < 0) {
             uint32_t el = now - ui.logo_at,
                      want = el >= 2u * LOGO_STEP ? LOGO_ALL : el >= LOGO_STEP ? LOGO_FACE | LOGO_CHARS : LOGO_FACE;
-            if (want != ui.logo_layers) {
+            if (want != ui.logo_layers || now - ui.last_draw >= 33u) {   /* (its colours turning: ~30 a second) */
                 ui.logo_layers = (uint8_t)want;
-                draw_logo(want);
+                ui.last_draw = now;
+                draw_logo(want, el);
             }
             return;
         }

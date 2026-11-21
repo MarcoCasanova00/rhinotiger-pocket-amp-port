@@ -50,12 +50,12 @@ M-VAVE's own firmware back.
 
 ## 2. Starting up
 
-When the FM-1 starts, the logo shows: a face behind, the two characters 犀 and 虎 on it, and a band across the middle
-with RHINOTIGER in it. They come one by one and stay a moment, about two and a half seconds in all. The sound is
+When the FM-1 starts, the logo shows: a face behind, ringed with colours that flow outward in time with the tempo, the
+two characters 犀 and 虎 on it, and a band across the middle with RHINOTIGER in it. They come one by one and stay a moment, about two and a half seconds in all. The sound is
 silent until they are gone. Then the music starts at once, from the top, with the settings you saved (see 10.
 Saving).
 
-![The logo: a rhino-tiger face, 犀 above 虎 in rainbow colours, and a band across the middle with RHINOTIGER](img/screen-logo.png "The logo")
+![The logo: a rhino-tiger face in rings of colour, 犀 above 虎 in rainbow colours, and a band across the middle with RHINOTIGER](img/screen-logo.png "The logo")
 
 You don't have to wait for it. Press PLAY while the logo is up and the music starts at once. Turning the knobs and
 pressing the keys already works during the logo.
