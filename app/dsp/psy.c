@@ -1132,7 +1132,11 @@ static void drop(uint32_t bar)         /* on this bar's first tick: the groove a
     enter(SEC_MAIN, 0);
     s.origin = s.last_drop = bar;
     s.drops++;
-    s.type[PART_BASS] = (uint8_t)((s.type[PART_BASS] + 1u + rnd() % 3u) % 4u);   /* another of the bass's four colours */
+    {                                  /* another of the bass's four colours; or, less often the higher DRIFT, the same */
+        uint32_t r = rnd() % 3u;
+        if (vary_u(0u, 0xBA55u) >= 0.4f * (1.0f - m.drift))
+            s.type[PART_BASS] = (uint8_t)((s.type[PART_BASS] + 1u + r) % 4u);
+    }
     s.out = 0;
     ps_ui.sitting_out = 0;
     s.x_t = 0.0f;                      /* the crash */
@@ -1159,8 +1163,10 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
             enter(SEC_BREAK, 0);
         else if (par[P_BREAKS] > 0 && rb && rb % 32u == 0u && bar - s.last_drop >= GAP_BARS[clampi(par[P_GAP] + vary_step(0u, 0x6A90u, VARY_P), 0, 3)] &&
                  (float)(rnd() % 100u) < 70.0f * m.drift * ((float)par[P_BREAKS] / 50.0f)) {
-            uint32_t len = BREAK_BARS[clampi(par[P_BREAK_LEN], 0, 4)];
-            enter(SEC_BREAK, len ? len : w->brk);
+            int k = clampi(par[P_BREAK_LEN], 0, 4), d = vary_step(0u, 0xB7EAu, VARY_P);   /* (swayed as BUILD's) */
+            uint32_t len = k ? BREAK_BARS[clampi(k + d, 1, 4)]   /* (the world's: half or twice it, 4 to 32) */
+                             : (uint32_t)clampi(d < 0 ? w->brk / 2 : d > 0 ? w->brk * 2 : w->brk, 4, 32);
+            enter(SEC_BREAK, len);
         }
     } else if (s.sec == SEC_BREAK) {
         if (build || (s.sec_len && s.sec_bar >= s.sec_len))   /* (a break cued in a break: nothing) */

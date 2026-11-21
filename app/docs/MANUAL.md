@@ -155,9 +155,10 @@ world is as it is.
 - DARK: darker and stranger, or brighter and plainer. Higher darkens the bass, leans the one-shot sounds to the low and
   the middle, brings in harsher notes and lets the line creep and reach higher. Lower is lighter and more open. 50.
 - DRIFT: how much changes by itself. Higher redraws more of the one-shot sounds at each phrase, lets the bass open and
-  close further, rewrites more of the line, lets breaks come on their own more often (see 8. Sections), and lets FILLS,
-  BUILD and GAP stray more often from their lengths to the next one down or up (see GROOVE and PHASE). At 0 nothing
-  moves by itself, no break comes on its own, and those lengths are exact. 50.
+  close further, rewrites more of the line, lets breaks come on their own more often (see 8. Sections), lets FILLS,
+  BUILD, BREAK and GAP stray more often from their lengths to the next one down or up (see GROOVE and PHASE). At 0 nothing
+  moves by itself, no break comes on its own, and those lengths are exact; higher, the bass changes its type at more
+  of the drops. 50.
 
 ALGORITHM turns the kit. What it changed shows in the header for a moment, each type in the colour of its part.
 
@@ -193,7 +194,8 @@ Sections).
 
 - BREAKS: how often a break comes on its own. At 0 it says CUED: a break comes only when you call it. Higher is more
   often, and DRIFT scales it. 50.
-- BREAK: how long a break that comes on its own lasts. WORLD leaves it to the world; or 4, 8, 16 or 32 bars. WORLD.
+- BREAK: how long a break that comes on its own usually lasts. WORLD leaves it to the world; or 4, 8, 16 or 32 bars.
+  Now and then a break is half or twice as long, more often with DRIFT higher. WORLD.
 - BUILD: how long a build usually lasts: 2, 4 or 8 bars. Now and then a build is one step shorter or longer, more often
   with DRIFT higher. 4.
 - GAP: the fewest bars between a drop and the next break that comes on its own: 32, 64, 96 or 128. After some drops it
@@ -240,7 +242,7 @@ SEL again.
 - LENGTH: how long each note is, from short stabs (a quarter of the world's) to as long as a note can be. 50.
 - DRIVE: how hard the bass is driven. 50.
 
-ALGORITHM picks the type, the bass's colour: ROUND, BITTEN, METAL or HOLLOW. Every drop picks another on its own.
+ALGORITHM picks the type, the bass's colour: ROUND, BITTEN, METAL or HOLLOW. Most drops pick another on its own; with DRIFT lower, more of them keep it.
 
 ### 5.6 PERC
 
@@ -507,7 +509,7 @@ A muted part's name is struck through on the screen, and its black key goes dark
 The music moves through sections by itself, and you can call them. There are three. The groove is the main part. A
 break takes the kick, the bass and the percussion out, brings the atmosphere up and thins the events, and the line goes
 softer. A build comes after it, a roll and a rising noise, for a few bars. Then the drop: on a bar's first beat
-everything is back, with a crash. After a drop the bass is another of its four types, the events' loop and the line's
+everything is back, with a crash. After a drop the bass is most often another of its four types, the events' loop and the line's
 phrase are drawn anew, and the colours jump. The music never comes back exactly as it was.
 
 **By itself.** If BREAKS is above 0 and DRIFT is above 0, a break may come as a block of 32 bars begins, and not
