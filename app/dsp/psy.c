@@ -219,6 +219,9 @@ static struct {
     float k_nb, k_nl;                  /* (rounded, and its last sample: the lows taken off) */
     float k_dr, k_cmp;                 /* its drive (the type's, DRIVE's), and the level keeping its peak */
     float h_k, o_k, c_k, r_k;          /* each one's decay, of the world's: its type's, taken as it strikes */
+    float h_a, o_a;                    /* the hats' attack (s; SEED's), taken as they strike */
+    float p_bead, p_bt;                /* SEED's grain: the noise's size now and then, smoothed to it */
+    uint32_t p_bc;
     float p_w[4];                      /* the percussion's source, moving to its type's: noise, metal, grit; its level */
     float p_ph[6], p_nh;               /* TIN's six squares; GRIT's noise held, */
     uint32_t p_hc;                     /* its count */
@@ -405,7 +408,7 @@ static const char *const TYPE_NAME[6][PS_NTYPE] = {   /* PART_*; as many as each
     [PART_KICK] = {"SOLID", "HARD", "KNOCK", "ZIP", "CRACK"},
     [PART_BASS] = {"ROUND", "BITTEN", "METAL", "HOLLOW", "SNAP", "NASAL"},
     [PART_LINE] = {"ACID", "GLASS", "GROWL", "REED", "BEND", "CRUSH"},
-    [PART_PERC] = {"HISS", "TIN", "TICK", "GRIT"},
+    [PART_PERC] = {"HISS", "TIN", "TICK", "GRIT", "SEED"},
     [PART_EVENTS] = {"ALIVE", "METAL", "LIQUID", "SHARD", "GHOST", "RATCHET"},
     [PART_ATMOS] = {"MIST", "CHIME", "DRONE", "GRAIN", "PULSE"},
 };
@@ -438,14 +441,16 @@ static const float ATMOS_TYPE[PS_NTYPE][AM_N] = {
  *   HISS  the world's own: noise
  *   TIN   six squares, inharmonic, a little noise, ringing longer: a small cheap cymbal
  *   TICK  short and thin, the clap's tail clipped: dry ticks
- *   GRIT  the noise held in steps (a lower rate), the clap too: dust in the machine */
-enum { PT_HAT, PT_OPEN, PT_CLAP, PT_RIDE, PT_THIN, PT_NOISE, PT_METAL, PT_GRIT, PT_LEVEL, PT_N };
+ *   GRIT  the noise held in steps (a lower rate), the clap too: dust in the machine
+ *   SEED  the hats swelling in over a few ms, fuller, a little longer, their noise grainy: a shaker's seeds */
+enum { PT_HAT, PT_OPEN, PT_CLAP, PT_RIDE, PT_THIN, PT_NOISE, PT_METAL, PT_GRIT, PT_LEVEL, PT_ATTACK, PT_N };
 static const float PERC_TYPE[PS_NTYPE][PT_N] = {
     /* decays: hat  open   clap   ride   thin   noise  metal  grit   level (matched to HISS's) */
     {1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
     {1.4f, 1.3f, 1.0f, 1.3f, 0.0f, 0.3f, 1.0f, 0.0f, 1.15f},
     {0.45f, 0.5f, 0.4f, 0.5f, 0.06f, 1.0f, 0.0f, 0.0f, 1.25f},
     {1.1f, 1.1f, 1.2f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.55f},
+    {1.7f, 0.75f, 0.9f, 1.0f, -0.10f, 1.0f, 0.0f, 0.0f, 1.13f, 0.007f},   /* (attack: s) */
 };
 
 /* the kick's types (ALGORITHM on the KICK page), taken as it strikes. None longer than the world's: after it is the
@@ -861,6 +866,7 @@ void ps_init(void)
     s.k_t = s.b_t = -1.0f;
     s.h_t = s.o_t = s.c_t = s.r_t = -1.0f;
     s.h_k = s.o_k = s.c_k = s.r_k = 1.0f;
+    s.h_a = s.o_a = 0.0001f;
     s.k_ty = KICK_TYPE[0];
     s.p_w[0] = s.p_w[3] = 1.0f;
     s.gap_g = 1.0f;
@@ -1449,23 +1455,34 @@ static void perc(const world_t *w, float dt, float *l, float *r)
     s.h_hp2 = a * (s.h_hp2 + s.h_hp1 - s.h_x2);
     s.h_x2 = s.h_hp1;
     hp = s.h_hp2;
-    if (s.h_t == 0.0f)                 /* (each takes its type's decay as it strikes) */
+    if (s.h_t == 0.0f) {               /* (each takes its type's decay as it strikes) */
         s.h_k = pt[PT_HAT];
-    if (s.o_t == 0.0f)
+        s.h_a = fm_maxf(pt[PT_ATTACK], 0.0001f);
+    }
+    if (s.o_t == 0.0f) {
         s.o_k = pt[PT_OPEN] * cf.o_len;  /* (OPEN: longer or shorter) */
+        s.o_a = fm_maxf(pt[PT_ATTACK], 0.0001f);
+    }
+    if (s.p_bc++ % 48u == 0u)          /* SEED's grain: the noise's size every ~1 ms (the music's dice as they are), */
+        s.p_bt = fm_fabsf(n);
+    s.p_bead += (s.p_bt - s.p_bead) * 0.08f;   /* reached in ~0.3 ms */
     if (s.c_t == 0.0f)
         s.c_k = pt[PT_CLAP];
     if (s.r_t == 0.0f)
         s.r_k = pt[PT_RIDE];
     if (s.h_t >= 0.0f) {
-        x = hp * s.h_v * fm_expf(-s.h_t * 1000.0f / (w->hat_ms * s.h_k)) * 0.20f * (s.h_t < 0.0001f ? s.h_t / 0.0001f : 1.0f);
+        x = hp * s.h_v * fm_expf(-s.h_t * 1000.0f / (w->hat_ms * s.h_k)) * 0.20f * (s.h_t < s.h_a ? s.h_t / s.h_a : 1.0f);
+        if (s.h_a > 0.001f)            /* (SEED: grainy) */
+            x *= 0.5f + s.p_bead;
         *l += 0.8f * x;
         *r += 1.1f * x;
         if ((s.h_t += dt) > w->hat_ms * s.h_k * 0.008f)
             s.h_t = -1.0f;
     }
     if (s.o_t >= 0.0f) {
-        x = hp * s.o_v * fm_expf(-s.o_t * 1000.0f / (w->open_ms * s.o_k)) * 0.22f * (s.o_t < 0.0001f ? s.o_t / 0.0001f : 1.0f);
+        x = hp * s.o_v * fm_expf(-s.o_t * 1000.0f / (w->open_ms * s.o_k)) * 0.22f * (s.o_t < s.o_a ? s.o_t / s.o_a : 1.0f);
+        if (s.o_a > 0.001f)
+            x *= 0.5f + s.p_bead;
         *l += 1.05f * x;
         *r += 0.85f * x;
         if ((s.o_t += dt) > w->open_ms * s.o_k * 0.008f)

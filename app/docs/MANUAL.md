@@ -260,7 +260,8 @@ ENV.
   rises. 50 is as it is.
 
 ALGORITHM picks the type: HISS is the world's own; TIN rings longer, a small cheap cymbal; TICK is short and thin, dry ticks;
-GRIT is the noise held in steps, dust in the machine.
+GRIT is the noise held in steps, dust in the machine; SEED
+swells into each hat over a few milliseconds, fuller and grainy, a shaker's seeds.
 
 ### 5.7 EVENTS
 
