@@ -160,7 +160,9 @@ static const struct {
     {0, {0}, 6, 0, 0, 0x4444u},                              /* D#4 the offbeat eighths, ..x. a beat */
     {0, {0}, 6, 0, 0, 0xAAAAu},                              /* F#4 SKIP: the second and fourth sixteenths, .x.x */
     {0, {0}, 6, 0, 0, 0x4949u},                              /* G#4 3-3-2 each half bar, x..x..x. */
-    {13, {6, 6, 6, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2}, 6, 0, 0, 0},  /* A#4 faster and faster (two beats) */
+    {13, {0, 16, 28, 38, 47, 55, 62, 68, 74, 79, 84, 88, 92}, 6, 0, 0, 0, 1},   /* A#4 faster and faster over the bar:
+                                                             * from nearly quarters to sixteenth triplets, into the
+                                                             * next bar's first */
     {13, {0, 4, 8, 12, 17, 22, 28, 34, 41, 49, 58, 68, 80}, 6, 0, 0, 0, 1},   /* C#5 slower and slower over the bar:
                                                              * from sixteenth triplets to nearly quarters, the bar's
                                                              * first quick again */
