@@ -14,7 +14,7 @@ RhinoTiger（犀虎）は、M-VAVE FM-1 のための、ダークサイからハ�
 - [ブラウザで試す](../emu/)。音つきで、ここで鳴らせます。FM-1 と同じコードが動くので、FM-1 がなくてもかまいません。
 - FM-1 を USB でつなぎ、Chrome か Edge から[インストール](../install/)します。
 - [マニュアル](../manual/ja/)では、画面、ページ、鍵盤とエフェクト、セクション、世界を説明しています。
-- コマンドラインのインストーラーを使うなら、[{{PKG}} をダウンロード](../firmware/{{PKG}})して `python3 tools/fm1_install.py {{PKG}}` を実行します。
+- コマンドラインのインストーラーを使うなら、[{{PKG}} をダウンロード](../firmware/{{PKG}})して ソースの中で `python3 base/tools/fm1_install.py {{PKG}}` を実行します。
 - [ソース](https://github.com/hacha/rhinotiger)は GPL-3.0-only です。fm1-base（MPL-2.0）と felucca-bsp の上に作られていて、どちらも
   Hügelton Instruments の Leo Kuroshita による Felucca に由来します。また、Charles Vestal による fm1-base のテンプレートから始まりました。
   ロゴの文字は Noto Sans JP Black（SIL Open Font License 1.1）から描き起こしたものです。

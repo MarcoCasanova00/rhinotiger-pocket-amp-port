@@ -16,7 +16,7 @@ This is version {{VERSION}}. You install it at your own risk, and the installer 
   need one.
 - [Install](install/) it from Chrome or Edge, with the FM-1 connected by USB.
 - The [Manual](manual/) explains the screen, the pages, the keys and the effects, the sections and the worlds.
-- [Download {{PKG}}](firmware/{{PKG}}) to use the command-line installer: `python3 tools/fm1_install.py {{PKG}}`.
+- [Download {{PKG}}](firmware/{{PKG}}) to use the command-line installer: `python3 base/tools/fm1_install.py {{PKG}}` (in the source).
 - The [Source](https://github.com/hacha/rhinotiger) is under GPL-3.0-only. It's built on fm1-base (MPL-2.0) and
   felucca-bsp, which come from Felucca by Leo Kuroshita, Hügelton Instruments, and it was started from fm1-base's
   template by Charles Vestal. The logo's characters were drawn from Noto Sans JP Black (SIL Open Font License 1.1).

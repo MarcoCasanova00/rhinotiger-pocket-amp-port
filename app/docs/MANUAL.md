@@ -32,39 +32,34 @@ Eight worlds, slow and wet to fast and fine, decide how it all behaves.
 
 ## 1. Install
 
-To try it first, open the emulator. It runs the same code in your browser, with sound.
+To try it first, open the [emulator](../emu/). It runs the same code in your browser, with sound.
 
-To install it from the browser, use Chrome or Edge. Connect the FM-1 by USB, open the installer and press Install.
+To install it from the browser, use Chrome or Edge. Connect the FM-1 by USB, open the [installer](../install/) and press Install.
 The browser asks once to allow MIDI, so allow it. Don't unplug the cable while it writes.
 
-To install it from a terminal, run `python3 tools/fm1_install.py rhinotiger-VERSION.fwsc`, with the package that
-goes with the version you downloaded.
+To install it from a terminal, download the package and, in the source, run
+`python3 base/tools/fm1_install.py rhinotiger-VERSION.fwsc`.
 
 RhinoTiger keeps only its own settings. It doesn't read what another firmware saved (projects, presets, samples),
 and that may not be there when you go back to it, so back it up first.
 
-You install it at your own risk. To go back to the stock firmware, use the installer's last section, which writes
-M-VAVE's own firmware back.
+You install it at your own risk. To go back to the stock firmware, use the installer's "Back to the stock firmware":
+download M-VAVE's own firmware (FM-1.fwsc), choose it there and press the button.
 
 ---
 
 ## 2. Starting up
 
-When the FM-1 starts, the logo shows: a face behind, ringed with colours that flow outward in time with the tempo, the
-two characters 犀 and 虎 on it, and a band across the middle with RHINOTIGER in it. They come one by one and stay a moment, about two and a half seconds in all. The sound is
-silent until they are gone. Then the music starts at once, from the top, with the settings you saved (see 10.
+Switch the FM-1 on and the logo shows. When it goes, the music starts by itself, with the settings you saved (see 10.
 Saving).
 
 ![The logo: a rhino-tiger face in rings of colour, 犀 above 虎 in rainbow colours, and a band across the middle with RHINOTIGER](img/screen-logo.png "The logo")
 
-You don't have to wait for it. Press PLAY while the logo is up and the music starts at once. Turning the knobs and
-pressing the keys already works during the logo.
+To start without waiting, press PLAY while the logo is up.
 
-The music starts sparse. Over the first bars the parts come in one by one: the kick, the bass and the hats first, then
-the open hat, the clap, the line and the rest, and after about 24 bars it is all there (some 40 seconds, depending on
-the world; see 9. Worlds).
+The music starts sparse, and the parts come in one by one until it is all there.
 
-Press PLAY again and it rests at once. Press it once more and it begins again from the top, sparse as before.
+PLAY rests it. Press it again and it begins anew, sparse as before.
 
 ---
 
@@ -126,9 +121,9 @@ quickly while it waits for the next bar, on the beats while it takes, and is lit
 | MASTER | The volume. |
 | Keys | Throw sounds into the music. On the ECHO page they are the performance instead. |
 
-ALGORITHM does something different on each page. On MAIN it takes the kit: forward, one part, or a few of the parts
-that are sounding, take another type from the next bar, and the more you turn in a bar the more change (up to three
-parts); back, the kit before, up to eight steps. On GROOVE it picks the shape of the bass. On ECHO it picks the kind of echo. On KICK, BASS, PERC, EVENTS, LINE, LINE SEQ and ATMOS it picks the type of
+ALGORITHM does something different on each page. On MAIN it changes the kit. Turn it forward and one
+or a few of the sounding parts take another type from the next bar; the more you turn within a bar, the more parts
+change, up to three. Turn it back for the kit before, up to eight steps. On GROOVE it picks the shape of the bass. On ECHO it picks the kind of echo. On KICK, BASS, PERC, EVENTS, LINE, LINE SEQ and ATMOS it picks the type of
 that part, one of four to six, and the new type begins from the part's next note. On MIX it picks the type of the
 track TRACK has chosen. On BREAK, BUILD and GLOBAL it does nothing. The name
 of the choice shows at the left of the rule. Types and shapes are listed on the pages they belong to. They are not
@@ -155,11 +150,10 @@ world is as it is.
 - DARK: darker and stranger, or brighter and plainer. Higher darkens the bass, leans the one-shot sounds to the low and
   the middle, brings in harsher notes and lets the line creep and reach higher. Lower is lighter and more open. 50.
 - DRIFT: how much changes by itself. Higher redraws more of the one-shot sounds at each phrase, lets the bass open and
-  close further, rewrites more of the line, lets breaks come on their own more often (see 8. Sections), lets FILLS,
-  GAP and the LENGTH of breaks and builds stray more often from their lengths to the next one down or up (see GROOVE,
-  BREAK and BUILD). At 0 nothing
-  moves by itself, no break comes on its own, and those lengths are exact; higher, the bass changes its type at more
-  of the drops. 50.
+  close further, rewrites more of the line, lets breaks come on their own more often (see 8. Sections), and changes
+  the bass's type at more of the drops. It also lets FILLS, GAP and the LENGTH of breaks and builds stray more often
+  to the next one down or up (see GROOVE, BREAK and BUILD). At 0 nothing moves by itself, no break comes on its own,
+  and those lengths are exact. 50.
 
 ALGORITHM turns the kit; MORPH, on BREAK, also turns it now and then by itself. What changed shows in the header for a
 moment, each type in the colour of its part.
@@ -177,9 +171,8 @@ HOME again.
 - ROOT: the note the bass and the kick are built on, shown by name. It moves it up to five semitones down and six up.
   The world's own.
 - FILLS: how often the last beat of a bar turns into a fill, with the bass resting and a clap rolling up, and how often a
-  phrase ends in a twist of the kick. OFF, or every 32, 16, 8 or 4 bars. That is the usual distance: every 32 bars it
-  may become half or twice as long for a while, more often with DRIFT higher, and the fills still fall on the ends of
-  4, 8, 16 or 32 bars. 8.
+  phrase ends in a twist of the kick. OFF, or every 32, 16, 8 or 4 bars. That is the usual distance; for a while it may be
+  halved or doubled, more often with DRIFT higher. The fills always fall on the ends of 4, 8, 16 or 32 bars. 8.
 - SIT OUT: how often one of the percussion (the hats, the open hat, the clap, the ride) rests for a whole phrase.
   At 0 never. 25.
 
@@ -343,7 +336,7 @@ LFO again. The phrase itself. Its 32 steps show at once, so you hear a change st
 - RANGE: how high the notes reach. At 0 they stay on the root; at 100 they reach twice the world's range. 50.
 - SLIDE: how many notes slide into the next. 50.
 
-ALGORITHM picks the type, as on LINE.
+ALGORITHM picks the type, as on LINE. Holding LFO draws the phrase anew here too (`NEW PHRASE`).
 
 ### 5.11 ATMOS
 
@@ -372,7 +365,7 @@ with a cap, and under its name is a short bar for its send into the echo. The tr
 muted part is dark. ALGORITHM picks that track's type, as on the part's own page, and its name shows at the left of the
 rule.
 
-- TRACK: which part the next three knobs act on: KICK, BASS, PERC, EVENTS, LINE, ATMOS. KICK.
+- TRACK: which part the next three knobs act on: KICK, BASS, PERC, EVENTS, LINE, ATMOS (EVT and ATM on the strips). KICK.
 - LEVEL: its level. 80 for the kick, bass, percussion and events; 70 for the line and the atmosphere.
 - SEND: how much of it goes into the echo. The kick and the bass have none: the knob is blank. 0 for the percussion;
   50 for the events, the line and the atmosphere.
@@ -403,9 +396,8 @@ GLO.
 - LIGHTS: the glow of the buttons: OFF, LOW or HIGH. LOW.
 - THEME: the colours of the screen and how they move. NEON.
 - CPU: how much of its time the audio is using, in percent. It is only a reading; the knob does nothing. If it says,
-  for example, `83%!`, the music came close to what the FM-1 can compute, and it has made itself lighter: the atmosphere plays one
-  note instead of three, the events use half their voices, and FLANGE is off. It stays lighter for about eight seconds
-  after the last time.
+  for example, `83%!`, the music came close to what the FM-1 can compute, and it has made the sound a little simpler
+  for a few seconds.
 - MIDI IN: ON or OFF. OFF. Turn right for ON (see 11. MIDI).
 
 The themes:
@@ -495,7 +487,7 @@ On the ECHO page (FX) the keys are the performance instead of events. The screen
 
 **The white keys: 16 effects.** The white keys, low to high, fill the grid on the screen row by row, four rows of four. Each works
 over the whole mix while its key is held, and stops when you let go. The first key of each row glows, to mark the rows.
-Each fades in and out in a few milliseconds.
+None of them clicks as it comes in or goes.
 
 *REPEAT.* The music, or the last bit of it, again and again.
 - 1/4: a quarter note of the music repeated, from the next beat.
@@ -555,13 +547,13 @@ A muted part's name is struck through on the screen, and its black key goes dark
 
 The music moves through sections by itself, and you can call them. There are three. The groove is the main part. A
 break takes the kick, the bass and the percussion out, brings the atmosphere up and thins the events, and the line goes
-softer. A build comes after it, a roll and a rising noise, for a few bars. Then the drop: on a bar's first beat
+softer. A build comes after it, for a few bars, one of several kinds (see 5.4). Then the drop: on a bar's first beat
 everything is back, with a crash. After a drop the bass is most often another of its types, the events' loop and the line's
 phrase are drawn anew, and the colours jump. The music never comes back exactly as it was.
 
 **By itself.** If BREAKS is above 0 and DRIFT is above 0, a break may come as a block of 32 bars begins, and not
-sooner than about GAP bars after the last drop. It lasts BREAK bars (or the world's own), then a build, then the drop come on
-their own. How likely it is depends on BREAKS and DRIFT together: at the defaults, about once in three blocks. See BREAK, 5.3.
+sooner than about GAP bars after the last drop. It lasts as many bars as LENGTH on BREAK sets (or the world's own), then a build, then the drop come on
+their own. How likely it is depends on BREAKS and DRIFT together: at the defaults, about once in three blocks. See 5.3.
 
 **You call them.** All of them wait for the next bar, and they work only while the music is playing.
 
@@ -596,7 +588,7 @@ Every knob works inside the world, and none of them is moved by the choice. Eigh
 - BLACK UNDERTOW: 160, root E. Heavy: a distorted bass, a long dragging line, groans. Big breaks of 16 bars.
 - COPPER NERVE: 168, root F. Tight: a short metallic repeat, the staircases begin, a ride on the eighths, and a bar of
   triplets fairly often. Breaks of 8 bars.
-- GLASS INSECTS: 176, root F#. Bright hi-tech: clean sixteenths, a bright metallic lead, staircases flying left and
+- GLASS INSECTS: 176, root F#. Bright hi-tech: clean sixteenths, a bright metallic line, staircases flying left and
   right, a ride. Short breaks of 8 bars.
 - CHROME SWARM: 186, root G. Fast and fine: the detail in the line's fragments and in the events, the densest world,
   changing all the time, a ride, and almost no atmosphere in the groove. Breaks of only 4 bars.
@@ -606,7 +598,7 @@ Every knob works inside the world, and none of them is moved by the choice. Eigh
 ## 10. Saving
 
 On GLOBAL, tap SAVE to keep everything: the world, every knob of every page, Lights, Theme and MIDI IN. They come back
-the next time the FM-1 starts. The rule says `SAVE: KEEP IT` and SAVE stays lit while something is not saved, and the header says
+the next time the FM-1 starts. While something is not saved, the rule there says `SAVE: KEEP IT` and SAVE stays lit, and the header says
 `SAVED` when it is done. Elsewhere SAVE calls a break (see 8. Sections), so go to GLOBAL to save.
 
 The types and shapes that ALGORITHM picks, the muted parts, the octave and the keys' loop are not saved: the music
@@ -624,15 +616,15 @@ you tap SAVE.
 MIDI in is optional: turn MIDI IN on GLOBAL on. It is OFF until you do. It listens on USB and the TRS jack, on any
 channel.
 
-- Notes: a note throws the sound of the key it matches, as the key would (see 6. The keys). The keys are F3 to G5 (MIDI
+- Notes: a note throws the sound of the key it matches, as the key would (see 6. The keys), on every page: on ECHO
+  too, where the notes throw sounds while the keys play the effects. The keys are F3 to G5 (MIDI
   notes 53 to 79). A note outside them is folded in by octaves. A note's velocity counts, and note off ends a held note.
   The black keys' rhythms work too.
 - Start: plays from the top. If it is already playing, it begins again from the top.
 - Continue: plays.
 - Stop: rests.
-- Clock: the tempo follows it, 24 pulses to a beat, between 125 and 220 BPM. The header shows the tempo it follows, and
-  the TEMPO knob is moved aside. Only the speed is followed, not where the beat lies. When the clock has been gone for
-  half a second the world's tempo comes back. It needs 24 pulses before it takes hold.
+- Clock: the tempo follows it, between 125 and 220 BPM. The header shows the tempo it follows, and the TEMPO knob is
+  moved aside. Only the speed is followed, not where the beat lies. When the clock stops, the world's tempo comes back.
 
 Start, continue and stop also end the logo's silence at once (see 2. Starting up).
 
