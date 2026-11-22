@@ -244,19 +244,19 @@ The endings:
 
 ### 5.5 AUTO
 
-![The AUTO page: Auto play OFF, Minutes 60, Set NEW](img/screen-auto.png "AUTO")
+![The AUTO page: Auto play OFF, Minutes 60, Seed RANDOM](img/screen-auto.png "AUTO")
 
 SEQ, a third time. AUTO PLAY plays a whole set by itself, as a DJ would: it goes through the worlds, moves the tempo and
 the key, calls the breaks and the builds, and raises and lowers the music along a curve of its own.
 
 - AUTO PLAY: right for ON, left for OFF. OFF.
 - MINUTES: how long the set is: 30, 60, 90, or ENDLESS. 60.
-- SET: which set. Each number from 1 to 99 is a plan of its own: the worlds, the tempos, the keys, where it rises and
+- SEED: which set. Each number from 1 to 99 is a plan of its own: the worlds, the tempos, the keys, where it rises and
   falls. Started from rest, the same number and the same MINUTES plan the same set again; the sounds in it
-  still come out different each time. NEW takes another number each time, and shows it while the set plays. NEW.
+  still come out different each time. RANDOM takes another number each time, and shows it while the set plays. RANDOM.
 
 Turn it on while the music rests and the set waits at its beginning for PLAY. Turn it on while the music plays and the
-set goes on from there. MINUTES and SET can be turned only while it is off. On MAIN, BREAK and AUTO the rule shows how
+set goes on from there. MINUTES and SEED can be turned only while it is off. On MAIN, BREAK and AUTO the rule shows how
 many minutes have gone.
 
 A set is made of chapters of some minutes each. A new chapter comes in on a drop, with its world and its key. The tempo

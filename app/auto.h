@@ -3,7 +3,7 @@
 /* AUTO PLAY: a set, played as a DJ would: 30, 60 or 90 minutes, or without end. Included in app.c; on the UI's side, it
  * only turns what a hand could (psy.h), a bar at a time.
  *
- * A set is drawn from its number: a curve of how high it stands (one of several, none chosen by hand), and chapters
+ * A set is drawn from its seed: a curve of how high it stands (one of several, none chosen by hand), and chapters
  * of some 5 to 9 minutes along it: a world, a tempo reached by its end, a key, the macros, how dark. Within a chapter
  * the groove runs 48 to 96 bars, then a break, a build, the drop; the last drop of a chapter is the next one's first
  * bar: its world and its key come there, never elsewhere. The tempo glides, a tenth of a BPM a bar at most, and goes
@@ -14,7 +14,7 @@
  * set keeps those. Off: the music goes on from where it is, the knobs where the set left them. A set done: its last
  * break fades, the music rests, and everything is the hand's again.
  *
- * Its dice are its own (never the engine's): the same number draws the same set; what the generator plays within it is
+ * Its dice are its own (never the engine's): the same seed draws the same set; what the generator plays within it is
  * its own each time. */
 #define AU_HOLD 32                       /* bars a thing touched stays the hand's */
 #define AU_NCH 20

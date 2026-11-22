@@ -20,7 +20,7 @@
  *   4 BUILD (SEQ again)      the builds: K1 Type (AUTO, or one held), K2 Ending (their last bar's: AUTO, or one held),
  *                            K3 Length (2, 4, 8 bars)
  *   5 AUTO (SEQ, a third)    AUTO PLAY (auto.h), a set played as a DJ would: K1 on or off, K2 its minutes (30, 60, 90,
- *                            endless), K3 its number (0: a new one each time)
+ *                            endless), K3 its seed (0: a random one each time)
  *   6 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body: short and tight, or long and full)
  *   7 BASS (SEL again)       K1..K4 Bite, Decay (how fast the bite closes), Length, Drive (as LINE's)
  *   8 PERC (ENV)             K1..K4 Hats, Open (the open hat's length), Clap, Tone (all of it brighter, darker)
@@ -79,7 +79,7 @@ typedef struct {
     uint8_t theme;                       /* THEME (the screen's colours and their movement) */
     uint8_t flags;                       /* SET_MIDI */
     int16_t par[P_NPARAMS];
-    uint8_t auto_len, auto_set;          /* AUTO PLAY's: 30, 60, 90 minutes, without end; its set (0: a new one) */
+    uint8_t auto_len, auto_set;          /* AUTO PLAY's: 30, 60, 90 minutes, without end; its seed (0: a random one) */
 } settings_t;
 static settings_t set;
 #define SET_MIDI 2u                      /* MIDI in: notes throw events, start / stop / clock followed */
@@ -135,7 +135,7 @@ static void settings_defaults(void)
     set.theme = 0;                       /* NEON */
     for (p = 0; p < P_NPARAMS; p++)
         set.par[p] = ps_param(p)->def;
-    set.auto_len = 1;                    /* AUTO: 60 minutes, a new set */
+    set.auto_len = 1;                    /* AUTO: 60 minutes, a random seed */
     set.auto_set = 0;
 }
 
@@ -211,7 +211,7 @@ static int page_par(int p, int k)
         {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
         {P_BREAKS, P_BREAK_LEN, P_GAP, P_MORPH},         /* BREAK: the breaks, and the kit changing on its own */
         {-1, -1, P_BUILD_LEN, -1},                       /* BUILD: K1 the builds' type, K2 their ending, K3 their bars */
-        {-1, -1, -1, -1},                                /* AUTO: K1 on, K2 the set's minutes, K3 its number */
+        {-1, -1, -1, -1},                                /* AUTO: K1 on, K2 the set's minutes, K3 its seed */
         {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, P_KICK_DECAY},   /* (the levels and the sends: MIX's) */
         {P_BASS_BITE, P_BASS_DECAY, P_BASS_LEN, P_BASS_DRIVE},   /* (as LINE's) */
         {P_HATS, P_PERC_OPEN, P_CLAP, P_HAT_TONE},   /* (TONE: all of it, the clap's too) */
@@ -383,7 +383,7 @@ static const char *knob_name(int page, int k)
     if (page == PG_BUILD)
         return k == 0 ? "TYPE" : k == 1 ? "ENDING" : k == 2 ? "LENGTH" : "";
     if (page == PG_AUTO)
-        return k == 0 ? "AUTO PLAY" : k == 1 ? "MINUTES" : k == 2 ? "SET" : "";
+        return k == 0 ? "AUTO PLAY" : k == 1 ? "MINUTES" : k == 2 ? "SEED" : "";
     if (page == PG_MIX)
         return k == 0 ? "TRACK" : k == 1 ? "LEVEL" : k == 2 ? (TRACK_SEND[mix_track % NTRACK] < 0 ? "" : "SEND")
              : "MUTE";                   /* (no send: no SEND) */
@@ -457,7 +457,7 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
         else if (n)
             int_text(n, t);
         else
-            str_put(t, 12, "NEW");
+            str_put(t, 12, "RANDOM");
         *pos = k == 0 ? au.on : k == 1 ? l : n;
         *span = k == 0 ? 1 : k == 1 ? AU_NLEN - 1 : 99;
         return;
@@ -550,7 +550,7 @@ static void knob_turn(int k, int32_t d)
         knob_value(page, k, t, &pos, &span);
         app_say(knob_name(page, k), t);
         return;
-    } else if (page == PG_AUTO) {        /* AUTO PLAY: on, off; its minutes and its set, while off */
+    } else if (page == PG_AUTO) {        /* AUTO PLAY: on, off; its minutes and its seed, while off */
         if (k == 3)
             return;
         if (k == 0) {

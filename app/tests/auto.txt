@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# AUTO PLAY (SEQ's third page): a set of 30 minutes, number 7. What it turns is the hand's a while once touched, and the
+# AUTO PLAY (SEQ's third page): a set of 30 minutes, seed 7. What it turns is the hand's a while once touched, and the
 # settings (what SAVE keeps) stay the hand's. Off: the music goes on from where it is. Run out: it fades and rests.
 wait 3000   # the logo, then the play
 jack in
@@ -27,7 +27,7 @@ said AUTO PLAY PLAY: BEGIN
 expect autoplay 1
 expect chapters >3
 expect chapters <7
-# its minutes and its number: only while off
+# its minutes and its seed: only while off
 turn K2 1
 wait 30
 said AUTO PLAY IS ON
