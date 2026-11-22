@@ -1205,7 +1205,9 @@ static void enter_build(const world_t *w)   /* a build: BUILD's bars, its kind (
     }
     s.be = (uint8_t)k;
     ps_ui.build_end = (int8_t)k;
-    enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN] + vary_step(s.builds++, 0xB111u, VARY_P), 0, 2)] +
+    float u = vary_u(s.builds++, 0xB111u);   /* its length swayed: longer as the rest (p/2), shorter a third as often */
+    int d = u < VARY_P / 6.0f ? -1 : u >= 0.5f * VARY_P && u < VARY_P ? 1 : 0;
+    enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN] + d, 0, 2)] +
                      (k == PS_BUILD_FAKE));   /* (FAKE: its false drop's bar) */
 }
 

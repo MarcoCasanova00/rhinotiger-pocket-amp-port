@@ -196,8 +196,8 @@ Sections).
   often, and DRIFT scales it. 50.
 - BREAK: how long a break that comes on its own usually lasts. WORLD leaves it to the world; or 4, 8, 16 or 32 bars.
   Now and then a break is half or twice as long, more often with DRIFT higher. WORLD.
-- BUILD: how long a build usually lasts: 2, 4 or 8 bars. Now and then a build is one step shorter or longer, more often
-  with DRIFT higher. 4.
+- BUILD: how long a build usually lasts: 2, 4 or 8 bars. Now and then a build is one step longer, and more rarely one
+  step shorter, both more often with DRIFT higher. 4.
 - GAP: the fewest bars between a drop and the next break that comes on its own: 32, 64, 96 or 128. After some drops it
   is one step shorter or longer, more often with DRIFT higher. 64.
 
