@@ -58,6 +58,8 @@ typedef struct {
     float hx;                          /* SHARD: the sample held, */
     uint8_t hold, hc;                  /* for hold samples (0: none), counted */
     uint8_t rev;                       /* GHOST: the envelope backwards */
+    uint8_t live;                      /* a key's, played now (not the loop's or the generator's): the next cuts it */
+    float ck;                          /* cut: it ends at this t, fading the last 15 ms (0: not cut) */
     float chop;                        /* RATCHET: on and off so many times a second (0: none) */
     uint8_t cn;                        /* samples to the next control point (0: one now; EV_CTL apart) */
     float cph, mph;
@@ -96,6 +98,9 @@ static struct {
     uint8_t rwait;                     /* ticks to its next beat */
     uint32_t ri;                       /* its beats so far */
     uint8_t kcyc[27];                  /* each key's repeats (its sound's cycle) */
+    int8_t lastk;                      /* the white key pressed last (mono: the one that plays) */
+    int8_t rseq[16];                   /* a drawn rhythm's pitches (semitones), a bar's, drawn at its press */
+    uint8_t live_next;                 /* (ev_voice: the next is a key's, played now) */
     volatile uint8_t press[27];        /* each key's pressure (the UI writes it directly: not through the queue) */
     uint8_t vel[27];
     uint32_t fired;                    /* events begun (the host's checks) */
@@ -157,11 +162,11 @@ typedef struct {
     float level;
 } key_sound_t;
 static const key_sound_t KEY_SOUND[16] = {
-    {"DIVE", EV_DIVE, 1.0f, -1.5f, 0.0f, 0.36f, 0.18f, 0.5f, 3.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0, 1.19f},     /* F3 */
-    {"GROWL", EV_GROWL, 1.0f, 0.0f, 0.0f, 0.34f, 0.25f, 1.0f, 1.6f, 1.6f, 8.0f, 0.0f, 2.4f, 1, 0.90f},   /* G3 */
-    {"CROAK", EV_GROWL, 0.5f, 0.2f, 3.0f, 0.22f, 0.12f, 0.5f, 3.0f, 3.0f, 18.0f, 0.05f, 2.0f, 0, 1.48f}, /* A3 */
-    {"SPRING", EV_DIVE, 1.0f, 0.0f, 0.0f, 0.30f, 0.15f, 1.0f, 1.2f, 0.6f, 22.0f, 0.25f, 0.0f, 0, 1.01f}, /* B3 */
-    {"SIREN", EV_GURGLE, 1.0f, 0.0f, 0.0f, 0.45f, 0.35f, 2.0f, 1.5f, 1.5f, 3.0f, 0.5f, 0.5f, 1, 0.71f},  /* C4 */
+    {"DIVE", EV_DIVE, 2.0f, -1.5f, 0.0f, 0.36f, 0.18f, 0.5f, 3.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0, 0.95f},     /* F3 */
+    {"GROWL", EV_GROWL, 2.0f, 0.0f, 0.0f, 0.34f, 0.25f, 1.0f, 1.6f, 1.6f, 8.0f, 0.0f, 2.4f, 1, 0.71f},   /* G3 */
+    {"CROAK", EV_GROWL, 1.0f, 0.2f, 3.0f, 0.22f, 0.12f, 0.5f, 3.0f, 3.0f, 18.0f, 0.05f, 2.0f, 0, 1.19f}, /* A3 */
+    {"SPRING", EV_DIVE, 2.0f, 0.0f, 0.0f, 0.30f, 0.15f, 1.0f, 1.2f, 0.6f, 22.0f, 0.25f, 0.0f, 0, 0.94f}, /* B3 */
+    {"SIREN", EV_GURGLE, 2.0f, 0.0f, 0.0f, 0.45f, 0.35f, 2.0f, 1.5f, 1.5f, 3.0f, 0.5f, 0.5f, 1, 0.60f},  /* C4 */
     {"ZAP", EV_ZAP, 8.0f, -4.0f, 6.0f, 0.09f, 0.045f, 1.0f, 4.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1, 1.23f},     /* D4 */
     {"GURGLE", EV_GURGLE, 1.0f, 0.0f, 0.0f, 0.30f, 0.15f, 0.5f, 2.5f, 2.5f, 30.0f, 0.15f, 2.0f, 0, 0.94f},  /* E4 */
     {"SQUELCH", EV_ZAP, 1.0f, 0.3f, 4.0f, 0.12f, 0.07f, 1.0f, 6.0f, 0.3f, 0.0f, 0.0f, 0.0f, 0, 0.92f},  /* F4 */
@@ -178,14 +183,15 @@ static const key_sound_t KEY_SOUND[16] = {
 /* the black keys' rhythms, F#3 to F#5: the ticks between throws (24 a beat), going round, the first where the tick in
  * the beat modulo grid is phase; a pitch step a throw. Or a pattern of the bar's sixteenths (mask, bit i the i-th):
  * where the bar is, from the next sixteenth (never out of step with the groove, nothing waited for) */
-static const struct { uint8_t n; uint8_t iv[13]; uint8_t grid, phase; int8_t step; uint16_t mask; } KEY_RHYTHM[11] = {
+enum { PK_STEP, PK_SCATTER, PK_WANDER, PK_LEAP };   /* a rhythm's pitches: a step a throw, or drawn at its press */
+static const struct { uint8_t n; uint8_t iv[13]; uint8_t grid, phase; int8_t step; uint16_t mask; uint8_t pk; } KEY_RHYTHM[11] = {
     {1, {18}, 6, 0, 0, 0},                                   /* F#3 dotted eighths */
     {1, {12}, 12, 0, 0, 0},                                  /* G#3 eighths (on the eighths) */
     {1, {8}, 8, 0, 0, 0},                                    /* A#3 eighth triplets (on theirs) */
     {0, {0}, 6, 0, 0, 0xDDDDu},                              /* C#4 a gallop, x.xx a beat */
-    {0, {0}, 6, 0, 0, 0x4444u},                              /* D#4 the offbeat eighths, ..x. a beat */
-    {0, {0}, 6, 0, 0, 0xAAAAu},                              /* F#4 SKIP: the second and fourth sixteenths, .x.x */
-    {0, {0}, 6, 0, 0, 0x4949u},                              /* G#4 3-3-2 each half bar, x..x..x. */
+    {1, {6}, 6, 0, 0, 0, PK_SCATTER},                        /* D#4 SCATTER: sixteenths, anywhere in an octave */
+    {1, {6}, 6, 0, 0, 0, PK_WANDER},                         /* F#4 WANDER: sixteenths, a step or two along the scale */
+    {1, {12}, 12, 0, 0, 0, PK_LEAP},                         /* G#4 LEAP: eighths, the root, the fifth, octaves */
     {1, {3}, 3, 0, 0, 0},                                    /* A#4 FASTER: thirty-seconds (twice the sixteenths) */
     {0, {0}, 6, 0, 0, 0x1111u},                              /* C#5 SLOWER: quarters, x... a beat */
     {1, {6}, 6, 0, 3, 0},                                    /* D#5 sixteenths climbing (a minor third each, eight) */
@@ -243,6 +249,9 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
     if (r->run == RUN_STAIRS)
         f *= fm_exp2f((float)(i * (r->type <= EV_GROWL ? -3 : 3)) / 12.0f);   /* up a minor third a step (low: down) */
     v->t = 0.0f;
+    v->live = ev.live_next;
+    ev.live_next = 0;
+    v->ck = 0.0f;
     v->cph = v->mph = 0.0f;
     v->cn = 0;
     v->gl1 = v->gr1 = 0.0f;            /* (its first point: from silence, as its attack began from it) */
@@ -482,7 +491,12 @@ static void key_throw(int k, int stepped)   /* key k's sound now (its cycle on; 
             if (take.e[i].pos == pos && take.e[i].r.snd == r.snd && take.e[i].r.note == r.note)
                 break;
         if (i == take.n) {
+            for (i = 0; i < EV_NVOICE; i++)   /* mono: a key's sound before it is cut */
+                if (ev.v[i].t >= 0.0f && ev.v[i].live && ev.v[i].ck == 0.0f)
+                    ev.v[i].ck = ev.v[i].t + 0.015f;
+            ev.live_next = 1;
             ev_start(&r, bite, 1.0f);
+            i = take.n;
             if (take.rec && take.n < TAKE_N) {   /* into the keys' loop, where it fell */
                 take.e[take.n].r = r;
                 take.e[take.n].pos = (int16_t)pos;
@@ -494,6 +508,45 @@ static void key_throw(int k, int stepped)   /* key k's sound now (its cycle on; 
     ev.last_type = EV_NTYPE + r.snd - 1;   /* (the screen names it: the key's sound) */
     ps_ui.thrown_type = (int8_t)ev.last_type;
     ps_ui.hits[HIT_THROW]++;
+}
+
+/* mono: of the white keys held or tapped, the one that plays: the last pressed, else the highest */
+static int key_mono(uint32_t whites)
+{
+    int k;
+    if (!whites)
+        return -1;
+    if (ev.lastk >= 0 && (whites >> ev.lastk & 1u))
+        return ev.lastk;
+    for (k = 26; k >= 0; k--)
+        if (whites >> k & 1u)
+            return k;
+    return -1;
+}
+
+/* a drawn rhythm's pitches, at its press (a bar's, again and again while held): along the Phrygian scale */
+static int key_scale(int d)            /* a degree (any whole number), in semitones */
+{
+    static const int8_t PH[7] = {0, 1, 3, 5, 7, 8, 10};
+    int o = d >= 0 ? d / 7 : -((-d + 6) / 7);
+    return 12 * o + PH[d - 7 * o];
+}
+static void rhythm_draw(int pk)
+{
+    static const int8_t LEAP[6] = {0, 0, 7, 12, -12, 19};
+    int i, d = 0;
+    for (i = 0; i < 16; i++) {
+        if (pk == PK_SCATTER)          /* anywhere in an octave, the root now and then */
+            d = (int)(rnd() % 8u);
+        else if (pk == PK_WANDER) {    /* a step or two up or down, kept within an octave and a bit */
+            int st = (int)(rnd() % 4u);
+            d += st < 2 ? st - 2 : st - 1;
+            d = d < -3 ? -1 : d > 8 ? 6 : d;
+        }
+        ev.rseq[i] = (int8_t)(pk == PK_LEAP ? LEAP[rnd() % 6u] : pk == PK_STEP ? 0 : key_scale(d));
+    }
+    if (pk == PK_WANDER || pk == PK_SCATTER)
+        ev.rseq[0] = 0;                /* (each bar from the key's own note) */
 }
 
 /* a tick: the loop's events, the runs, the keys' throws */
@@ -531,22 +584,21 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
     if (ev.rk >= 0 && KEY_RHYTHM[key_blacki(ev.rk)].mask) {   /* a pattern's: on its sixteenths of the bar */
         ev.rstart = 0;
         if (t % 6u == 0u && (KEY_RHYTHM[key_blacki(ev.rk)].mask >> (pos16 % 16u) & 1u)) {
-            uint32_t whites = (ev.down | ev.pending) & ~KEY_BLACKS;
+            k = key_mono((ev.down | ev.pending) & ~KEY_BLACKS);
             ev.pending = 0;
-            for (k = 0; k < 27; k++)
-                if (whites >> k & 1u)
-                    key_throw(k, 0);
+            if (k >= 0)
+                key_throw(k, 0);
             ev.ri++;
         }
     } else if (ev.rk >= 0 && !(ev.rstart && t % KEY_RHYTHM[key_blacki(ev.rk)].grid != KEY_RHYTHM[key_blacki(ev.rk)].phase) &&
         (ev.rstart || --ev.rwait == 0u)) {   /* a rhythm's beat (its first on its grid) */
-        int b = key_blacki(ev.rk), stepped = (int)(ev.ri % 8u) * (int)KEY_RHYTHM[b].step;
-        uint32_t whites = (ev.down | ev.pending) & ~KEY_BLACKS;   /* (held, or tapped since its last beat) */
+        int b = key_blacki(ev.rk), stepped = KEY_RHYTHM[b].pk == PK_STEP ? (int)(ev.ri % 8u) * (int)KEY_RHYTHM[b].step
+                                            : ev.rseq[ev.ri % (KEY_RHYTHM[b].pk == PK_LEAP ? 8u : 16u)];
+        k = key_mono((ev.down | ev.pending) & ~KEY_BLACKS);   /* (held, or tapped since its last beat) */
         ev.rstart = 0;
         ev.pending = 0;                /* (the white keys wait for its beats) */
-        for (k = 0; k < 27; k++)       /* (none held: its beats go by unheard) */
-            if (whites >> k & 1u)
-                key_throw(k, stepped);
+        if (k >= 0)                    /* (none held: its beats go by unheard) */
+            key_throw(k, stepped);
         ev.rwait = KEY_RHYTHM[b].iv[ev.ri % KEY_RHYTHM[b].n];
         ev.ri++;
     }
@@ -561,12 +613,11 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
         }
     }
     if (ev.rk < 0) {                   /* no rhythm: the white keys on the sixteenths */
-        uint32_t keys = (ev.pending | ev.down) & ~KEY_BLACKS;   /* the newly pressed (if let go since), and the held
-                                                                * (again each sixteenth; a rhythm let go: on) */
+        k = key_mono((ev.pending | ev.down) & ~KEY_BLACKS);   /* the newly pressed (if let go since), or the held
+                                                              * (again each sixteenth; a rhythm let go: on) */
         ev.pending = 0;
-        for (k = 0; keys && k < 27; k++)
-            if (keys >> k & 1u)
-                key_throw(k, 0);
+        if (k >= 0)
+            key_throw(k, 0);
     }
 }
 
@@ -581,8 +632,10 @@ static void ev_key(int k, int down, int press)   /* (render: from the command qu
             ev.rk = (int8_t)k;
             ev.ri = 0;
             ev.rstart = 1;
+            rhythm_draw(KEY_RHYTHM[key_blacki(k)].pk);
             return;
         }
+        ev.lastk = (int8_t)k;
         ev.kcyc[k] = 0;                /* its sound's cycle from the start */
         ev.pending |= 1u << k;
         ev.down |= 1u << k;
@@ -641,6 +694,8 @@ static void ev_ctl(evoice_t *v, float t, float dt, float wide, float law, float 
         amp = u * u * (u < 0.94f ? 1.0f : (1.0f - u) / 0.06f) * v->level * 0.28f;
     else
         amp = (t < 0.001f ? t / 0.001f : 1.0f) * fm_expf(-t / v->tau) * (1.0f - u * u) * v->level * 0.28f;
+    if (v->ck > 0.0f)                  /* cut: down over its last 15 ms */
+        amp *= t >= v->ck ? 0.0f : t > v->ck - 0.015f ? (v->ck - t) / 0.015f : 1.0f;
     if (v->chop > 0.0f) {              /* RATCHET: on the first 55% of each turn, its edges ~1.8 ms slopes */
         float c = v->chop * t, e = 0.0018f * v->chop;
         c -= fm_floorf(c);
@@ -665,7 +720,7 @@ static float ev_render(float dt, float *l, float *r)
         float x;
         if (v->t < 0.0f)
             continue;
-        if (v->t >= v->dur) {
+        if (v->t >= v->dur || (v->ck > 0.0f && v->t >= v->ck + 0.001f)) {
             v->t = -1.0f;
             continue;
         }

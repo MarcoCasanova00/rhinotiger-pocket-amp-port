@@ -437,13 +437,14 @@ and the screen names it at once, at the lower right. This is true on every page 
 F5 is TWEET and G5 is SPARK.
 
 A sound starts on the next sixteenth, so it stays in the groove. It starts from the pitch of the key. Press harder, or land harder, and it bites more. Hold the key and it repeats on every sixteenth, the sound
-turning a little each time round. What you throw is remembered, and now and then the music's own events take it up.
+turning a little each time round. One sound plays at a time: press another key and it takes over from the one before. What you throw is remembered, and now and then the music's own events take it up.
 With ALGORITHM on the EVENTS page you change the type of all of them (see 5.8).
 
-**The black keys.** There are 11, F#3 to F#5. Hold one and it becomes a rhythm: the white keys held with it throw on its
-beats instead of on every sixteenth. The eighths, the triplets and the thirty-seconds fall on their own places in the beat, and GALLOP,
-OFFBEAT, SKIP, 3-3-2 and SLOWER are patterns of the bar: whenever you press, they are in step with the groove, from the next
-sixteenth. Held alone, it makes no sound. Let go and the sixteenths come back. The name of the rhythm shows to the left
+**The black keys.** There are 11, F#3 to F#5. Hold one and it becomes a rhythm: the white key held with it throws on its
+beats instead of on every sixteenth. The eighths, the triplets and the thirty-seconds fall on their own places in the beat, and GALLOP
+and SLOWER are patterns of the bar: whenever you press, they are in step with the groove, from the next sixteenth.
+SCATTER, WANDER and LEAP move the pitch: each time you press one, it makes up a new run of notes, and plays it again
+every bar for as long as you hold it. Held alone, it makes no sound. Let go and the sixteenths come back. The name of the rhythm shows to the left
 of the event's name.
 
 ![A black key held with a white key: GALLOP and ZAP at the lower right](img/screen-rhythm.png "GALLOP, with ZAP")
@@ -454,9 +455,9 @@ of the event's name.
 | G#3 | 1/8: eighths |
 | A#3 | 1/8T: eighth triplets |
 | C#4 | GALLOP: x.xx on each beat |
-| D#4 | OFFBEAT: the offbeat eighths, ..x. on each beat |
-| F#4 | SKIP: the second and fourth sixteenths, .x.x on each beat |
-| G#4 | 3-3-2: x..x..x. on each half bar |
+| D#4 | SCATTER: sixteenths, jumping anywhere within an octave |
+| F#4 | WANDER: sixteenths, stepping up and down the scale |
+| G#4 | LEAP: eighths, leaping between the root, the fifth and the octaves |
 | A#4 | FASTER: thirty-seconds, twice as fast as the sixteenths |
 | C#5 | SLOWER: quarters, once a beat |
 | D#5 | CLIMB: sixteenths climbing a minor third each time, eight steps |

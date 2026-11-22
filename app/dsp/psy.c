@@ -945,6 +945,7 @@ void ps_init(void)
     ln.t = -1.0f;
     ev.last_type = -1;
     ev.rk = -1;
+    ev.lastk = -1;
     ps_ui.thrown_type = -1;
     s.tick = 0;
     s.next = 0.0f;
@@ -991,7 +992,7 @@ const char *ps_event_name(int type)
 int ps_rhythm(void) { return ev.rk; }
 const char *ps_rhythm_name(int k)
 {
-    static const char *const N[11] = {"3/16", "1/8", "1/8T", "GALLOP", "OFFBEAT", "SKIP", "3-3-2", "FASTER", "SLOWER",
+    static const char *const N[11] = {"3/16", "1/8", "1/8T", "GALLOP", "SCATTER", "WANDER", "LEAP", "FASTER", "SLOWER",
                                       "CLIMB", "FALL"};
     return k >= 0 && k < 27 && key_black(k) ? N[key_blacki(k)] : "";
 }
