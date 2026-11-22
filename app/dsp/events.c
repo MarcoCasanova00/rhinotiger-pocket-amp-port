@@ -45,7 +45,9 @@ typedef struct {
     uint8_t cyc;                       /* a held key's repeat (1..: its sound turning; 0: none) */
 } recipe_t;
 
-#define EV_NVOICE 8
+#define EV_NVOICE 8                    /* (the places: the ones fading out too) */
+#define EV_MOST 5                      /* as many sound at once (the render's time); lighter: */
+#define EV_MOST_SHED 3
 typedef struct {
     float t, dur;                      /* seconds since it began (< 0: free), its length */
     float f0, oct;                     /* the starting pitch (Hz) and how far it glides (octaves) */
@@ -235,15 +237,24 @@ static void ev_voice(const recipe_t *r, int i, float bite, float level)
     evoice_t *v = 0;
     int k;
     float f = note_hz(r->note + par[P_EV_PITCH]), a = fvar(r->var, 0), b = fvar(r->var, 1);   /* (PITCH: semitones) */
-    int nv = shed ? EV_NVOICE / 2 : EV_NVOICE;   /* (lighter: half of them) */
-    for (k = 0; k < nv; k++)
-        if (ev.v[k].t < 0.0f) {
-            v = &ev.v[k];
-            break;
+    int full = 0;
+    evoice_t *q = 0;
+    for (k = 0; k < EV_NVOICE; k++) {  /* as many as may sound (EV_MOST; lighter: fewer) already: the quietest is cut, */
+        evoice_t *c = &ev.v[k];        /* its last 15 ms fading (a key's and one just begun stay) */
+        if (c->t < 0.0f) {
+            if (!v)
+                v = c;
+        } else if (c->ck == 0.0f) {
+            full++;
+            if (!c->live && c->t > 0.01f && (!q || c->gl1 + c->gr1 < q->gl1 + q->gr1))
+                q = c;
         }
-    if (!v) {                          /* all sounding: the oldest gives way */
+    }
+    if (q && full >= (shed ? EV_MOST_SHED : EV_MOST))
+        q->ck = q->t + 0.015f;
+    if (!v) {                          /* not one free: the oldest gives way */
         v = &ev.v[0];
-        for (k = 1; k < nv; k++)
+        for (k = 1; k < EV_NVOICE; k++)
             if (ev.v[k].t > v->t)
                 v = &ev.v[k];
     }
@@ -708,63 +719,78 @@ static void ev_ctl(evoice_t *v, float t, float dt, float wide, float law, float 
     v->gr1 = amp * (1.0f + law * pan);
 }
 
-static float ev_render(float dt, float *l, float *r)
+#define EV_CHUNK 16u                    /* samples at a time (no tick begins inside: ps_render) */
+static float evb_l[EV_CHUNK], evb_r[EV_CHUNK];
+static void ev_chunk(uint32_t m, float dt)   /* the voices' next m samples, each voice's together */
 {
     /* SPREAD: 0 all in the middle, 50 as each event has it, 100 three times as far (to the sides), the pan's law
      * from half to whole (hard left, hard right), and each crossing to the other side as it sounds */
-    float send = 0.0f, el = 0.0f, er = 0.0f, sp = (float)par[P_EV_SPREAD] / 50.0f,
-          wide = sp <= 1.0f ? sp : 1.0f + 2.0f * (sp - 1.0f), law = 0.5f + 0.25f * (wide - 1.0f > 0.0f ? wide - 1.0f : 0.0f),
-          cross = sp > 1.0f ? sp - 1.0f : 0.0f;
+    float sp = (float)par[P_EV_SPREAD] / 50.0f, wide = sp <= 1.0f ? sp : 1.0f + 2.0f * (sp - 1.0f),
+          law = 0.5f + 0.25f * (wide - 1.0f > 0.0f ? wide - 1.0f : 0.0f), cross = sp > 1.0f ? sp - 1.0f : 0.0f;
+    uint32_t i;
     int k;
+    for (i = 0; i < m; i++)
+        evb_l[i] = evb_r[i] = 0.0f;
     for (k = 0; k < EV_NVOICE; k++) {
         evoice_t *v = &ev.v[k];
-        float x;
+        float t, end, mph, cph, ratio, hx;
+        uint32_t cn, hc, hold;
         if (v->t < 0.0f)
             continue;
-        if (v->t >= v->dur || (v->ck > 0.0f && v->t >= v->ck + 0.001f)) {
-            v->t = -1.0f;
-            continue;
-        }
-        if (!v->cn) {                  /* a control point: on from where the last one aimed, to the next */
-            if (v->t == 0.0f)
-                ev_ctl(v, 0.0f, dt, wide, law, cross);
-            v->fi = v->fi1;
-            v->ix = v->ix1;
-            v->gl = v->gl1;
-            v->gr = v->gr1;
-            ev_ctl(v, v->t + (float)EV_CTL * dt, dt, wide, law, cross);
-            v->cn = EV_CTL;
-        }
-        {
-            const float w = 1.0f / (float)EV_CTL, a = (float)(EV_CTL - v->cn) * w;   /* (its share of the way) */
-            float fi = v->fi + (v->fi1 - v->fi) * a, ix = v->ix + (v->ix1 - v->ix) * a;
-            v->mph += fi * v->ratio;
-            v->mph -= fm_floorf(v->mph);
-            v->cph += fi;
-            v->cph -= fm_floorf(v->cph);
-            x = fm_sin_turns(v->cph + ix * fm_sin_turns(v->mph));
-            if (v->hold) {             /* (SHARD) held in steps */
-                if (v->hc == 0u)
-                    v->hx = x;
-                if (++v->hc >= v->hold)
-                    v->hc = 0;
-                x = v->hx;
+        t = v->t;
+        end = v->ck > 0.0f ? fm_minf(v->dur, v->ck + 0.001f) : v->dur;
+        mph = v->mph, cph = v->cph, ratio = v->ratio, hx = v->hx;
+        cn = v->cn, hc = v->hc, hold = v->hold;
+        for (i = 0; i < m; i++) {
+            float x, z, a, fi, ix;
+            if (t >= end) {
+                t = -1.0f;
+                break;
             }
-            {                          /* tanh(1.4 x) for x in -1..1: an odd polynomial (within 2e-5), no exp, no divide */
-                float z = x * x;
-                x *= 1.39991761f + z * (-0.912032723f + z * (0.692545849f + z * (-0.466315745f + z * (0.222434431f +
-                     z * -0.0512179515f))));
+            if (!cn) {                 /* a control point: on from where the last one aimed, to the next */
+                if (t == 0.0f)
+                    ev_ctl(v, 0.0f, dt, wide, law, cross);
+                v->fi = v->fi1;
+                v->ix = v->ix1;
+                v->gl = v->gl1;
+                v->gr = v->gr1;
+                ev_ctl(v, t + (float)EV_CTL * dt, dt, wide, law, cross);
+                cn = EV_CTL;
             }
-            el += x * (v->gl + (v->gl1 - v->gl) * a);
-            er += x * (v->gr + (v->gr1 - v->gr) * a);
+            a = (float)(EV_CTL - cn) * (1.0f / (float)EV_CTL);   /* (its share of the way) */
+            fi = v->fi + (v->fi1 - v->fi) * a;
+            ix = v->ix + (v->ix1 - v->ix) * a;
+            mph += fi * ratio;
+            mph -= fm_floorf(mph);
+            cph += fi;
+            cph -= fm_floorf(cph);
+            x = fm_sin_turns(cph + ix * fm_sin_turns(mph));
+            if (hold) {                /* (SHARD) held in steps */
+                if (hc == 0u)
+                    hx = x;
+                if (++hc >= hold)
+                    hc = 0;
+                x = hx;
+            }
+            /* tanh(1.4 x) for x in -1..1: an odd polynomial (within 2e-5), no exp, no divide */
+            z = x * x;
+            x *= 1.39991761f + z * (-0.912032723f + z * (0.692545849f + z * (-0.466315745f + z * (0.222434431f +
+                 z * -0.0512179515f))));
+            evb_l[i] += x * (v->gl + (v->gl1 - v->gl) * a);
+            evb_r[i] += x * (v->gr + (v->gr1 - v->gr) * a);
+            cn--;
+            t += dt;
         }
-        v->cn--;
-        v->t += dt;
+        v->t = t, v->mph = mph, v->cph = cph, v->hx = hx;
+        v->cn = (uint8_t)cn, v->hc = (uint8_t)hc;
     }
-    el = hp2(&ev_hp2[0], ev_highpass(0, el), 0.9747f);   /* (twice: 24 dB an octave, a dive's depths out) */
-    er = hp2(&ev_hp2[1], ev_highpass(1, er), 0.9747f);
+}
+
+static float ev_render(uint32_t at, float *l, float *r)   /* the sample at of the chunk: l and r; returns the echo's */
+{
+    float el = hp2(&ev_hp2[0], ev_highpass(0, evb_l[at]), 0.9747f);   /* (twice: 24 dB an octave, a dive's depths out) */
+    float er = hp2(&ev_hp2[1], ev_highpass(1, evb_r[at]), 0.9747f);
     *l += el;
     *r += er;
-    send = 0.5f * (el + er);           /* the echo hears them high-passed too */
-    return send;
+    return 0.5f * (el + er);           /* the echo hears them high-passed too */
 }

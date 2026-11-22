@@ -1897,7 +1897,8 @@ void ps_render(float *outl, float *outr, uint32_t n)
     float pk[NPART] = {0};             /* the parts' peaks this block (the meters) */
     float perc_send = 0.4f * (float)par[P_PERC_SEND] / 100.0f, line_send = (float)par[P_LINE_SEND] / 50.0f;
     float fb = (float)par[P_ECHO_FB] / 100.0f, tone = 0.12f + 0.46f * (float)par[P_ECHO_TONE] / 100.0f;
-    uint32_t i;
+    uint32_t i, ev_n = 0, ev_at = 0;   /* the events' samples made so far, the next one to take */
+    const uint32_t blk = n;            /* (n inside is a noise) */
     static float fx_send;              /* what the effects sent to the echo (the next frame takes it) */
     float hp_to, hp_g;                 /* FILTER's cutoff, the block's target (0: none); its share now */
     int lp_on;                         /* SINK's low-pass, the block's */
@@ -2014,7 +2015,17 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 s.p_lp[0] = s.p_lp[1] = 0.0f;
             l *= pg[PART_PERC];
             r *= pg[PART_PERC];
-            send = ev_render(dt, &el, &er) * ev_g * send_g * pg[PART_EVENTS] + perc_g * (l + r) * perc_send;
+            if (ev_at >= ev_n) {           /* the events, as far as the next tick (EV_CHUNK at most) */
+                float nx = s.next;
+                ev_n = 1;
+                while (ev_n < EV_CHUNK && ev_n < blk - i && (!playing || nx > 0.0f)) {
+                    nx -= 1.0f;
+                    ev_n++;
+                }
+                ev_chunk(ev_n, dt);
+                ev_at = 0;
+            }
+            send = ev_render(ev_at++, &el, &er) * ev_g * send_g * pg[PART_EVENTS] + perc_g * (l + r) * perc_send;
             el *= pg[PART_EVENTS];
             er *= pg[PART_EVENTS];
             {   /* the line: softer in a break, and more of it into the echo */
