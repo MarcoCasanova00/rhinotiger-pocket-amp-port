@@ -15,7 +15,8 @@
  *   2 GROOVE (HOME again)    K1..K4 Tempo (the world's, moved), Root, Fills (how often), Sit out (how often a part
  *                            rests a phrase)
  *   3 BREAK (SEQ)            the breaks: K1..K3 Breaks (how often one comes on its own; 0: only when cued), Length (its
- *                            bars: the world's, 4..32), Gap (bars after a drop before one comes on its own)
+ *                            bars: the world's, 4..32), Gap (bars after a drop before one comes on its own); K4 Morph
+ *                            (how often the kit changes on its own: at a drop, or a long groove's 32-bar block)
  *   4 BUILD (SEQ again)      the builds: K1 Type (AUTO, or one held), K2 Ending (their last bar's: AUTO, or one held),
  *                            K3 Length (2, 4, 8 bars)
  *   5 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body: short and tight, or long and full)
@@ -61,9 +62,11 @@
 #include "logo.h"
 #include "face.h"
 
-#define SET_MAGIC 0x37544852u            /* "RHT7": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
+#define SET_MAGIC 0x38544852u            /* "RHT8": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
                                           * 4: PHASE's four, the breaks' switch gone into BREAKS; 5: MIX's TOP; 6: the
-                                          * percussion's and the line's sends, TOP gone; 7: the sounds' new eight) */
+                                          * percussion's and the line's sends, TOP gone; 7: the sounds' new eight; 8:
+                                          * BREAK's MORPH, the last: a 7's taken, MORPH at its default) */
+#define SET_MAGIC7 0x37544852u           /* "RHT7" */
 typedef struct {
     uint32_t magic;
     uint8_t world;
@@ -140,8 +143,17 @@ void app_init(void)
 {
     int p, ok;
     ps_init();
-    ok = plat_store_load(OBJ_SETTINGS, &set, sizeof set) == (int)sizeof set && set.magic == SET_MAGIC &&
-         set.world < PS_NWORLD && set.lights <= 2u && set.theme < NTHEME &&
+    {   /* (a 7's: one parameter fewer at the end, MORPH) */
+        int n = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
+        ok = (n == (int)sizeof set && set.magic == SET_MAGIC) ||
+             (n == (int)(((uint32_t)((char *)&set.par[P_NPARAMS - 1] - (char *)&set) + 3u) & ~3u) &&
+              set.magic == SET_MAGIC7);
+        if (ok && set.magic == SET_MAGIC7) {
+            set.magic = SET_MAGIC;
+            set.par[P_MORPH] = ps_param(P_MORPH)->def;
+        }
+    }
+    ok = ok && set.world < PS_NWORLD && set.lights <= 2u && set.theme < NTHEME &&
          (set.flags & ~SET_MIDI) == 0u;
     for (p = 0; ok && p < P_NPARAMS; p++)
         ok = set.par[p] >= ps_param(p)->lo && set.par[p] <= ps_param(p)->hi;
@@ -184,7 +196,7 @@ static int page_par(int p, int k)
     static const int8_t PAR[NPAGE][4] = {
         {P_ENERGY, P_DETAIL, P_DARK, P_DRIFT},
         {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
-        {P_BREAKS, P_BREAK_LEN, P_GAP, -1},              /* BREAK: the breaks */
+        {P_BREAKS, P_BREAK_LEN, P_GAP, P_MORPH},         /* BREAK: the breaks, and the kit changing on its own */
         {-1, -1, P_BUILD_LEN, -1},                       /* BUILD: K1 the builds' type, K2 their ending, K3 their bars */
         {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, P_KICK_DECAY},   /* (the levels and the sends: MIX's) */
         {P_BASS_BITE, P_BASS_DECAY, P_BASS_LEN, P_BASS_DRIVE},   /* (as LINE's) */

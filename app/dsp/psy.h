@@ -47,6 +47,8 @@ enum { P_ENERGY, P_DETAIL, P_DARK, P_DRIFT,                  /* MAIN: the macros
                                                               * once), the open hat's length, the line driven (0: clean) */
        P_EV_PITCH, P_EV_SPREAD, P_ATMOS_MOTION, P_ATMOS_DEPTH,   /* the events' semitones (-12..12) and how far apart
                                                               * left and right; the atmos's sway, how fast and how deep */
+       P_MORPH,                                              /* BREAK's K4: how often the kit changes on its own (a
+                                                              * drop's, a long groove's 32-bar block's) */
        P_NPARAMS };
 typedef struct {
     const char *name;

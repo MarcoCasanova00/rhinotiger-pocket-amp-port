@@ -161,7 +161,8 @@ world is as it is.
   moves by itself, no break comes on its own, and those lengths are exact; higher, the bass changes its type at more
   of the drops. 50.
 
-ALGORITHM turns the kit. What it changed shows in the header for a moment, each type in the colour of its part.
+ALGORITHM turns the kit; MORPH, on BREAK, also turns it now and then by itself. What changed shows in the header for a
+moment, each type in the colour of its part.
 
 ![The header after a kit change: KIT GLASS K-B-B-B, the line's new type and the bass's new shape](img/screen-kit.png "A kit, taken")
 
@@ -188,9 +189,10 @@ K-B-B-B holds the roll; GALLOP holds a gallop; OFFBEAT holds an offbeat. The new
 
 ### 5.3 BREAK
 
-![The BREAK page: Breaks 50, Length WORLD, Gap 64](img/screen-phase.png "BREAK")
+![The BREAK page: Breaks 50, Length WORLD, Gap 64, Morph 40](img/screen-phase.png "BREAK")
 
-SEQ. The breaks: how the music moves through breaks, builds and drops by itself. Press SAVE and ARP to call them yourself (see 8.
+SEQ. The breaks: how the music moves through breaks, builds and drops by itself, and how its sounds change by
+themselves. Press SAVE and ARP to call them yourself (see 8.
 Sections).
 
 - BREAKS: how often a break comes on its own. At 0 it says CUED: a break comes only when you call it. Higher is more
@@ -199,6 +201,9 @@ Sections).
   Now and then a break is half or twice as long, more often with DRIFT higher. WORLD.
 - GAP: the fewest bars between a drop and the next break that comes on its own: 32, 64, 96 or 128. After some drops it
   is one step shorter or longer, more often with DRIFT higher. 64.
+- MORPH: how often the kit changes by itself, as if you turned ALGORITHM on MAIN: one part or a few take another type.
+  It can happen at a drop, and, in a groove that runs long, every 32 bars, half as often. Higher is more often and more
+  parts at once; the header says what changed. At 0 the kit changes only when you turn ALGORITHM. 40.
 
 ### 5.4 BUILD
 

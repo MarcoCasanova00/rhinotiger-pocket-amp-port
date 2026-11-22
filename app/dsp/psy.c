@@ -159,6 +159,7 @@ static const ps_param_t PAR[P_NPARAMS] = {
     {"SEND", 0, 100, 0}, {"SEND", 0, 100, 50},
     {"DECAY", 0, 100, 50}, {"DECAY", 0, 100, 50}, {"OPEN", 0, 100, 50}, {"DRIVE", 0, 100, 0},
     {"PITCH", -12, 12, 0}, {"SPREAD", 0, 100, 50}, {"MOTION", 0, 100, 50}, {"DEPTH", 0, 100, 50},
+    {"MORPH", 0, 100, 40},
 };
 static const uint8_t BREAK_BARS[5] = {0, 4, 8, 16, 32};   /* P_BREAK_LEN (0: the world's) */
 static const uint8_t BUILD_BARS[3] = {2, 4, 8};           /* P_BUILD_LEN */
@@ -529,10 +530,73 @@ static uint32_t kit_heard(void)        /* the parts heard now, 1 << PART_* (and 
     return m;
 }
 
+static void kit_forward(int n)         /* n parts or so, or the groove, another type: the kit before kept (forward) */
+{
+    uint32_t heard, pick = 0, p;
+    heard = kit_heard();
+    if (!heard)
+        heard = (1u << NPART) - 1u;
+    if (s.kit_bars)                    /* (a shape still over AUTO's: not again) */
+        heard &= ~(1u << KIT_GROOVE);
+    for (; n > 0; n--) {               /* one at a time: from the heard not changed last, else the heard */
+        uint32_t from = heard & ~pick & ~(uint32_t)kit.last, c = 0, k;
+        if (!from)
+            from = heard & ~pick;
+        if (!from)
+            break;
+        for (p = 0; p <= KIT_GROOVE; p++)
+            c += from >> p & 1u;
+        k = rnd() % c;
+        for (p = 0; p <= KIT_GROOVE; p++)
+            if ((from >> p & 1u) && k-- == 0u)
+                break;
+        pick |= 1u << p;
+    }
+    for (p = 0; p < NPART; p++)        /* the kit as it was, kept for going back */
+        kit.hist[kit.top][p] = s.type[p];
+    kit.top = (uint8_t)((kit.top + 1u) % KIT_HIST);
+    if (kit.depth < KIT_HIST)
+        kit.depth++;
+    for (p = 0; p < NPART; p++)
+        if (pick >> p & 1u)
+            s.type[p] = (uint8_t)((s.type[p] + 1u + rnd() % (ntypes((int)p) - 1u)) % ntypes((int)p));
+    if (pick >> KIT_GROOVE & 1u) {     /* the groove: another shape than this bar's, four bars */
+        static const uint8_t SHAPE[3] = {0, 1, 3};
+        uint32_t now = (s.tick / TPBAR - s.origin) % 8u == s.trip_at ? 2u : s.pat, j = rnd() % 3u;
+        if (SHAPE[j] == now)
+            j = (j + 1u + rnd() % 2u) % 3u;
+        s.kit_pat = SHAPE[j];
+        s.kit_bars = 4;
+    }
+    kit.last = (uint8_t)pick;
+    if (pick) {
+        ps_ui.kit_parts = (uint8_t)pick;
+        ps_ui.kits++;
+    }
+    ps_ui.kit_depth = kit.depth;
+}
+
+/* MORPH: now and then, on its own, the kit forward (a drop's; a 32-bar block's in a long groove, half as likely): more
+ * likely and more parts the higher, and the longer since the last the likelier (half again each chance gone by) */
+static uint8_t morph_wait;             /* the chances gone by since the kit last changed on its own */
+static void kit_morph(float chance)
+{
+    float m = (float)par[P_MORPH] / 100.0f;
+    if (m <= 0.0f)
+        return;
+    if ((float)(rnd() % 1000u) >= 1000.0f * m * chance * (1.0f + 0.5f * (float)morph_wait)) {
+        if (morph_wait < 255u)
+            morph_wait++;
+        return;
+    }
+    morph_wait = 0;
+    kit_forward(1 + ((float)(rnd() % 100u) < 60.0f * m) + ((float)(rnd() % 100u) < 25.0f * m));
+}
+
 static void kit_step(void)
 {
     int net = (int)(kit_fwd - kit.fwd_seen) - (int)(kit_back - kit.back_seen);
-    uint32_t heard, pick = 0, p;
+    uint32_t pick = 0, p;
     int n;
     kit.fwd_seen = kit_fwd;
     kit.back_seen = kit_back;
@@ -562,42 +626,7 @@ static void kit_step(void)
         kit.last = (uint8_t)pick;
     } else if (net > 0) {
         n = net > 1 ? (net > 3 ? 3 : net) : rnd() % 100u < 30u ? 2 : 1;
-        heard = kit_heard();
-        if (!heard)
-            heard = (1u << NPART) - 1u;
-        if (s.kit_bars)                /* (a shape still over AUTO's: not again) */
-            heard &= ~(1u << KIT_GROOVE);
-        for (; n > 0; n--) {           /* one at a time: from the heard not changed last, else the heard */
-            uint32_t from = heard & ~pick & ~(uint32_t)kit.last, c = 0, k;
-            if (!from)
-                from = heard & ~pick;
-            if (!from)
-                break;
-            for (p = 0; p <= KIT_GROOVE; p++)
-                c += from >> p & 1u;
-            k = rnd() % c;
-            for (p = 0; p <= KIT_GROOVE; p++)
-                if ((from >> p & 1u) && k-- == 0u)
-                    break;
-            pick |= 1u << p;
-        }
-        for (p = 0; p < NPART; p++)    /* the kit as it was, kept for going back */
-            kit.hist[kit.top][p] = s.type[p];
-        kit.top = (uint8_t)((kit.top + 1u) % KIT_HIST);
-        if (kit.depth < KIT_HIST)
-            kit.depth++;
-        for (p = 0; p < NPART; p++)
-            if (pick >> p & 1u)
-                s.type[p] = (uint8_t)((s.type[p] + 1u + rnd() % (ntypes((int)p) - 1u)) % ntypes((int)p));
-        if (pick >> KIT_GROOVE & 1u) { /* the groove: another shape than this bar's, four bars */
-            static const uint8_t SHAPE[3] = {0, 1, 3};
-            uint32_t now = (s.tick / TPBAR - s.origin) % 8u == s.trip_at ? 2u : s.pat, j = rnd() % 3u;
-            if (SHAPE[j] == now)
-                j = (j + 1u + rnd() % 2u) % 3u;
-            s.kit_pat = SHAPE[j];
-            s.kit_bars = 4;
-        }
-        kit.last = (uint8_t)pick;
+        kit_forward(n);
     }
     if (pick) {
         ps_ui.kit_parts = (uint8_t)pick;
@@ -882,6 +911,7 @@ void ps_init(void)
 {
     int k;
     want_world = world = 2;            /* COLD SIGNAL */
+    morph_wait = 0;
     want_play = playing = 1;
     for (k = 0; k < P_NPARAMS; k++)
         par[k] = PAR[k].def;
@@ -1223,6 +1253,7 @@ static void drop(uint32_t bar)         /* on this bar's first tick: the groove a
     }
     s.out = 0;
     ps_ui.sitting_out = 0;
+    kit_morph(1.0f);                   /* (MORPH: now and then the kit too) */
     s.x_t = 0.0f;                      /* the crash */
     ps_ui.hits[HIT_PERC]++;
 }
@@ -1252,6 +1283,8 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
                              : (uint32_t)clampi(d < 0 ? w->brk / 2 : d > 0 ? w->brk * 2 : w->brk, 4, 32);
             enter(SEC_BREAK, len);
         }
+        if (s.sec == SEC_MAIN && rb && rb % 32u == 0u)   /* a long groove: MORPH now and then, half as likely */
+            kit_morph(0.5f);
     } else if (s.sec == SEC_BREAK) {
         if (build || (s.sec_len && s.sec_bar >= s.sec_len))   /* (a break cued in a break: nothing) */
             enter_build(w);
