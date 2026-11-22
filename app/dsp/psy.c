@@ -197,7 +197,7 @@ static volatile uint32_t restart_n;    /* restarts asked for, counted */
 static uint32_t restart_seen;
 static volatile float ext_bpm;         /* a MIDI clock's tempo (0: the world's) */
 static volatile float auto_bpm;        /* AUTO PLAY's tempo (0: the world's), its root (0: the world's), and the world */
-static volatile int auto_root;         /* and the root it takes as the next bar begins (1 + world, the root << 8; 0: none) */
+static volatile int auto_root;         /* and the root it takes as a drop's bar begins (1 + world, the root << 8; 0: none) */
 static volatile uint32_t stage;
 static int world, playing;
 
@@ -1290,6 +1290,10 @@ static void drop(uint32_t bar)         /* on this bar's first tick: the groove a
     ps_ui.hits[HIT_PERC]++;
 }
 
+static int drop_next(void)             /* the bar about to begin is a drop's (as section_bar will have it) */
+{
+    return drop_n != s.drop_seen || (s.sec == SEC_BUILD && s.sec_bar + 1u >= s.sec_len);
+}
 static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the cues, and what comes on its own */
 {
     uint32_t cue = cue_n, dn = drop_n, bn = build_n;
@@ -1958,11 +1962,13 @@ void ps_render(float *outl, float *outr, uint32_t n)
         }
         if (playing) {
             if (s.next <= 0.0f) {                  /* a tick begins on this sample */
-                if (s.tick % TPBAR == 0u && stage) {   /* AUTO PLAY's next world and root, together */
+                if (s.tick % TPBAR == 0u && stage && drop_next()) {   /* AUTO PLAY's next world and root, together,
+                                                                       * and two turns of the kit */
                     uint32_t st = stage;
                     want_world = (int)((st & 255u) - 1u);
                     auto_root = (int)(st >> 8);
                     stage = 0;
+                    kit.fwd_seen -= 2u;
                     tempo(w);
                 }
                 if (s.tick % TPBAR == 0u && want_world != world) {   /* a world changes as a bar begins */

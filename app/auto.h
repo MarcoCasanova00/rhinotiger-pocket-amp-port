@@ -4,8 +4,8 @@
  * only turns what a hand could (psy.h), a bar at a time.
  *
  * A set is drawn from its seed: a curve of how high it stands (one of several, none chosen by hand), and chapters
- * of some 5 to 9 minutes along it: a world, a tempo reached by its end, a key, the macros, how dark. Within a chapter
- * the groove runs 48 to 96 bars, then a break, a build, the drop; the last drop of a chapter is the next one's first
+ * of some 4 to 10 minutes along it: a world, a tempo reached by its end, a key, the macros, how dark. Within a chapter
+ * the groove runs 48 to 96 bars (the last one of it what is left, 32 to 128), then a break, a build, the drop; the last drop of a chapter is the next one's first
  * bar: its world and its key come there, never elsewhere. The tempo glides, a tenth of a BPM a bar at most, and goes
  * on through the change of world; the macros move one step a bar.
  *
@@ -332,6 +332,29 @@ static const char *au_text(void)         /* for the rule: its chapter, its minut
     return t;
 }
 
+/* the next chapter's world and key handed to the engine, which takes them on the drop, whenever it comes (the set's or
+ * the hand's): from the last break on, anew each bar (the key may have become the hand's) */
+static void au_next(int sec)
+{
+    int i;
+    if (!au.staged) {
+        if (au.cur + 1u < au.nch) {
+            au.staged = 1;
+        } else if (sec == SEC_BUILD) {   /* (endless: the next hour, planned as the build begins) */
+            au.total += au.min;
+            au.min = 0.0f;
+            au.cycle++;
+            au_plan(2, ps_world_now(), ps_root(), au.bpm);
+            au_chapter(0);
+            au.staged = 2;
+        } else {
+            return;
+        }
+    }
+    i = au.staged == 2u ? 0 : au.cur + 1;
+    ps_stage(au.ch[i].world, au_held(P_ROOT) ? ps_root() : au.ch[i].root);
+}
+
 static void au_bar(int sec)              /* a bar has begun */
 {
     const au_ch_t *c = &au.ch[au.cur];
@@ -383,28 +406,12 @@ static void au_bar(int sec)              /* a bar has begun */
         }
     } else if (sec == SEC_BREAK) {
         if (au.ours && au.last && !au_more()) {   /* the end */
-            au.closing = 1;
-            hd_clear(255u);
+            au.closing = 1;              /* (what its hands carried into it goes on; nothing new) */
         } else if (at + 1 >= (au.ours ? au.brk : AU_HOLD))   /* (one called by hand: the hand's build, or in time) */
             ps_cue(PS_CUE_BUILD);
-    } else if (au.last && au_more() && ps_ui.sec_bar + 1 >= ps_ui.sec_len && !au.staged) {   /* a build's last bar */
-        int root;
-        if (au.cur + 1u < au.nch) {
-            root = au_held(P_ROOT) ? ps_root() : au.ch[au.cur + 1u].root;
-            ps_stage(au.ch[au.cur + 1u].world, root);
-            au.staged = 1;
-        } else {                         /* (endless: the next hour) */
-            au.total += au.min;
-            au.min = 0.0f;
-            au.cycle++;
-            au_plan(2, ps_world_now(), ps_root(), au.bpm);
-            au_chapter(0);
-            root = au_held(P_ROOT) ? ps_root() : au.ch[0].root;
-            ps_stage(au.ch[0].world, root);
-            au.staged = 2;
-        }
-        ps_kit(2);
     }
+    if (!au.closing && sec != SEC_MAIN && au.last && au_more())
+        au_next(sec);
     au_push();
     if (!au.closing)
         hd_bar(sec, at);

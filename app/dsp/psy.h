@@ -60,7 +60,7 @@ int ps_get(int p);
 int ps_bpm(void);                      /* the tempo now (the world's, moved) */
 int ps_root(void);                     /* the root now, MIDI note of the bass */
 /* AUTO PLAY (app/auto.h): a tempo and a root of its own over the worlds' and the knobs' (0: theirs), and a world and a
- * root taken together as the next bar begins */
+ * root taken together as the next drop's bar begins, with two turns of the kit */
 void ps_auto_bpm(float bpm);
 void ps_auto_root(int note);
 void ps_stage(int world, int root);    /* (world < 0: none after all) */

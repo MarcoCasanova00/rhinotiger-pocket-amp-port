@@ -254,7 +254,7 @@ them back, and throws sounds as the keys do.
 - MINUTES: how long the set is: 30, 60, 90, or ENDLESS. 60.
 - SEED: which set. Each number from 1 to 99 is a plan of its own: the worlds, the tempos, the keys, where it rises and
   falls. Started from rest, the same number and the same MINUTES plan the same set again; the sounds in it
-  still come out different each time. RANDOM takes another number each time, and shows it while the set plays. RANDOM.
+  still come out different each time. RANDOM picks a number for you, and shows it while the set plays. RANDOM.
 - PERFORM: how much it plays the effects, the parts and the sounds of the keys. At 0 it leaves them all to you. 50.
 
 Turn it on while the music rests and the set waits at its beginning for PLAY. Turn it on while the music plays and the
@@ -272,8 +272,9 @@ light up as if they were pressed. On the ECHO page, tap a dark part's black key 
 but slowly faded down and up again, now and then, and its fader on MIX moves with it.
 
 You can play along. What you turn of what the set moves (the four knobs of MAIN, TEMPO, ROOT, BREAKS, the LENGTH of
-builds) stays yours for 32 bars, then goes back to the set: ROOT at the next chapter, the rest by degrees. A world you
-choose with PRESETS stays until the next chapter. Breaks, builds and drops you call are followed. Play an effect yourself
+builds) stays yours for 32 bars, then goes back to the set: the four knobs and TEMPO by degrees, BREAKS and LENGTH at once, ROOT at the next chapter (turned
+just before one, it stays through that one too). A world you
+choose with PRESETS stays until the next chapter. Breaks, builds and drops you call are followed: a drop you call in a chapter's last break or build brings the next chapter. Play an effect yourself
 and the set leaves the effects and the parts to you for 32 bars; mute a part, or bring it back, and it leaves that part
 alone as long, and takes no part out while any is muted. Turn the atmos's LEVEL and it comes back up, and is left alone so too. Throw a sound with the keys or press REC and it throws none for 32 bars, nor while REC's loop plays.
 Everything else is yours as always.

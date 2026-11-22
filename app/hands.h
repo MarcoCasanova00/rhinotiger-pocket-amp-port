@@ -7,7 +7,7 @@
  * In a groove: at a phrase's end (8 bars) a move now and then, at the 16s and 32s more often and larger; a part left out
  * for a phrase or two, back on a phrase's first beat; a throw now and then on an offbeat, a run of them into a phrase's
  * end; the chapter's motif (one or a few cells of a sound of the chapter's, along the scale, the set's own to come back
- * to) over 16 bars or 32. In a break: one or two of the long effects, few throws, the motif again, softer. In a build:
+ * to) over 8 to 32 bars. In a break: one of the long effects (and what the groove carried into it), few throws, the motif again, softer. In a build:
  * none (it has its own). On a drop: a throw on its first beat, a part held back.
  *
  * PERFORM (0..100) is how much of it. The hand's own take over: a grid's effect (or a fill, a gap, half time, the kick
