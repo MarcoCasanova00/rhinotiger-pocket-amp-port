@@ -10,7 +10,7 @@ listen
 wait 600
 tap EDIT
 wait 30
-expect page 10
+expect page 11
 said MIX
 expect track 0
 # into the line's sure phrase (bars 16..23): every part sounding, the echo too
@@ -95,7 +95,7 @@ expect muted 0
 # the echo's level: ECHO's K4
 tap FX
 wait 30
-expect page 11
+expect page 12
 expect param24 50
 turn K4 -5
 wait 30

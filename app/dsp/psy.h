@@ -68,7 +68,7 @@ const char *ps_phase_name(int p, int v);   /* P_BREAKS .. P_GAP's values as the 
  * BUILD. */
 enum { SEC_MAIN, SEC_BREAK, SEC_BUILD };
 enum { PS_CUE_BREAK = 1, PS_CUE_DROP, PS_CUE_BUILD };
-/* a build's kind (ALGORITHM on the PHASE page; AUTO: each build one of them, by the world's leaning, not the last
+/* a build's kind (K1 on the BUILD page; AUTO: each build one of them, by the world's leaning, not the last
  * one again): ROLL (the kick and the bass out, a clap rolling quarters, eighths, sixteenths), KICK (the kick rolling
  * so, rising an octave; the bass out), FILTER (the kick on, the perc in from its second quarter, the bass from its
  * half; the rest and the bass thinned from under, the hats harder), TRIPLET (a clap rolling quarters, eighth and
@@ -83,7 +83,7 @@ enum { PS_CUE_BREAK = 1, PS_CUE_DROP, PS_CUE_BUILD };
 enum { PS_BUILD_AUTO, PS_BUILD_ROLL, PS_BUILD_KICK, PS_BUILD_FILTER, PS_BUILD_TRIP, PS_BUILD_STUTTER, PS_BUILD_POLY,
        PS_BUILD_SINK, PS_BUILD_FAKE, PS_BUILD_HALF, PS_BUILD_ACID, PS_BUILD_STAIRS, PS_BUILD_GATE, PS_NBUILD };
 void ps_build_kind(int k);
-/* a build's ending (ALGORITHM on PHASE with SEQ held; AUTO: each build one of them, not the last one again), its
+/* a build's ending (K2 on the BUILD page; AUTO: each build one of them, not the last one again), its
  * last bar (FAKE: before its false drop): BREATH (its last beat silent), RUSH (none: the roll twice as fast through its
  * last beat), VOID (its last bar silent but the riser, its last beat all silent; a 2-bar build: its last two beats),
  * TAPE (the music slowing to a stop over its last two beats), REVERSE (its last beat the one before, backwards), ECHO

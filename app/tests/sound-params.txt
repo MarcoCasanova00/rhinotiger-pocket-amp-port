@@ -23,7 +23,7 @@ wait 3200
 # KICK: Decay up (a longer body)
 tap SEL
 wait 30
-expect page 3
+expect page 4
 turn K4 25
 wait 30
 expect param46 100
@@ -34,7 +34,7 @@ turn K4 -25
 # BASS: Decay down (the bite closing at once, a rounder body)
 tap SEL
 wait 30
-expect page 4
+expect page 5
 turn K2 -25
 wait 30
 expect param47 0
@@ -45,7 +45,7 @@ turn K2 25
 # PERC: Open up (the open hat long)
 tap ENV
 wait 30
-expect page 5
+expect page 6
 turn K2 25
 wait 30
 expect param48 100
@@ -56,7 +56,7 @@ turn K2 -25
 # EVENTS: Pitch +7, Spread wide
 tap ENV
 wait 30
-expect page 6
+expect page 7
 turn K3 7
 wait 30
 expect param50 7
@@ -72,7 +72,7 @@ turn K4 -25
 # LINE: Drive up
 tap LFO
 wait 30
-expect page 7
+expect page 8
 turn K4 40
 wait 30
 expect param49 80
@@ -85,7 +85,7 @@ tap LFO
 wait 30
 tap LFO
 wait 30
-expect page 9
+expect page 10
 turn K3 25
 turn K4 25
 wait 30

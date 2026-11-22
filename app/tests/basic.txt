@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
 # RhinoTiger in the host simulator: ./test.sh basic
-# It plays as the boot's logo goes (silent till then), on MAIN. Buttons: HOME (MAIN, GROOVE), SEQ (PHASE), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ),
+# It plays as the boot's logo goes (silent till then), on MAIN. Buttons: HOME (MAIN, GROOVE), SEQ (PHASE, BUILD), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ),
 # EDIT (MIX), FX (ECHO), GLO (GLOBAL); ENV also reaches EVENTS and LFO also ATMOS; SELECT steps through the pages in that order.
 # the logo (the face, the characters on it, the band: 0.5 s, 0.5 s, 1.4 s), silent, the engine held
 wait 600
@@ -16,15 +16,12 @@ expect held 0
 expect playing 1
 wait 700
 shot main.png
-# SELECT turns through every page (MAIN GROOVE PHASE KICK BASS PERC EVENTS LINE LINE-SEQ ATMOS MIX ECHO GLOBAL); the buttons jump
-# (HOME again: GROOVE, again MAIN; SEQ: PHASE; SEL: KICK, BASS; ENV: PERC, EVENTS; LFO: LINE, LINE SEQ, ATMOS; EDIT: MIX; FX: ECHO; GLO: GLOBAL)
+# SELECT turns through every page (MAIN GROOVE PHASE BUILD KICK BASS PERC EVENTS LINE LINE-SEQ ATMOS MIX ECHO GLOBAL); the buttons jump
+# (HOME again: GROOVE, again MAIN; SEQ: PHASE, BUILD; SEL: KICK, BASS; ENV: PERC, EVENTS; LFO: LINE, LINE SEQ, ATMOS; EDIT: MIX; FX: ECHO; GLO: GLOBAL)
 turn SELECT 1
 wait 30
 expect page 1
-turn SELECT 6
-wait 30
-expect page 7
-turn SELECT 1
+turn SELECT 7
 wait 30
 expect page 8
 turn SELECT 1
@@ -39,6 +36,9 @@ expect page 11
 turn SELECT 1
 wait 30
 expect page 12
+turn SELECT 1
+wait 30
+expect page 13
 tap HOME
 wait 30
 expect page 0
@@ -53,14 +53,14 @@ wait 30
 expect page 2
 tap SEQ
 wait 30
+expect page 3
+tap SEQ
+wait 30
 expect page 2
 tap SEL
 wait 30
-expect page 3
-tap SEL
-wait 30
 expect page 4
-tap ENV
+tap SEL
 wait 30
 expect page 5
 tap ENV
@@ -68,10 +68,10 @@ wait 30
 expect page 6
 tap ENV
 wait 30
-expect page 5
-tap LFO
-wait 30
 expect page 7
+tap ENV
+wait 30
+expect page 6
 tap LFO
 wait 30
 expect page 8
@@ -80,19 +80,22 @@ wait 30
 expect page 9
 tap LFO
 wait 30
-expect page 7
-tap EDIT
-wait 30
 expect page 10
-tap EDIT
+tap LFO
 wait 30
-expect page 10
-tap FX
+expect page 8
+tap EDIT
 wait 30
 expect page 11
-tap GLO
+tap EDIT
+wait 30
+expect page 11
+tap FX
 wait 30
 expect page 12
+tap GLO
+wait 30
+expect page 13
 # the macros on MAIN, reaching the engine
 tap HOME
 wait 30

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The builds' endings: ALGORITHM on the PHASE page with SEQ held chooses BREATH, RUSH, VOID, TAPE, REVERSE, ECHO,
+# The builds' endings: K2 on the BUILD page (SEQ, twice) chooses BREATH, RUSH, VOID, TAPE, REVERSE, ECHO,
 # PICKUP (or AUTO); a ROLL build each (4 bars) from ARP, then the drop. Recorded (build/host/build-ends.wav) to listen
 # to. COLD SIGNAL, 152: a bar is about 1.58 s.
 wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
@@ -8,18 +8,18 @@ jack in
 wait 1500
 tap SEQ
 wait 60
-expect page 2
+tap SEQ
+wait 60
+expect page 3
 expect endset 0
 expect end 0
-turn ALGO 1
+turn K1 1
 wait 30
 expect buildset 1
 listen
 wav build-ends.wav
-press SEQ
-turn ALGO 1
+turn K2 1
 wait 30
-release SEQ
 expect endset 1
 said ENDING BREATH
 expect buildset 1
@@ -31,10 +31,8 @@ wait 3200
 wait 3400
 expect section 0
 wait 3200
-press SEQ
-turn ALGO 1
+turn K2 1
 wait 30
-release SEQ
 expect endset 2
 said ENDING RUSH
 expect buildset 1
@@ -46,10 +44,8 @@ wait 3200
 wait 3400
 expect section 0
 wait 3200
-press SEQ
-turn ALGO 1
+turn K2 1
 wait 30
-release SEQ
 expect endset 3
 said ENDING VOID
 expect buildset 1
@@ -61,10 +57,8 @@ wait 3200
 wait 3400
 expect section 0
 wait 3200
-press SEQ
-turn ALGO 1
+turn K2 1
 wait 30
-release SEQ
 expect endset 4
 said ENDING TAPE
 expect buildset 1
@@ -77,10 +71,8 @@ shot build-end.png
 wait 3400
 expect section 0
 wait 3200
-press SEQ
-turn ALGO 1
+turn K2 1
 wait 30
-release SEQ
 expect endset 5
 said ENDING REVERSE
 expect buildset 1
@@ -92,10 +84,8 @@ wait 3200
 wait 3400
 expect section 0
 wait 3200
-press SEQ
-turn ALGO 1
+turn K2 1
 wait 30
-release SEQ
 expect endset 6
 said ENDING ECHO
 expect buildset 1
@@ -107,10 +97,8 @@ wait 3200
 wait 3400
 expect section 0
 wait 3200
-press SEQ
-turn ALGO 1
+turn K2 1
 wait 30
-release SEQ
 expect endset 7
 said ENDING PICKUP
 expect buildset 1
@@ -123,11 +111,9 @@ wait 3400
 expect section 0
 wait 3200
 wavstop
-# back round to AUTO: an ending its own (not PICKUP, the last, again)
-press SEQ
-turn ALGO 1
+# back to AUTO, at the left: an ending its own (not PICKUP, the last, again)
+turn K2 -10
 wait 30
-release SEQ
 expect endset 0
 tap ARP
 wait 1700

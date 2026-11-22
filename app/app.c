@@ -16,29 +16,29 @@
  *                            rests a phrase)
  *   3 PHASE (SEQ)            K1..K4 Breaks (how often one comes on its own; 0: only when cued), Break (its bars: the
  *                            world's, 4..32), Build (2, 4, 8 bars), Gap (bars after a drop before one comes on its own)
- *   4 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body: short and tight, or long and full)
- *   5 BASS (SEL again)       K1..K4 Bite, Decay (how fast the bite closes), Length, Drive (as LINE's)
- *   6 PERC (ENV)             K1..K4 Hats, Open (the open hat's length), Clap, Tone (all of it brighter, darker)
- *   7 EVENTS (ENV again)     K1..K4 Density, Runs, Pitch (semitones), Spread (0 the middle; up, wider, and each
+ *   4 BUILD (SEQ again)      K1 Type (the builds': AUTO, or one held), K2 Ending (their last bar's: AUTO, or one held)
+ *   5 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body: short and tight, or long and full)
+ *   6 BASS (SEL again)       K1..K4 Bite, Decay (how fast the bite closes), Length, Drive (as LINE's)
+ *   7 PERC (ENV)             K1..K4 Hats, Open (the open hat's length), Clap, Tone (all of it brighter, darker)
+ *   8 EVENTS (ENV again)     K1..K4 Density, Runs, Pitch (semitones), Spread (0 the middle; up, wider, and each
  *                            crossing to the other side)
- *   8 LINE (LFO)             K1..K4 Bite (the modulation's height), Decay (its fall), Length, Drive
- *   9 LINE SEQ (LFO again)   K1..K4 Density, Mutate, Range (how far the notes go up), Slide (how many)
+ *   9 LINE (LFO)             K1..K4 Bite (the modulation's height), Decay (its fall), Length, Drive
+ *  10 LINE SEQ (LFO again)   K1..K4 Density, Mutate, Range (how far the notes go up), Slide (how many)
  *                            On either LINE page LFO acts as it is let go (tapped: the next); held, the line's
  *                            phrase drawn anew from the next bar
- *  10 ATMOS (LFO, a third)   K1..K4 Colour, Air, Motion (its sway's speed; past the middle the sway also opens and
+ *  11 ATMOS (LFO, a third)   K1..K4 Colour, Air, Motion (its sway's speed; past the middle the sway also opens and
  *                            closes it, more), Depth (how far)
- *  11 MIX (EDIT)             K1 the track (the six parts, as the pages), K2 its level, K3 its send into the echo
+ *  12 MIX (EDIT)             K1 the track (the six parts, as the pages), K2 its level, K3 its send into the echo
  *                            (the kick and the bass: none, not shown), K4 its mute (right on, left off); a strip a
  *                            track, its meter, its level and its send
- *  12 ECHO (FX)              K1..K4 Feedback, Tone, Time, Level (the return)
- *  13 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme (the screen's colours and how they move: NEON,
+ *  13 ECHO (FX)              K1..K4 Feedback, Tone, Time, Level (the return)
+ *  14 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme (the screen's colours and how they move: NEON,
  *                            ACID, INFRA, ICE, MONO); K3 shows the audio's load (CPU); K4 MIDI in
  *                            (off by default); SAVE here keeps it all (tapped: as it is let go); held 1.5 s, every
  *                            knob of every page back where it began (the world's own sound: the knobs move from it),
  *                            not kept until SAVE (SAVE lit); the world, the lights, the theme and MIDI stay
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
- * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on PHASE the
- * builds' kind (SEQ held: their ending), on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
+ * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
  * those heard another type as the next bar begins, more turns more parts, and the groove another shape for four
  * bars, GROOVE's staying; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
  * the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the loop gone; lit while one
@@ -151,14 +151,14 @@ void app_init(void)
 }
 
 /* ------------------------------------------------------------------ pages --- */
-/* the pages in the panel's order: HOME the whole (MAIN, GROOVE, PHASE); the top row's middle four the sounds (SEL the
+/* the pages in the panel's order: HOME the whole (MAIN, GROOVE); SEQ the sections (PHASE, BUILD); the top row's middle four the sounds (SEL the
  * kick and the bass, ENV the percussion, LFO the line, EDIT the events and the atmos); FX the echo; GLO the global.
  * A button with two or three pages steps through them */
-enum { PG_MAIN, PG_GROOVE, PG_PHASE, PG_KICK, PG_BASS, PG_PERC, PG_EVENTS, PG_LINE, PG_LINE_SEQ, PG_ATMOS, PG_MIX,
+enum { PG_MAIN, PG_GROOVE, PG_PHASE, PG_BUILD, PG_KICK, PG_BASS, PG_PERC, PG_EVENTS, PG_LINE, PG_LINE_SEQ, PG_ATMOS, PG_MIX,
        PG_ECHO, PG_GLOBAL, NPAGE };
-static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "PHASE", "KICK", "BASS", "PERC", "EVENTS", "LINE",
+static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "PHASE", "BUILD", "KICK", "BASS", "PERC", "EVENTS", "LINE",
                                              "LINE SEQ", "ATMOS", "MIX", "ECHO", "GLOBAL"};
-static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEL, B_SEL, B_ENV, B_ENV, B_LFO, B_LFO, B_LFO, B_EDIT,
+static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEQ, B_SEL, B_SEL, B_ENV, B_ENV, B_LFO, B_LFO, B_LFO, B_EDIT,
                                         B_FX, B_GLO};
 /* MIX's tracks: the parts (PART_*), each its level, its send into the echo (-1: none, the kick's and the bass's low
  * end kept out of it) and its mute */
@@ -184,6 +184,7 @@ static int page_par(int p, int k)
         {P_ENERGY, P_DETAIL, P_DARK, P_DRIFT},
         {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
         {P_BREAKS, P_BREAK_LEN, P_BUILD_LEN, P_GAP},
+        {-1, -1, -1, -1},                                /* BUILD: K1 the builds' type, K2 their ending */
         {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, P_KICK_DECAY},   /* (the levels and the sends: MIX's) */
         {P_BASS_BITE, P_BASS_DECAY, P_BASS_LEN, P_BASS_DRIVE},   /* (as LINE's) */
         {P_HATS, P_PERC_OPEN, P_CLAP, P_HAT_TONE},   /* (TONE: all of it, the clap's too) */
@@ -345,6 +346,8 @@ static const char *knob_name(int page, int k)
 {
     if (page == PG_GLOBAL)
         return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "MIDI IN";
+    if (page == PG_BUILD)
+        return k == 0 ? "TYPE" : k == 1 ? "ENDING" : "";
     if (page == PG_MIX)
         return k == 0 ? "TRACK" : k == 1 ? "LEVEL" : k == 2 ? (TRACK_SEND[mix_track % NTRACK] < 0 ? "" : "SEND")
              : "MUTE";                   /* (no send: no SEND) */
@@ -402,6 +405,12 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
         }
         return;
     }
+    if (page == PG_BUILD && k < 2) {     /* the builds' type, their ending (AUTO, or one held) */
+        str_put(t, 12, k == 0 ? ps_build_name(ps_build_kind_now()) : ps_end_name(ps_build_end_now()));
+        *pos = k == 0 ? ps_build_kind_now() : ps_build_end_now();
+        *span = k == 0 ? PS_NBUILD - 1 : PS_NEND - 1;
+        return;
+    }
     if (page == PG_MIX && k == 0) {      /* the track */
         str_put(t, 12, TRACK_NAME[mix_track % NTRACK]);
         *pos = mix_track;
@@ -449,6 +458,23 @@ static void knob_turn(int k, int32_t d)
                 midi_off();
         } else
             return;
+    } else if (page == PG_BUILD) {       /* the builds' type (K1), their ending (K2): AUTO at the left */
+        int32_t c;
+        if (k == 0) {
+            c = clamp(ps_build_kind_now() + d, 0, PS_NBUILD - 1);
+            if (c == ps_build_kind_now())
+                return;
+            ps_build_kind((int)c);
+        } else if (k == 1) {
+            c = clamp(ps_build_end_now() + d, 0, PS_NEND - 1);
+            if (c == ps_build_end_now())
+                return;
+            ps_build_end((int)c);
+        } else
+            return;
+        knob_value(page, k, t, &pos, &span);
+        app_say(knob_name(page, k), t);
+        return;
     } else if (page == PG_MIX && k == 0) {   /* the track */
         int32_t tr = clamp(mix_track + d, 0, NTRACK - 1);
         if (tr == mix_track)
@@ -784,16 +810,7 @@ static void input(void)
         page_go((int)ui.page + (int)e);
     if ((e = plat_enc(EN_PRESET)) != 0)
         world_step(e);
-    if ((e = plat_enc(EN_ALGO)) != 0 && ui.page == PG_PHASE && (btn & 1u << B_SEQ)) {   /* PHASE, SEQ held: the
-                                                                                         * builds' ending */
-        int c = (ps_build_end_now() + (int)e % PS_NEND + PS_NEND) % PS_NEND;
-        ps_build_end(c);
-        app_say("ENDING", ps_end_name(c));
-    } else if (e != 0 && ui.page == PG_PHASE) {   /* PHASE: the builds' kind */
-        int c = (ps_build_kind_now() + (int)e % PS_NBUILD + PS_NBUILD) % PS_NBUILD;
-        ps_build_kind(c);
-        app_say("BUILD", ps_build_name(c));
-    } else if (e != 0 && ui.page == PG_GROOVE) {   /* GROOVE: the bass's shape */
+    if ((e = plat_enc(EN_ALGO)) != 0 && ui.page == PG_GROOVE) {   /* GROOVE: the bass's shape */
         int c = (ps_bass_shape_now() + (int)e % PS_NSHAPE + PS_NSHAPE) % PS_NSHAPE;
         ps_bass_shape(c);
         app_say("BASS", ps_bass_shape_name(c));
@@ -1251,17 +1268,11 @@ static void draw_rule(void)
         ctx = "SAVE: KEEP IT";
     if (ctx)
         xs = cv_text(6, 0, &FONT_XS, ctx, C_AMB) + 6;
-    else if (ui.page == PG_PHASE) {    /* the builds' kind, then their ending (AUTO in a build: in its place, grey, the
-                                        * one it chose) */
-        int k = ps_build_kind_now(), in = ps_ui.section == SEC_BUILD;
-        xs = 6;
-        xs = k == PS_BUILD_AUTO && in && ps_ui.build_kind > 0
-           ? cv_text(xs, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_GRAY) + 6
-           : cv_text(xs, 0, &FONT_XS, ps_build_name(k), C_HI) + 6;
-        k = ps_build_end_now();
-        xs = k == PS_END_AUTO && in && ps_ui.build_end > 0
-           ? cv_text(xs, 0, &FONT_XS, ps_end_name(ps_ui.build_end), C_GRAY) + 6
-           : cv_text(xs, 0, &FONT_XS, ps_end_name(k), C_HI) + 6;
+    else if (ui.page == PG_BUILD && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0) {   /* in a build: this
+                                                                                              * one's type and ending */
+        xs = cv_text(6, 0, &FONT_XS, "NOW", C_GRAY) + 6;
+        xs = cv_text(xs, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_HI) + 6;
+        xs = cv_text(xs, 0, &FONT_XS, ps_end_name(ps_ui.build_end), C_HI) + 6;
     } else if (ui.page == PG_GROOVE || ui.page == PG_ECHO) {   /* the bass's shape; the echo's kind */
         xs = 6;
         xs = cv_text(xs, 0, &FONT_XS, ui.page == PG_GROOVE ? ps_bass_shape_name(ps_bass_shape_now())
@@ -1296,7 +1307,8 @@ static void draw_knobs(uint32_t now)
             continue;
         knob_value(page, (int)i, t, &pos, &span);
         cv_text(x, 14, &FONT_XS, name, lit ? C_WHITE : C_GRAY);
-        cv_text(x, 29, &FONT_B, t, lit ? C_WHITE : C_HI);
+        cv_text(x, 29, text_w(&FONT_B, t) > w ? &FONT_S : &FONT_B, t, lit ? C_WHITE : C_HI);   /* (a long name: the
+                                                                                         * narrower) */
         cv_rect(x, 51, w, 2, C_LINE);
         if (span > 0) {                      /* the value: a run of hues, from the knob's own */
             int32_t len = w * pos / span, j;
@@ -1528,11 +1540,11 @@ int app_expect(const char *what, int *got)
         *got = ps_bass_shape_now();
     else if (!strcmp(what, "echo_kind"))     /* the echo's kind (ECHO's ALGORITHM) */
         *got = ps_echo_kind_now();
-    else if (!strcmp(what, "buildset"))      /* the kind ALGORITHM chose on PHASE (0 AUTO) */
+    else if (!strcmp(what, "buildset"))      /* the type BUILD's K1 chose (0 AUTO) */
         *got = ps_build_kind_now();
     else if (!strcmp(what, "end"))           /* the latest build's ending (PS_END_*; 0 none yet) */
         *got = ps_ui.build_end;
-    else if (!strcmp(what, "endset"))        /* the ending ALGORITHM chose on PHASE, SEQ held (0 AUTO) */
+    else if (!strcmp(what, "endset"))        /* the ending BUILD's K2 chose (0 AUTO) */
         *got = ps_build_end_now();
     else if (!strcmp(what, "take"))          /* the throws in the keys' loop */
         *got = ps_take();
