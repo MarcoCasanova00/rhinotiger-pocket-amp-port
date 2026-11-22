@@ -419,7 +419,7 @@ static void au_bar(int sec)              /* a bar has begun */
 static void au_tick(void)                /* each frame */
 {
     int bar, sec;
-    if (au_rested && plat_ms() - au_rested > (ps_playing() ? 300u : 3000u)) {   /* (the echoes gone; or PLAY) */
+    if (au_rested && (int32_t)(plat_ms() - au_rested) > (int32_t)(ps_playing() ? 300u : 3000u)) {   /* (the echoes gone; or PLAY) */
         au_rested = 0;
         au_fade = 1.0f;
     }

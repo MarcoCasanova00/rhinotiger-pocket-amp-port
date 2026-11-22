@@ -250,7 +250,11 @@ static struct {
     uint32_t klit;                       /* the keys lit (the host's checks) */
     uint32_t touched_at;                 /* the hand's latest touch (a key, a button, a knob) */
     uint32_t au_at;                      /* AUTO PLAY's latest effect (or half time, fill, gap, the kick or the bass out) */
-    uint32_t au_tap[NPART];              /* a part out or back by AUTO PLAY: its key's light (0: none) */
+    uint32_t au_since;                   /* its effects on the screen switched on or off, the last time */
+    uint32_t au_flips;                   /* ... and how many times (the host's checks) */
+    uint32_t au_tap[NPART];              /* a part out or back by AUTO PLAY: when its key's light began (if au_tapped) */
+    uint32_t au_tapped;                  /* the parts whose key is lit so (bits) */
+    uint8_t au_gone;                     /* its effects on the screen have gone off once (the first time is not held back) */
     uint8_t au_out;                      /* its parts out, as last seen */
     uint8_t au_show;                     /* its effects on the screen: the grid's picture, whatever the page */
     uint32_t turned_at[4];               /* each knob's last turn (the strip lights it) */
@@ -386,7 +390,17 @@ static void page_button(int b)           /* a page's button: its first page, or 
 
 #ifdef PLAT_HOST
 static uint8_t host_auto_log;            /* "autolog on" */
+static uint8_t host_jitter, host_skew;   /* "jitter on": a millisecond more, on every other frame (odd and even ms both) */
 #endif
+/* the ms for what is stamped and aged in the same frame; the host's can be jittered */
+static uint32_t app_ms(void)
+{
+#ifdef PLAT_HOST
+    return plat_ms() + host_skew;
+#else
+    return plat_ms();
+#endif
+}
 #include "auto.h"                        /* AUTO PLAY */
 
 /* the knobs of a page: K1..K4's names, values and positions ("": none) */
@@ -517,6 +531,11 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
     (void)b, (void)c, (void)d;
     if (!strcmp(cmd, "autolog")) {       /* AUTO PLAY, a line a bar (a probe's) */
         host_auto_log = !strcmp(a, "on");
+        return 1;
+    }
+    if (!strcmp(cmd, "jitter")) {        /* the frames' ms odd and even by turns (an age is never a wrapped one) */
+        host_jitter = !strcmp(a, "on");
+        host_skew = 0;
         return 1;
     }
     if (!strcmp(cmd, "oldset")) {        /* the settings saved as an older version's (9, 8, 7): a reboot takes them */
@@ -899,18 +918,20 @@ static void midi_poll(void)
  * the kick and the bass out together the black keys of ECHO's; a part out or back, a tap of its key */
 static uint32_t au_keys(void)
 {
-    uint32_t now = plat_ms(), w = (uint32_t)(ps_stat(9) | ps_stat(13)), m = 0, b = 0, k;
+    uint32_t now = app_ms(), w = (uint32_t)(ps_stat(9) | ps_stat(13)), m = 0, b = 0, k;
     int doing = ps_stat(11), out = ps_stat(10), low = 1 << PART_KICK | 1 << PART_BASS, i;
     for (i = 0; i < NPART; i++)
-        if ((out ^ ui.au_out) >> i & 1 && !(low >> i & 1 && ((out & low) == low || (ui.au_out & low) == low)))
-            ui.au_tap[i] = now | 1u;
+        if ((out ^ ui.au_out) >> i & 1 && !(low >> i & 1 && ((out & low) == low || (ui.au_out & low) == low))) {
+            ui.au_tap[i] = now;
+            ui.au_tapped |= 1u << i;
+        }
     ui.au_out = (uint8_t)out;
     for (i = 0; i < BK_FILL; i++)
-        if (ui.au_tap[BK_PART[i]]) {
-            if (now - ui.au_tap[BK_PART[i]] < 150u)
+        if (ui.au_tapped >> BK_PART[i] & 1u) {
+            if ((int32_t)(now - ui.au_tap[BK_PART[i]]) < 150)
                 b |= 1u << i;
             else
-                ui.au_tap[BK_PART[i]] = 0;
+                ui.au_tapped &= ~(1u << BK_PART[i]);
         }
     b |= (doing & 1 ? 1u << BK_HALF : 0u) | (doing & 2 ? 1u << BK_FILL : 0u) | (doing & 4 ? 1u << BK_GAP : 0u) |
          ((out & low) == low ? 1u << BK_NOLOW : 0u);
@@ -919,18 +940,30 @@ static uint32_t au_keys(void)
             m |= 1u << k;
     return m;
 }
-/* its effects on the screen: the grid in the lanes' place, the page and its knobs as they are; two seconds after the last,
- * not while the hand is at it (three seconds) */
+/* its effects on the screen: the grid in the lanes' place, the page and its knobs as they are. On when one is at it (and
+ * the hand has not been for three seconds, and not the ECHO page), after three seconds off at the least (the first time at
+ * once); then three seconds on at the least, and till two seconds after the last effect. Off at once when the hand
+ * touches, AUTO PLAY is off, or the page is ECHO's. (The ages as signed: a stamp a millisecond ahead is no wrapped one.) */
 static void au_see(void)
 {
-    uint32_t now = plat_ms();
+    uint32_t now = app_ms();
     int on = ps_stat(9) || ps_stat(11) || (ps_stat(10) & (1 << PART_KICK | 1 << PART_BASS));
-    uint8_t show;
+    int touched = (int32_t)(now - ui.touched_at) < 3000, since = (int32_t)(now - ui.au_since);
+    uint8_t show = ui.au_show;
     if (au.on && on)
-        ui.au_at = now | 1u;
-    show = (uint8_t)(au.on && ui.au_at && now - ui.au_at < 2000u && now - ui.touched_at >= 3000u && !grid_mode());
+        ui.au_at = now;
+    if (show) {
+        if (!au.on || touched || grid_mode() || (since >= 3000 && (int32_t)(now - ui.au_at) >= 2000))
+            show = 0;
+    } else if (au.on && on && !touched && !grid_mode() && (!ui.au_gone || since >= 3000)) {
+        show = 1;
+    }
     if (show != ui.au_show) {
         ui.au_show = show;
+        ui.au_since = now;
+        ui.au_flips++;
+        if (!show)
+            ui.au_gone = 1;
         ui.redraw = 1;
     }
 }
@@ -1032,14 +1065,14 @@ static void input(void)
             page_button((int)k);
     if ((e = plat_enc(EN_SELECT)) != 0) {
         page_go((int)ui.page + (int)e);
-        ui.touched_at = plat_ms();
+        ui.touched_at = app_ms();
     }
     if ((e = plat_enc(EN_PRESET)) != 0) {
         world_step(e);
-        ui.touched_at = plat_ms();
+        ui.touched_at = app_ms();
     }
     if ((e = plat_enc(EN_ALGO)) != 0)
-        ui.touched_at = plat_ms();
+        ui.touched_at = app_ms();
     if (e != 0 && ui.page == PG_GROOVE) {   /* GROOVE: the bass's shape */
         int c = (ps_bass_shape_now() + (int)e % PS_NSHAPE + PS_NSHAPE) % PS_NSHAPE;
         ps_bass_shape(c);
@@ -1073,10 +1106,10 @@ static void input(void)
     for (k = 0; k < 4; k++)
         if ((e = plat_enc((int)(EN_K1 + k))) != 0) {
             knob_turn((int)k, e);
-            ui.touched_at = plat_ms();
+            ui.touched_at = app_ms();
         }
     if (keys | btn | ui.keys | ui.btn)
-        ui.touched_at = plat_ms();
+        ui.touched_at = app_ms();
     if (keys != ui.keys || btn != ui.btn)
         ui.redraw = 1;
     ui.keys = keys;
@@ -1718,6 +1751,10 @@ void app_ui_init(void)
 void app_frame(void)
 {
     uint32_t now = plat_ms();
+#ifdef PLAT_HOST
+    if (host_jitter)
+        host_skew ^= 1u;
+#endif
     input();
     au_tick();
     au_see();
@@ -1732,9 +1769,12 @@ void app_frame(void)
         ui.world_until = 0;
         ui.redraw = 1;
     }
-    if (shed_at && now - shed_at > 8000u) {   /* lighter no more */
-        shed_at = 0;
-        ps_shed(0);
+    uint32_t shed = shed_at;             /* (the interrupt sets it, maybe after this frame began: ages as signed) */
+    if (shed && (int32_t)(plat_ms() - shed) > 8000) {   /* lighter no more */
+        if (shed_at == shed) {
+            shed_at = 0;
+            ps_shed(0);
+        }
     }
     if (ui.logo_until) {                     /* the logo, a moment more: its layers one by one */
         if ((int32_t)(now - ui.logo_until) < 0) {
@@ -1832,6 +1872,8 @@ int app_expect(const char *what, int *got)
         *got = (int)ui.klit;
     else if (!strcmp(what, "au_show"))       /* AUTO PLAY's effects on the screen */
         *got = ui.au_show;
+    else if (!strcmp(what, "au_flips"))      /* ... and how many times that has switched */
+        *got = (int)ui.au_flips;
     else if (!strcmp(what, "perform"))
         *got = set.auto_perf;
     else if (!strcmp(what, "au_min"))        /* its minutes */

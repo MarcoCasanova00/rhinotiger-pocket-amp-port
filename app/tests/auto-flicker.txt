@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY's effects on the screen do not flicker: the frames' ms odd and even by turns (jitter), and the picture still
+# switches once on and once off for the BAND (w7, F4) of set 7 at 100, and only so often over the minute after
+wait 3000   # the logo, then the play
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 7
+wait 30
+turn K4 -60
+wait 30
+expect perform 0
+turn K4 50
+wait 30
+expect perform 100
+turn K1 1
+wait 30
+jitter on
+tap PLAY
+wait 11900
+expect page 4
+expect au_show 1
+expect au_flips 1
+# the effect still on, a second later: the same picture, no switch
+wait 1000
+expect au_show 1
+expect au_flips 1
+# gone (two seconds after the last, three on at the least): off the once
+wait 3000
+expect au_show 0
+expect au_flips 2
+# a minute more: three seconds on and three off at the least would allow 20 switches; the effects being apart, it takes
+# 10 (the old logic: 150 and more)
+wait 60000
+expect au_flips <13
