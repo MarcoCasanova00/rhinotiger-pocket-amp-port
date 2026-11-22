@@ -20,8 +20,8 @@
  *            often a break comes on its own
  *
  * The sections (psy.h): the groove; a break, the kick, the bass and the percussion out, the atmos up and the events
- * fewer; its build, a clap roll quickening (quarters, eighths, sixteenths, and the last beat silent: a breath) under a
- * noise rising, over BUILD's bars (4 unless moved); the drop, on a bar's first beat: a crash, the phrases counted from
+ * fewer; its build, a clap roll quickening (quarters, eighths, sixteenths, and an ending: the last beat silent, a
+ * breath, or another) under a noise rising, over BUILD's bars (4 unless moved); the drop, on a bar's first beat: a crash, the phrases counted from
  * it, the events' loop drawn anew, and the bass a shade other (another of its colours: its ratio, its bite). A cue
  * (SAVE) acts as the next bar begins; a break on its own comes as a 32-bar block begins (how likely: Drift and
  * BREAKS), GAP bars after the last drop at least, and lasts BREAK's bars or the world's (then builds and drops on its
@@ -256,6 +256,7 @@ static struct {
     uint32_t builds;                   /* builds so far (their lengths' dice) */
     uint32_t sec_bar, sec_len;         /* bars into the section; a break's length (0: until cued), a build's */
     uint8_t bk;                        /* the build's kind (PS_BUILD_ROLL ..), taken as it begins */
+    uint8_t be;                        /* its ending (PS_END_BREATH ..), taken so too */
     float hp_hz, hp_b[2], hp_u[2][2];  /* FILTER's high-pass: its cutoff (glides; 0 none), the bass's, the upper's */
     float lp_g, lp_u[2][2];            /* SINK's low-pass over the upper: its share (glides), its states */
     uint32_t cue_seen, drop_seen, build_seen;
@@ -605,6 +606,7 @@ static void kit_step(void)
                                                                                 : PS_SHAPE_ROLL) : PS_SHAPE_AUTO);
 }
 static volatile int build_want;        /* PS_BUILD_* (AUTO: the world leans) */
+static volatile int end_want;          /* PS_END_* (AUTO: any but the last) */
 static volatile int echo_kind;         /* PS_ECHO_* */
 void ps_bass_shape(int k) { shape_want = k >= 0 && k < PS_NSHAPE ? k : PS_SHAPE_AUTO; }
 int ps_bass_shape_now(void) { return shape_want; }
@@ -622,6 +624,13 @@ const char *ps_echo_kind_name(int k)
 }
 void ps_build_kind(int k) { build_want = k >= 0 && k < PS_NBUILD ? k : PS_BUILD_AUTO; }
 int ps_build_kind_now(void) { return build_want; }
+void ps_build_end(int k) { end_want = k >= 0 && k < PS_NEND ? k : PS_END_AUTO; }
+int ps_build_end_now(void) { return end_want; }
+const char *ps_end_name(int k)
+{
+    static const char *const N[PS_NEND] = {"AUTO", "BREATH", "RUSH", "VOID", "TAPE", "REVERSE", "ECHO", "PICKUP"};
+    return N[(unsigned)k % PS_NEND];
+}
 const char *ps_build_name(int k)
 {
     static const char *const N[PS_NBUILD] = {"AUTO", "ROLL", "KICK", "FILTER", "TRIPLET", "STUTTER", "POLY", "SINK",
@@ -698,6 +707,7 @@ static uint32_t build_len(void);
 static uint32_t roll_every(uint32_t pb);
 static int build_fake(void);
 static int build_grooves(void);
+static uint32_t poly_grid(uint32_t pb, uint32_t *st);
 static uint32_t bass_pat(uint32_t rb)  /* the shape of bar rb (the kit's over AUTO's while it lasts) */
 {
     return s.kit_bars ? s.kit_pat : rb % 8u == s.trip_at ? 2u : s.pat;
@@ -743,8 +753,7 @@ static void lane_poly(uint8_t out[24])   /* POLY's kick: each sixteenth a dotted
 {
     uint32_t len = build_len(), i, d;
     for (i = 0; i < 16u; i++) {
-        uint32_t pb = s.sec_bar * 4u + i / 4u, st = pb < 2u * len ? 0u : pb < 3u * len ? 2u * len : 3u * len;
-        uint32_t grid = st == 0u ? 18u : st == 2u * len ? 9u : 6u;
+        uint32_t pb = s.sec_bar * 4u + i / 4u, st, grid = poly_grid(pb, &st);
         if (build_breath(i / 4u))
             continue;
         for (d = 0; d < 6u; d++)
@@ -946,9 +955,18 @@ static void mods(const world_t *w)     /* the macros and the moved tempo and roo
 
 /* a build's bars but FAKE's last (its false drop's) */
 static uint32_t build_len(void) { return s.bk == PS_BUILD_FAKE && s.sec_len > 1u ? s.sec_len - 1u : s.sec_len; }
-static int build_breath(uint32_t beat)   /* its last beat, silent (FAKE: before its false drop) */
+/* its ending's beats (its last bar's last: VOID the bar, or two in a 2-bar build; TAPE, ECHO two; the rest one), at
+ * beat here (FAKE: before its false drop) */
+static int build_end(uint32_t beat)
 {
-    return s.sec == SEC_BUILD && s.sec_bar + 1u == build_len() && beat == 3u;
+    uint32_t n = s.be == PS_END_VOID ? (build_len() > 2u ? 4u : 2u) : s.be == PS_END_TAPE || s.be == PS_END_ECHO ? 2u : 1u;
+    return s.sec == SEC_BUILD && s.sec_bar + 1u == build_len() && beat + n >= 4u;
+}
+static int build_breath(uint32_t beat)   /* silent here: its ending's (BREATH, PICKUP its last beat; VOID its beats;
+                                          * ECHO its last; RUSH, TAPE, REVERSE none: the music goes on beneath) */
+{
+    return build_end(beat) && s.be != PS_END_RUSH && s.be != PS_END_TAPE && s.be != PS_END_REVERSE &&
+           (s.be != PS_END_ECHO || beat == 3u);
 }
 static int build_fake(void) { return s.sec == SEC_BUILD && s.bk == PS_BUILD_FAKE && s.sec_bar >= build_len(); }
 static int build_grooves(void)         /* the groove goes on through it (FILTER: by turns; STUTTER: repeated) */
@@ -969,7 +987,16 @@ static uint32_t roll_every(uint32_t pb)
 {
     uint32_t len = build_len(), q = pb < len ? 0u : pb < 2u * len ? 1u : 2u;
     static const uint8_t E[3][3] = {{24, 12, 6}, {24, 8, 4}, {6, 12, 24}};
-    return E[s.bk == PS_BUILD_TRIP ? 1 : s.bk == PS_BUILD_SINK ? 2 : 0][q];
+    uint32_t e = E[s.bk == PS_BUILD_TRIP ? 1 : s.bk == PS_BUILD_SINK ? 2 : 0][q];
+    return s.be == PS_END_RUSH && pb + 1u == 4u * len ? e / 2u : e;   /* (RUSH: its last beat twice as fast) */
+}
+/* POLY's kick: dotted eighths against the bar (from its half dotted sixteenths, its last quarter sixteenths; RUSH's
+ * last beat 32nds); *st the beat its grid counts from */
+static uint32_t poly_grid(uint32_t pb, uint32_t *st)
+{
+    uint32_t len = build_len();
+    *st = pb < 2u * len ? 0u : pb < 3u * len ? 2u * len : 3u * len;
+    return s.be == PS_END_RUSH && pb + 1u == 4u * len ? 3u : *st == 0u ? 18u : *st == 2u * len ? 9u : 6u;
 }
 
 /* the build's roll, louder beat by beat: a clap's, or (KICK) the kick's; its last beat silent. POLY: the kick on
@@ -995,7 +1022,7 @@ static void build_step(uint32_t t, uint32_t beat)
         return;
     }
     if (s.bk == PS_BUILD_POLY) {
-        uint32_t st = pb < 2u * len ? 0u : pb < 3u * len ? 2u * len : 3u * len, grid = st == 0u ? 18u : st == 2u * len ? 9u : 6u;
+        uint32_t st, grid = poly_grid(pb, &st);
         if (((pb - st) * TPB + t) % grid == 0u) {
             s.k_t = 0.0f;
             s.k_ph = 0.0f;
@@ -1147,6 +1174,14 @@ static void enter_build(const world_t *w)   /* a build: BUILD's bars, its kind (
     }
     s.bk = (uint8_t)k;
     ps_ui.build_kind = (int8_t)k;
+    k = end_want;                      /* its ending (AUTO: any but the last) */
+    if (k == PS_END_AUTO) {
+        k = PS_END_BREATH + (int)(rnd() % (s.be >= PS_END_BREATH ? PS_NEND - 2u : PS_NEND - 1u));
+        if (s.be >= PS_END_BREATH && k >= s.be)
+            k++;
+    }
+    s.be = (uint8_t)k;
+    ps_ui.build_end = (int8_t)k;
     enter(SEC_BUILD, BUILD_BARS[clampi(par[P_BUILD_LEN] + vary_step(s.builds++, 0xB111u, VARY_P), 0, 2)] +
                      (k == PS_BUILD_FAKE));   /* (FAKE: its false drop's bar) */
 }
@@ -1226,6 +1261,9 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         fx.auto_slice = s.sec == SEC_BUILD && s.bk == PS_BUILD_STUTTER && !build_breath(beat)
                       ? SL[clampi((int)((s.sec_bar * 4u + beat) / build_len()), 0, 3)] : 0u;
     }
+    /* the ending's: TAPE, REVERSE the buffer's (from its first beat's tick); ECHO thrown into the echo, as DUB */
+    fx.auto_buf = (uint8_t)(!build_end(beat) ? 0 : s.be == PS_END_TAPE ? FX_TAPE : s.be == PS_END_REVERSE ? FX_REVERSE : 0);
+    fx.auto_dub = (uint8_t)(build_end(beat) && s.be == PS_END_ECHO);
     if (t % 6u == 0u)
         fx_sixteenth(t == 0u);
     if (t == 0u) {                     /* a fill cued (a black key): this beat */
@@ -1275,6 +1313,13 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         s.gap = 1;
     } else if (t == 0u && beat == 0u)
         s.gap = 0;
+    if (s.be == PS_END_PICKUP && build_end(beat) && t == 18u) {   /* PICKUP: its last sixteenth, the kick and the bass */
+        s.k_t = 0.0f;
+        s.k_ph = 0.0f;
+        ps_ui.hits[HIT_KICK]++;
+        bass_note(w, 6u);
+        return;
+    }
     if (fx.half) {                     /* HALF (a black key held): half time, the kick on 1 and 3, the bass's roll over
                                         * two beats (K-B-B-B, an eighth each); the kick's twists not */
         uint32_t ht = (beat & 1u) * TPB + t;
@@ -1556,8 +1601,9 @@ static float build_progress(void)      /* 0..1 through a build's bars (FAKE's la
 static float riser(float n, float *l, float *r)
 {
     float p = build_progress(), target = 0.0f, f, x;
-    if (s.sec == SEC_BUILD && !build_breath((s.tick ? s.tick - 1u : 0u) / TPB % 4u) && !build_fake())
-        target = p * p;
+    uint32_t beat = (s.tick ? s.tick - 1u : 0u) / TPB % 4u;
+    if (s.sec == SEC_BUILD && !(build_breath(beat) && (s.be != PS_END_VOID || beat == 3u)) && !build_fake())
+        target = p * p;   /* (VOID's: on through its bar, but its last beat) */
     s.z_g += (target - s.z_g) * (target > s.z_g ? 0.0005f : 0.004f);
     if (s.z_g < 0.0003f)
         return 0.0f;
@@ -1763,14 +1809,14 @@ void ps_render(float *outl, float *outr, uint32_t n)
     }
     tempo(w);
     if (!playing) {                    /* resting: no STUTTER's repeat going on */
-        fx.auto_slice = 0;
-        if (fx.cur.id == FX_AUTO)
+        fx.auto_slice = fx.auto_buf = fx.auto_dub = 0;
+        if (fx.cur.id == FX_AUTO || (fx.cur.id >= 0 && fx.buf_want < 0))
             fx.buf_on = 0;
     }
-    if (fx.held >> FX_DUB & 1u) {      /* DUB: the echo longer and darker (its time stretching: below); FREEZE: it
+    if (dub_on()) {                    /* DUB: the echo longer and darker (its time stretching: below); FREEZE: it
                                         * takes in the music for one echo's time, then keeps it (below) */
         fb = 0.9f;
-        tone = 0.16f;
+        tone = fx.held >> FX_DUB & 1u ? 0.16f : fm_maxf(tone, 0.4f);   /* (an ending's throw: not so dark) */
     }
     if (fx.held >> FX_FREEZE & 1u) {
         fb = 1.0f;
@@ -1875,7 +1921,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
                 dt_e = fm_minf(dt_e * (1.0f + s.e_tape * (0.005f * fm_sin_turns(s.e_wow) + 0.0015f * fm_sin_turns(s.e_flut))),
                                (float)(ECHO_N - 2u));
             }
-            if (fx.held >> FX_DUB & 1u) {  /* DUB: half again as long over ~2 s, wavering ~0.9 % at 0.7 Hz */
+            if (dub_on()) {            /* DUB: half again as long over ~2 s, wavering ~0.9 % at 0.7 Hz */
                 if ((s.dub_ph += 0.7f / PS_SR) >= 1.0f)
                     s.dub_ph -= 1.0f;
                 dt_e = fm_minf(dt_e * 1.5f * (1.0f + 0.009f * fm_sin_turns(s.dub_ph)), (float)(ECHO_N - 2u));

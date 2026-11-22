@@ -73,9 +73,13 @@ static struct {
     uint8_t half;                      /* HALF held: the kick and the bass in half time */
     uint8_t gap_req;                   /* GAP cued: the next bar's last beat to come silent */
     uint8_t auto_slice;                /* a STUTTER build's repeat, ticks (0: none): psy.c sets it a tick */
+    uint8_t auto_buf;                  /* a build's ending's buffer effect, FX_TAPE or FX_REVERSE (0: none): so too */
+    uint8_t auto_dub;                  /* a build's ending thrown into the echo, as DUB held: so too */
 } fx = {.buf_want = -1, .cur = {.id = -1}, .old = {.id = -1}};
 
 /* the read: frame position p (a count, fractional), channel ch, between two samples */
+static int dub_on(void) { return (fx.held >> FX_DUB & 1u) || fx.auto_dub; }   /* DUB: held, or an ending's */
+
 static float cap_read(int ch, float p)
 {
     uint32_t i = (uint32_t)p;
@@ -131,10 +135,13 @@ static void fx_sixteenth(int beat)     /* a sixteenth begins (beat: a beat too):
     if (fx.buf_want >= 0) {            /* a key's */
         if ((fx.buf_want != fx.cur.id || !fx.buf_on) && (beat || fx.buf_want > FX_R4T))
             fx_start(fx.buf_want, 0.0f);
+    } else if (fx.auto_buf) {          /* a build's ending's (TAPE, REVERSE): from where it begins, on */
+        if (fx.cur.id != (int)fx.auto_buf || !fx.buf_on)
+            fx_start(fx.auto_buf, 0.0f);
     } else if (fx.auto_slice) {        /* a STUTTER build's: anew as its slice shortens (a quarter's from a beat) */
         if ((fx.cur.id != FX_AUTO || !fx.buf_on || fx.cur.slice != (float)fx.auto_slice) && (beat || fx.auto_slice < 24u))
             fx_start(FX_AUTO, (float)fx.auto_slice);
-    } else if (fx.cur.id == FX_AUTO)   /* its breath: back to the music */
+    } else if (fx.cur.id >= 0 && fx.buf_on)   /* its breath, its ending done (the drop): back to the music */
         fx.buf_on = 0;
 }
 
@@ -303,7 +310,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     /* WASH and FREEZE (its taking in is psy.c's): what is above the kick and the bass sinking beneath the hall, the
      * echo (~10 ms down, ~40 ms back; a buffer's replay, all of it, stays) */
     {
-        int wa = fx.held >> FX_WASH & 1u, fz = fx.held >> FX_FREEZE & 1u, du = fx.held >> FX_DUB & 1u;
+        int wa = fx.held >> FX_WASH & 1u, fz = fx.held >> FX_FREEZE & 1u, du = dub_on();
         fx.wash_g += ((wa ? 1.0f : 0.0f) - fx.wash_g) * (wa ? 0.002f : 0.0006f);
         fx.frz_g += ((fz ? 1.0f : 0.0f) - fx.frz_g) * (fz ? 0.002f : 0.0006f);
         fx.dub_g += ((du ? 1.0f : 0.0f) - fx.dub_g) * (du ? 0.002f : 0.0006f);
@@ -368,6 +375,8 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     /* DUB: what is above the kick and the bass, into the echo */
     if (fx.held >> FX_DUB & 1u)
         send += 1.1f * (upper_l + upper_r);
+    else if (fx.auto_dub)              /* an ending's: all of it (a KICK build's roll too), the kick and the bass less */
+        send += 1.8f * (upper_l + upper_r) + 0.5f * (*l - upper_l + *r - upper_r);
     /* RISER: a band of noise, rising over two bars while held */
     fx.riser_g += ((fx.held >> FX_RISER & 1u ? 1.0f : 0.0f) - fx.riser_g) * 0.003f;
     if (fx.riser_g > 0.0005f) {

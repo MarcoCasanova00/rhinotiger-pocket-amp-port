@@ -38,7 +38,7 @@
  *                            not kept until SAVE (SAVE lit); the world, the lights, the theme and MIDI stay
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
  * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on PHASE the
- * builds' kind, on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
+ * builds' kind (SEQ held: their ending), on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
  * those heard another type as the next bar begins, more turns more parts, and the groove another shape for four
  * bars, GROOVE's staying; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
  * the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the loop gone; lit while one
@@ -784,7 +784,12 @@ static void input(void)
         page_go((int)ui.page + (int)e);
     if ((e = plat_enc(EN_PRESET)) != 0)
         world_step(e);
-    if ((e = plat_enc(EN_ALGO)) != 0 && ui.page == PG_PHASE) {   /* PHASE: the builds' kind */
+    if ((e = plat_enc(EN_ALGO)) != 0 && ui.page == PG_PHASE && (btn & 1u << B_SEQ)) {   /* PHASE, SEQ held: the
+                                                                                         * builds' ending */
+        int c = (ps_build_end_now() + (int)e % PS_NEND + PS_NEND) % PS_NEND;
+        ps_build_end(c);
+        app_say("ENDING", ps_end_name(c));
+    } else if (e != 0 && ui.page == PG_PHASE) {   /* PHASE: the builds' kind */
         int c = (ps_build_kind_now() + (int)e % PS_NBUILD + PS_NBUILD) % PS_NBUILD;
         ps_build_kind(c);
         app_say("BUILD", ps_build_name(c));
@@ -1246,12 +1251,17 @@ static void draw_rule(void)
         ctx = "SAVE: KEEP IT";
     if (ctx)
         xs = cv_text(6, 0, &FONT_XS, ctx, C_AMB) + 6;
-    else if (ui.page == PG_PHASE) {    /* the builds' kind (AUTO in a build: the one it chose too) */
-        int k = ps_build_kind_now();
+    else if (ui.page == PG_PHASE) {    /* the builds' kind, then their ending (AUTO in a build: in its place, grey, the
+                                        * one it chose) */
+        int k = ps_build_kind_now(), in = ps_ui.section == SEC_BUILD;
         xs = 6;
-        xs = cv_text(xs, 0, &FONT_XS, ps_build_name(k), C_HI) + 6;
-        if (k == PS_BUILD_AUTO && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0)
-            xs = cv_text(xs - 2, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_GRAY) + 6;
+        xs = k == PS_BUILD_AUTO && in && ps_ui.build_kind > 0
+           ? cv_text(xs, 0, &FONT_XS, ps_build_name(ps_ui.build_kind), C_GRAY) + 6
+           : cv_text(xs, 0, &FONT_XS, ps_build_name(k), C_HI) + 6;
+        k = ps_build_end_now();
+        xs = k == PS_END_AUTO && in && ps_ui.build_end > 0
+           ? cv_text(xs, 0, &FONT_XS, ps_end_name(ps_ui.build_end), C_GRAY) + 6
+           : cv_text(xs, 0, &FONT_XS, ps_end_name(k), C_HI) + 6;
     } else if (ui.page == PG_GROOVE || ui.page == PG_ECHO) {   /* the bass's shape; the echo's kind */
         xs = 6;
         xs = cv_text(xs, 0, &FONT_XS, ui.page == PG_GROOVE ? ps_bass_shape_name(ps_bass_shape_now())
@@ -1520,6 +1530,10 @@ int app_expect(const char *what, int *got)
         *got = ps_echo_kind_now();
     else if (!strcmp(what, "buildset"))      /* the kind ALGORITHM chose on PHASE (0 AUTO) */
         *got = ps_build_kind_now();
+    else if (!strcmp(what, "end"))           /* the latest build's ending (PS_END_*; 0 none yet) */
+        *got = ps_ui.build_end;
+    else if (!strcmp(what, "endset"))        /* the ending ALGORITHM chose on PHASE, SEQ held (0 AUTO) */
+        *got = ps_build_end_now();
     else if (!strcmp(what, "take"))          /* the throws in the keys' loop */
         *got = ps_take();
     else if (!strcmp(what, "lines"))         /* the line's notes so far */

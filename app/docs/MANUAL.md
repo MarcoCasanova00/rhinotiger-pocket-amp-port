@@ -129,7 +129,7 @@ while the keys' loop plays. Lights, on the global page, sets how bright the glow
 ALGORITHM does something different on each page. On MAIN it takes the kit: forward, one part, or a few of the parts
 that are sounding, take another type from the next bar, and the more you turn in a bar the more change (up to three
 parts); back, the kit before, up to eight steps. On GROOVE it picks the shape of the bass. On PHASE it picks the kind
-of build. On ECHO it picks the kind of echo. On KICK, BASS, PERC, EVENTS, LINE, LINE SEQ and ATMOS it picks the type of
+of build, and with SEQ held how builds end. On ECHO it picks the kind of echo. On KICK, BASS, PERC, EVENTS, LINE, LINE SEQ and ATMOS it picks the type of
 that part, one of four to six, and the new type begins from the part's next note. On MIX it picks the type of the
 track TRACK has chosen. On GLOBAL it does nothing. The name
 of the choice shows at the left of the rule. Types and shapes are listed on the pages they belong to. They are not
@@ -188,7 +188,7 @@ K-B-B-B holds the roll; GALLOP holds a gallop; OFFBEAT holds an offbeat. The new
 
 ### 5.3 PHASE
 
-![The PHASE page: AUTO in the rule, Breaks 50, Break WORLD, Build 4, Gap 64](img/screen-phase.png "PHASE")
+![The PHASE page: AUTO and AUTO in the rule (the kind of build and its ending), Breaks 50, Break WORLD, Build 4, Gap 64](img/screen-phase.png "PHASE")
 
 SEQ. How the music moves through breaks, builds and drops by itself. Press SAVE and ARP to call them yourself (see 8.
 Sections).
@@ -203,7 +203,7 @@ Sections).
   is one step shorter or longer, more often with DRIFT higher. 64.
 
 ALGORITHM picks the kind of build. AUTO chooses one of the others each time, leaning on the world's habits and never the
-same one twice running; in a build, the rule also shows the one it chose.
+same one twice running; in a build, the rule shows the one it chose in its place, in grey.
 
 - ROLL: the kick and the bass drop out and a clap rolls: quarters, then eighths, then sixteenths.
 - KICK: the kick rolls the same way, rising an octave; the bass is out.
@@ -216,7 +216,17 @@ same one twice running; in a build, the rule also shows the one it chose.
 - SINK: the other way: a clap rolling sixteenths, eighths, quarters, slowing and falling, the rest closing from above.
 - FAKE: a ROLL, then a drop for a beat that is cut short, then a bar of the clap's sixteenths before the real drop.
 
-Every build has its riser, and its last beat is silent.
+Every build has its riser. Hold SEQ and turn ALGORITHM to pick how builds end: what happens in the last bar (in FAKE,
+the bar before its short drop). AUTO chooses one of the others each time, never the same one twice running. The rule
+shows the ending after the kind, and in a build, in grey, the one AUTO chose.
+
+- BREATH: the last beat is silent.
+- RUSH: no silence. The roll goes twice as fast through the last beat, straight into the drop.
+- VOID: the last bar empties, only the riser left, and its last beat is silent. In a 2-bar build, the last two beats.
+- TAPE: the music slows to a stop over the last two beats.
+- REVERSE: the last beat plays the beat before it backwards.
+- ECHO: the third beat is thrown into the echo, and the last beat is silent but for its repeats.
+- PICKUP: the last beat is silent but for its last sixteenth, where the kick and the bass step into the drop.
 
 ### 5.4 KICK
 
@@ -539,7 +549,7 @@ their own. How likely it is depends on BREAKS and DRIFT together: at the default
 
 ![In the break: the lanes nearly bare, BREAK under them](img/screen-break.png "In the break")
 
-![In a build, on the PHASE page: BUILD under the lanes, AUTO and FAKE at the left of the rule](img/screen-build.png "In a build")
+![In a build, on the PHASE page: BUILD under the lanes, FAKE and REVERSE in grey at the left of the rule: the kind and the ending AUTO chose](img/screen-build.png "In a build")
 
 ---
 

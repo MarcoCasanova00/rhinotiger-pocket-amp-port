@@ -76,10 +76,21 @@ enum { PS_CUE_BREAK = 1, PS_CUE_DROP, PS_CUE_BUILD };
  * POLY (the kick on dotted eighths against the bar, closing to dotted sixteenths, then sixteenths; the clap on 2 and
  * 4), SINK (the other way: a clap rolling sixteenths, eighths, quarters, falling, the rest closing from above, the
  * riser falling), FAKE (a ROLL, then a drop for a beat, cut short: a bar of the clap's sixteenths, then the drop).
- * Each its riser, its last beat silent. Taken as the build begins. */
+ * Each its riser. Taken as the build begins. */
 enum { PS_BUILD_AUTO, PS_BUILD_ROLL, PS_BUILD_KICK, PS_BUILD_FILTER, PS_BUILD_TRIP, PS_BUILD_STUTTER, PS_BUILD_POLY,
        PS_BUILD_SINK, PS_BUILD_FAKE, PS_NBUILD };
 void ps_build_kind(int k);
+/* a build's ending (ALGORITHM on PHASE with SEQ held; AUTO: each build one of them, not the last one again), its
+ * last bar (FAKE: before its false drop): BREATH (its last beat silent), RUSH (none: the roll twice as fast through its
+ * last beat), VOID (its last bar silent but the riser, its last beat all silent; a 2-bar build: its last two beats),
+ * TAPE (the music slowing to a stop over its last two beats), REVERSE (its last beat the one before, backwards), ECHO
+ * (its third beat thrown into the echo, its last silent but the echo), PICKUP (its last beat silent but its last
+ * sixteenth: the kick and the bass). Taken as the build begins. */
+enum { PS_END_AUTO, PS_END_BREATH, PS_END_RUSH, PS_END_VOID, PS_END_TAPE, PS_END_REVERSE, PS_END_ECHO, PS_END_PICKUP,
+       PS_NEND };
+void ps_build_end(int k);
+int ps_build_end_now(void);            /* the one chosen (AUTO or another) */
+const char *ps_end_name(int k);
 /* the bass's shape (ALGORITHM on GROOVE): AUTO (the world's: K-B-B-B, now and then a gallop, an offbeat, a bar of
  * triplets), or one held: K-B-B-B, GALLOP, OFFBEAT (from the next bar, no triplets) */
 enum { PS_SHAPE_AUTO, PS_SHAPE_ROLL, PS_SHAPE_GALLOP, PS_SHAPE_OFF, PS_NSHAPE };
@@ -167,6 +178,7 @@ typedef struct {
     volatile uint8_t sec_bar;          /* bars into the section (the groove: into its phrase, 0..7) */
     volatile uint8_t sec_len;          /* a build's bars (else 0) */
     volatile int8_t build_kind;        /* the build's kind, the latest's (PS_BUILD_*, 0 none yet) */
+    volatile int8_t build_end;         /* its ending, the latest's (PS_END_*, 0 none yet) */
     volatile uint8_t drops;            /* drops so far (wraps) */
     volatile uint8_t muted;            /* the parts muted (1 << PART_*) */
     volatile uint8_t kits;             /* kits taken (wraps; back too) */
