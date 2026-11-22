@@ -192,7 +192,8 @@ int ps_stat(int which);                /* 0 events begun, 1 thrown and remembere
                                         * while a black key is held (1 << PART_*); 8 GAP sounding (1), cued
                                         * (2), HALF held (4); AUTO PLAY's hands: 9 its effects (1 << the grid's), 10 its
                                         * parts out, 11 half time (1), a fill (2), a gap (4) of its now, 12 its throws so
-                                        * far, 13 the white keys' sounds it throws just now, 1 << 0..15 */
+                                        * far, 13 the white keys' sounds it throws just now, 1 << 0..15, 14 its ride of the atmos's level, x100 (its parts out, 10:
+                                        * the atmos too while that is under half) */
 const char *ps_event_name(int type);
 int ps_rhythm(void);                   /* the black key held whose rhythm the white keys throw on (-1: none) */
 void ps_rec(int on);                   /* REC: tapped (1), a take of the keys from the next bar, four bars at most (again

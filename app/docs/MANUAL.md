@@ -268,13 +268,14 @@ ARP in that last break calls the music back: AUTO PLAY turns off and it goes on.
 Each chapter has a few sounds of its own and a short motif that comes back through it. The effects and the parts move
 mostly at the ends of phrases, and while they do, the effects of the ECHO page are shown in place of the lanes: the effect is lit, the
 part out is dark. The page you are on stays, with its knobs, and so does what the keys do; touch anything and the page's own picture is back. The keys AUTO PLAY plays
-light up as if they were pressed. On the ECHO page, tap a dark part's black key to bring the part back.
+light up as if they were pressed. On the ECHO page, tap a dark part's black key to bring the part back. The atmos is not cut
+but slowly faded down and up again, now and then, and its fader on MIX moves with it.
 
 You can play along. What you turn of what the set moves (the four knobs of MAIN, TEMPO, ROOT, BREAKS, the LENGTH of
 builds) stays yours for 32 bars, then goes back to the set: ROOT at the next chapter, the rest by degrees. A world you
 choose with PRESETS stays until the next chapter. Breaks, builds and drops you call are followed. Play an effect yourself
 and the set leaves the effects and the parts to you for 32 bars; mute a part, or bring it back, and it leaves that part
-alone as long, and takes no part out while any is muted. Throw a sound with the keys or press REC and it throws none for 32 bars, nor while REC's loop plays.
+alone as long, and takes no part out while any is muted. Turn the atmos's LEVEL and it comes back up, and is left alone so too. Throw a sound with the keys or press REC and it throws none for 32 bars, nor while REC's loop plays.
 Everything else is yours as always.
 
 Turn it off and the music goes on as it is, with the knobs where the set left them. What SAVE keeps during a set is

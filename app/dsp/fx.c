@@ -74,13 +74,14 @@ static struct {
     uint8_t gap_req;                   /* GAP cued: the next bar's last beat to come silent */
     uint16_t auto_held;                /* AUTO PLAY's (hands.c, worked out each tick): its effects, */
     int8_t auto_key;                   /* its buffer's effect (-1 none), */
-    uint8_t auto_out, auto_half;       /* its parts out, its half time */
+    uint8_t auto_out, auto_half;       /* its parts out (not the atmos: a fader's ride), its half time */
+    float auto_atm;                    /* the atmos's level, x: its ride (1: none) */
     uint8_t auto_slice;                /* a STUTTER build's repeat, ticks (0: none): psy.c sets it a tick */
     uint8_t auto_buf;                  /* a build's ending's buffer effect, FX_TAPE or FX_REVERSE (0: none): so too */
     uint8_t auto_dub;                  /* a build's ending thrown into the echo, as DUB held: so too */
     uint8_t auto_gate, ag_len;         /* a GATE build's slice, ticks (0: none): so too; the latest's */
     float ag_el, ag_g, ag_s;           /* frames since its slice began (psy.c: 0 as it does), its depth, the cut heard */
-} fx = {.buf_want = -1, .auto_key = -1, .cur = {.id = -1}, .old = {.id = -1}};
+} fx = {.buf_want = -1, .auto_key = -1, .auto_atm = 1.0f, .cur = {.id = -1}, .old = {.id = -1}};
 
 /* the read: frame position p (a count, fractional), channel ch, between two samples */
 static int fx_on(int id) { return (int)((uint32_t)(fx.held | fx.auto_held) >> id & 1u); }   /* held, or AUTO PLAY's */

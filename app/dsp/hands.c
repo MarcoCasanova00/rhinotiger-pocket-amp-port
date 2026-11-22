@@ -6,6 +6,9 @@
  * is on is worked out anew. A section's change ends them all, but those meant to go on (PS_AG_BREAK, into a break;
  * PS_AG_DROP, from a drop's first tick on). Resting and PLAY's beginning: none.
  *
+ * The atmos out is no mute but its fader's ride: down over the first quarter, up again over the last (cut short, by a
+ * section or the hand: its level's own glide, psy.c atmos).
+ *
  * A buffer's effect gives way to a key's and to a build's own. A throw's pitch is the sound's key's, moved to the
  * root, and so many semitones; one throw at a time (mono, among themselves). */
 #define AG_N 32u
@@ -56,6 +59,7 @@ static void ag_none(void)
     fx.auto_held = 0;
     fx.auto_key = -1;
     fx.auto_out = fx.auto_half = 0;
+    fx.auto_atm = 1.0f;
 }
 
 static void ag_reset(void)             /* (render: PLAY begins or rests) */
@@ -129,6 +133,7 @@ static void ag_step(void)              /* a tick: what is on */
     uint16_t held = 0;
     uint8_t out = 0, now = 0;
     int8_t key = -1;
+    float atm = 1.0f;
     for (k = 0; k < AG_N; k++) {
         const ps_ag_t *g = &ag[k];
         if (!g->t1)
@@ -143,6 +148,13 @@ static void ag_step(void)              /* a tick: what is on */
         if (t < g->t0)
             continue;
         switch (g->kind) {
+        case PS_AG_OUT:
+            if (g->id >> PART_ATMOS & 1u) {
+                float q = (float)(g->t1 - g->t0) * 0.25f,
+                      d = 1.0f - fm_minf(fm_minf((float)(t - g->t0), (float)(g->t1 - t)) / q, 1.0f);
+                atm = fm_minf(atm, d * d);   /* (the ear's: even) */
+            }
+            break;
         case PS_AG_FX:
             if (g->id > FX_R8T && g->id != FX_REVERSE && g->id != FX_TAPE && g->id != FX_STAIRS)
                 held |= (uint16_t)(1u << g->id);
@@ -178,7 +190,8 @@ static void ag_step(void)              /* a tick: what is on */
     }
     fx.auto_held = held;
     fx.auto_key = key;
-    fx.auto_out = out;
+    fx.auto_out = out & (uint8_t)~(1u << PART_ATMOS);
+    fx.auto_atm = atm;
     fx.auto_half = now & 1u;
     ag_do = now;
 }

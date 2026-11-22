@@ -17,6 +17,7 @@ static struct {
     uint32_t rng;
     int hold_fx, hold_keys, hold_part[NPART];   /* till this bar the hand's */
     int out_to, mot_to;                  /* a part out, the motif: till this bar */
+    int atm_to;                          /* the atmos's latest ride: till this bar */
     uint8_t hist[3], nhist;              /* the latest moves, not again at once */
     uint8_t lead, acc[2], low;           /* the chapter's sounds (white keys', 0..15) */
     uint8_t mlen;                        /* its motif: bars, */
@@ -39,6 +40,7 @@ static const char *const MV_NAME[MV_N] = {"ROLL8", "ROLL8T", "ROLLUP", "REV", "G
 enum { HF_R4, HF_R4T, HF_R8, HF_R8T, HF_LOW, HF_HIGH, HF_FLANGE, HF_BAND, HF_WASH, HF_DUB, HF_FREEZE, HF_REV, HF_TAPE,
        HF_RISER, HF_STAIRS, HF_GATE };   /* (the grid's order) */
 #define HD_BAR 96u
+#define HD_ATM_GAP 64                    /* bars from one ride of the atmos to the next, at the least */
 #define HD_FX_KINDS (1u << PS_AG_FX | 1u << PS_AG_OUT | 1u << PS_AG_HALF | 1u << PS_AG_FILL | 1u << PS_AG_GAP)
 #define HD_KEY_KINDS (1u << PS_AG_THROW | 1u << PS_AG_MOTIF)
 
@@ -155,6 +157,7 @@ static void hd_begin(void)               /* a set begins */
     for (k = 0; k < 8u; k++)
         hd_rnd(2u);
     hd.hold_fx = hd.hold_keys = hd.out_to = hd.mot_to = 0;
+    hd.atm_to = -HD_ATM_GAP;
     for (k = 0; k < NPART; k++)
         hd.hold_part[k] = 0;
     hd.nhist = 0;
@@ -266,12 +269,19 @@ static void hd_strip(uint32_t t0, int left, int flag, int thrown)   /* a part le
 {
     static const uint8_t PART[6] = {PART_LINE, PART_LINE, PART_EVENTS, PART_EVENTS, PART_PERC, PART_ATMOS};
     int p = PART[hd_rnd(6u)], bars = p == PART_PERC ? 4 : hd_rnd(2u) ? 16 : 8;
+    if (p == PART_ATMOS) {               /* its fader's ride (psy.c): long, seldom, and not on a drop */
+        bars *= 2;
+        if (flag || (int)(t0 / HD_BAR) < hd.atm_to + HD_ATM_GAP || left - 8 < 16)
+            return;
+    }
     if (bars > left - 8)
         bars = left - 8;
     if (bars < 4 || !hd_part_ok(p) || (p == PART_EVENTS && (hd.mot_to > (int)(t0 / HD_BAR) || thrown || ps_take() || ps_rec_state())))
         return;
     hd_do(PS_AG_OUT, 1 << p, t0, t0 + HD_BAR * (uint32_t)bars, flag);
     hd.out_to = (int)(t0 / HD_BAR) + bars;
+    if (p == PART_ATMOS)
+        hd.atm_to = hd.out_to;
     HD_LOG("HD strip part %d bar %d bars %d\n", p, (int)(t0 / HD_BAR), bars);
 }
 

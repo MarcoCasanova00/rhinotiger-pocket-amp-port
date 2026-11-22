@@ -671,6 +671,8 @@ static void knob_turn(int k, int32_t d)
             return;
         set.par[p] = (int16_t)v;
         ps_set(p, (int)v);
+        if (p == P_ATMOS_LEVEL)
+            hd_hand_part(PART_ATMOS);    /* (its fader the hand's) */
     }
     set_dirty = 1;
     knob_value(page, k, t, &pos, &span);
@@ -798,7 +800,7 @@ static void key_down(int k, int vel)
             app_say("KICK+BASS", "OUT");
         } else if (b == BK_ALL) {
             for (p = 0; p < NPART; p++) {
-                if ((pf.muted | (unsigned)ps_stat(10)) >> p & 1u)
+                if ((pf.muted | (unsigned)ps_stat(10)) >> p & 1u || (p == PART_ATMOS && ps_stat(14) < 100))
                     hd_hand_part(p);
                 if (pf.muted >> p & 1u)
                     ps_mute(p);
@@ -920,7 +922,7 @@ static uint32_t au_keys(void)
 {
     uint32_t now = app_ms(), w = (uint32_t)(ps_stat(9) | ps_stat(13)), m = 0, b = 0, k;
     int doing = ps_stat(11), out = ps_stat(10), low = 1 << PART_KICK | 1 << PART_BASS, i;
-    for (i = 0; i < NPART; i++)
+    for (i = 0; i < PART_ATMOS; i++)     /* (the atmos: a fader's ride, no tap) */
         if ((out ^ ui.au_out) >> i & 1 && !(low >> i & 1 && ((out & low) == low || (ui.au_out & low) == low))) {
             ui.au_tap[i] = now;
             ui.au_tapped |= 1u << i;
@@ -1443,7 +1445,10 @@ static void draw_mix(uint32_t now)
                     j < lit_n ? part_col(hue + j * 10, j >= 21 ? 255 : v * 9 / 10)
                               : mu ? C_BLACK : part_col(hue + j * 10, f ? 40 : 26));
         cv_rect(x + 18, y0, 2, h, mu ? C_LINE : part_col(hue, f ? 90 : 55));   /* the level's slot, its cap */
-        cap = y0 + h - 2 - clamp(set.par[TRACK_LEVEL[i]], 0, 100) * (h - 4) / 100;
+        cap = clamp(set.par[TRACK_LEVEL[i]], 0, 100);
+        if (TRACK_PART[i] == PART_ATMOS)
+            cap = cap * ps_stat(14) / 100;   /* (as AUTO PLAY rides it) */
+        cap = y0 + h - 2 - cap * (h - 4) / 100;
         cv_rect(x + 14, cap, 10, 3, f && lit ? C_WHITE : mu ? C_GRAY : part_txt(hue, v));
         {
             static const char *const SHORT[NTRACK] = {"KICK", "BASS", "PERC", "EVT", "LINE", "ATM"};
@@ -1874,6 +1879,8 @@ int app_expect(const char *what, int *got)
         *got = ui.au_show;
     else if (!strcmp(what, "au_flips"))      /* ... and how many times that has switched */
         *got = (int)ui.au_flips;
+    else if (!strcmp(what, "atm_ride"))      /* its ride of the atmos's level, x100 (100: none) */
+        *got = ps_stat(14);
     else if (!strcmp(what, "perform"))
         *got = set.auto_perf;
     else if (!strcmp(what, "au_min"))        /* its minutes */

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# AUTO PLAY's hands (PERFORM): set 7, at 100. Its parts out, its effects and its throws are beside the player's, give way to
-# them, and end with the set, with PLAY and with a section (bar 24..40: the LINE out; bar 16..48: the motif)
+# AUTO PLAY's hands (PERFORM): set 11, at 100. Its parts out, its effects and its throws are beside the player's, give way to
+# them, and end with the set, with PLAY and with a section (bar 24..40: the LINE out; bar 8..24 and 40..48: the motif)
 wait 3000   # the logo, then the play
 tap PLAY
 wait 200
@@ -12,7 +12,7 @@ wait 30
 tap SEQ
 wait 30
 expect page 4
-turn K3 7
+turn K3 11
 wait 30
 turn K4 -60
 wait 30
@@ -61,6 +61,6 @@ key w0 down 90
 wait 100
 key w0 up
 wait 300
-expect hd_throws 80
+expect hd_throws 42
 wait 15000
-expect hd_throws 80
+expect hd_throws 42
