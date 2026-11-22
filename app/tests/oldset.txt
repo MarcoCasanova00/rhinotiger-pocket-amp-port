@@ -28,3 +28,26 @@ expect world 3
 expect param0 60
 expect param54 40
 expect auto_len 1
+expect perform 50
+wait 3000
+tap HOME
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K2 1
+wait 30
+turn K4 10
+wait 30
+expect perform 70
+oldset 9
+reboot
+wait 600
+expect world 3
+expect param0 60
+expect auto_len 2
+expect perform 50

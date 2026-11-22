@@ -244,29 +244,36 @@ The endings:
 
 ### 5.5 AUTO
 
-![The AUTO page: Auto play OFF, Minutes 60, Seed RANDOM](img/screen-auto.png "AUTO")
+![The AUTO page: Auto play OFF, Minutes 60, Seed RANDOM, Perform 50](img/screen-auto.png "AUTO")
 
 SEQ, a third time. AUTO PLAY plays a whole set by itself, as a DJ would: it goes through the worlds, moves the tempo and
-the key, calls the breaks and the builds, and raises and lowers the music along a curve of its own.
+the key, calls the breaks and the builds, and raises and lowers the music along a curve of its own. It plays the effects, takes parts out and brings
+them back, and throws sounds as the keys do.
 
 - AUTO PLAY: right for ON, left for OFF. OFF.
 - MINUTES: how long the set is: 30, 60, 90, or ENDLESS. 60.
 - SEED: which set. Each number from 1 to 99 is a plan of its own: the worlds, the tempos, the keys, where it rises and
   falls. Started from rest, the same number and the same MINUTES plan the same set again; the sounds in it
   still come out different each time. RANDOM takes another number each time, and shows it while the set plays. RANDOM.
+- PERFORM: how much it plays the effects, the parts and the sounds of the keys. At 0 it leaves them all to you. 50.
 
 Turn it on while the music rests and the set waits at its beginning for PLAY. Turn it on while the music plays and the
-set goes on from there. MINUTES and SEED can be turned only while it is off. On MAIN, BREAK and AUTO the rule shows how
+set goes on from there. MINUTES and SEED can be turned only while it is off; PERFORM at any time. On MAIN, BREAK and AUTO the rule shows how
 many minutes have gone.
 
 A set is made of chapters of some minutes each. A new chapter comes in on a drop, with its world and its key. The tempo
 glides all the way through. A set of 30, 60 or 90 minutes ends in a break that fades out, and then the music rests.
 ARP in that last break calls the music back: AUTO PLAY turns off and it goes on.
 
+Each chapter has a few sounds of its own and a short motif that comes back through it. The effects and the parts move
+mostly at the ends of phrases, and the ECHO page shows them as they do: the effect is lit, the part out is dark.
+
 You can play along. What you turn of what the set moves (the four knobs of MAIN, TEMPO, ROOT, BREAKS, the LENGTH of
 builds) stays yours for 32 bars, then goes back to the set: ROOT at the next chapter, the rest by degrees. A world you
-choose with PRESETS stays until the next chapter. Breaks, builds and drops you call are followed. Everything else is
-yours as always.
+choose with PRESETS stays until the next chapter. Breaks, builds and drops you call are followed. Play an effect yourself
+and the set leaves the effects and the parts to you for 32 bars; mute a part, or bring it back, and it leaves that part
+alone as long, and takes no part out while any is muted. Throw a sound with the keys or press REC and it throws none for 32 bars, nor while REC's loop plays.
+Everything else is yours as always.
 
 Turn it off and the music goes on as it is, with the knobs where the set left them. What SAVE keeps during a set is
 your own settings, not the set's. When a set has run out, your own come back.

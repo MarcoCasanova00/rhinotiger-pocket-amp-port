@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY's hands (PERFORM): set 7, at 100. Its parts out, its effects and its throws are beside the player's, give way to
+# them, and end with the set, with PLAY and with a section (bar 24..40: the LINE out; bar 16..48: the motif)
+wait 3000   # the logo, then the play
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 7
+wait 30
+turn K4 -60
+wait 30
+expect perform 0
+turn K4 50
+wait 30
+expect perform 100
+turn K1 1
+wait 30
+tap PLAY
+wait 46000
+expect hd_out 8
+expect hd_throws >10
+expect muted 0
+expect out 0
+expect take 0
+# the LINE muted by hand (ECHO's D#4): the set lets go of it, the mute stays the hand's
+tap FX
+wait 30
+tapkey b4
+wait 100
+expect muted 8
+expect hd_out 0
+tapkey b4
+wait 100
+expect muted 0
+expect hd_out 0
+# DUB by hand: the hand's alone, and none of the set's after it for 32 bars (about 50 s)
+key w9 down 90
+wait 400
+expect fx 512
+expect hd_fx 0
+key w9 up
+wait 200
+expect fx 0
+wait 25000
+expect hd_fx 0
+expect hd_out 0
+# a key thrown: the motif stops, no throws so long
+tap HOME
+wait 30
+key w0 down 90
+wait 100
+key w0 up
+wait 300
+expect hd_throws 80
+wait 15000
+expect hd_throws 80

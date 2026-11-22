@@ -58,7 +58,8 @@ typedef struct {
     float hx;                          /* SHARD: the sample held, */
     uint8_t hold, hc;                  /* for hold samples (0: none), counted */
     uint8_t rev;                       /* GHOST: the envelope backwards */
-    uint8_t live;                      /* a key's, played now (not the loop's or the generator's): the next cuts it */
+    uint8_t live;                      /* a key's, played now (not the loop's or the generator's): the next cuts it
+                                        * (2: AUTO PLAY's, so among themselves) */
     float ck;                          /* cut: it ends at this t, fading the last 15 ms (0: not cut) */
     float chop;                        /* RATCHET: on and off so many times a second (0: none) */
     uint8_t cn;                        /* samples to the next control point (0: one now; EV_CTL apart) */
@@ -492,7 +493,7 @@ static void key_throw(int k, int stepped)   /* key k's sound now (its cycle on; 
                 break;
         if (i == take.n) {
             for (i = 0; i < EV_NVOICE; i++)   /* mono: a key's sound before it is cut */
-                if (ev.v[i].t >= 0.0f && ev.v[i].live && ev.v[i].ck == 0.0f)
+                if (ev.v[i].t >= 0.0f && ev.v[i].live == 1u && ev.v[i].ck == 0.0f)
                     ev.v[i].ck = ev.v[i].t + 0.015f;
             ev.live_next = 1;
             ev_start(&r, bite, 1.0f);

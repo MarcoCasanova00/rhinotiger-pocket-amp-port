@@ -72,15 +72,19 @@ static struct {
     uint8_t fill_req;                  /* a fill cued for the next beat */
     uint8_t half;                      /* HALF held: the kick and the bass in half time */
     uint8_t gap_req;                   /* GAP cued: the next bar's last beat to come silent */
+    uint16_t auto_held;                /* AUTO PLAY's (hands.c, worked out each tick): its effects, */
+    int8_t auto_key;                   /* its buffer's effect (-1 none), */
+    uint8_t auto_out, auto_half;       /* its parts out, its half time */
     uint8_t auto_slice;                /* a STUTTER build's repeat, ticks (0: none): psy.c sets it a tick */
     uint8_t auto_buf;                  /* a build's ending's buffer effect, FX_TAPE or FX_REVERSE (0: none): so too */
     uint8_t auto_dub;                  /* a build's ending thrown into the echo, as DUB held: so too */
     uint8_t auto_gate, ag_len;         /* a GATE build's slice, ticks (0: none): so too; the latest's */
     float ag_el, ag_g, ag_s;           /* frames since its slice began (psy.c: 0 as it does), its depth, the cut heard */
-} fx = {.buf_want = -1, .cur = {.id = -1}, .old = {.id = -1}};
+} fx = {.buf_want = -1, .auto_key = -1, .cur = {.id = -1}, .old = {.id = -1}};
 
 /* the read: frame position p (a count, fractional), channel ch, between two samples */
-static int dub_on(void) { return (fx.held >> FX_DUB & 1u) || fx.auto_dub; }   /* DUB: held, or an ending's */
+static int fx_on(int id) { return (int)((uint32_t)(fx.held | fx.auto_held) >> id & 1u); }   /* held, or AUTO PLAY's */
+static int dub_on(void) { return fx_on(FX_DUB) || fx.auto_dub; }   /* DUB: held, or an ending's */
 
 static float cap_read(int ch, float p)
 {
@@ -143,6 +147,9 @@ static void fx_sixteenth(int beat)     /* a sixteenth begins (beat: a beat too):
     } else if (fx.auto_slice) {        /* a STUTTER build's: anew as its slice shortens (a quarter's from a beat) */
         if ((fx.cur.id != FX_AUTO || !fx.buf_on || fx.cur.slice != (float)fx.auto_slice) && (beat || fx.auto_slice < 24u))
             fx_start(FX_AUTO, (float)fx.auto_slice);
+    } else if (fx.auto_key >= 0) {     /* AUTO PLAY's */
+        if (fx.cur.id != fx.auto_key || !fx.buf_on)
+            fx_start(fx.auto_key, 0.0f);
     } else if (fx.cur.id >= 0 && fx.buf_on)   /* its breath, its ending done (the drop): back to the music */
         fx.buf_on = 0;
 }
@@ -299,7 +306,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     }
     /* GATE: what is above the kick and the bass (the buffer's replay, all of it), open the first half of each
      * sixteenth; the edges ~0.75 ms slopes */
-    fx.gate_g += ((fx.held >> FX_GATE & 1u ? 1.0f : 0.0f) - fx.gate_g) * 0.003f;
+    fx.gate_g += ((fx_on(FX_GATE) ? 1.0f : 0.0f) - fx.gate_g) * 0.003f;
     fx.six_el += 1.0f;
     if (fx.gate_g > 0.0005f) {
         float cut;
@@ -320,7 +327,7 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
     /* WASH and FREEZE (its taking in is psy.c's): what is above the kick and the bass sinking beneath the hall, the
      * echo (~10 ms down, ~40 ms back; a buffer's replay, all of it, stays) */
     {
-        int wa = fx.held >> FX_WASH & 1u, fz = fx.held >> FX_FREEZE & 1u, du = dub_on();
+        int wa = fx_on(FX_WASH), fz = fx_on(FX_FREEZE), du = dub_on();
         fx.wash_g += ((wa ? 1.0f : 0.0f) - fx.wash_g) * (wa ? 0.002f : 0.0006f);
         fx.frz_g += ((fz ? 1.0f : 0.0f) - fx.frz_g) * (fz ? 0.002f : 0.0006f);
         fx.dub_g += ((du ? 1.0f : 0.0f) - fx.dub_g) * (du ? 0.002f : 0.0006f);
@@ -345,10 +352,10 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         }
     }
     /* the filters: LOW down to 250 Hz, HIGH up to 1.6 kHz, BAND a telephone, FLANGE */
-    fx.lo_g += ((fx.held >> FX_LOW & 1u ? 1.0f : 0.0f) - fx.lo_g) * (fx.held >> FX_LOW & 1u ? 0.00006f : 0.0003f);
-    fx.hi_g += ((fx.held >> FX_HIGH & 1u ? 1.0f : 0.0f) - fx.hi_g) * (fx.held >> FX_HIGH & 1u ? 0.00006f : 0.0003f);
-    fx.band_g += ((fx.held >> FX_BAND & 1u ? 1.0f : 0.0f) - fx.band_g) * 0.002f;
-    fx.fl_g += ((fx.held >> FX_FLANGE & 1u && !shed ? 1.0f : 0.0f) - fx.fl_g) * 0.002f;   /* (lighter: none) */
+    fx.lo_g += ((fx_on(FX_LOW) ? 1.0f : 0.0f) - fx.lo_g) * (fx_on(FX_LOW) ? 0.00006f : 0.0003f);
+    fx.hi_g += ((fx_on(FX_HIGH) ? 1.0f : 0.0f) - fx.hi_g) * (fx_on(FX_HIGH) ? 0.00006f : 0.0003f);
+    fx.band_g += ((fx_on(FX_BAND) ? 1.0f : 0.0f) - fx.band_g) * 0.002f;
+    fx.fl_g += ((fx_on(FX_FLANGE) && !shed ? 1.0f : 0.0f) - fx.fl_g) * 0.002f;   /* (lighter: none) */
     if (fx.lo_g > 0.001f) {
         float f = fx.lo_f;
         svf(fx.svf_lo[0], dl, f, 0.6f);
@@ -383,12 +390,12 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         dr *= 1.0f - 0.3f * fx.fl_g;
     }
     /* DUB: what is above the kick and the bass, into the echo */
-    if (fx.held >> FX_DUB & 1u)
+    if (fx_on(FX_DUB))
         send += 1.1f * (upper_l + upper_r);
     else if (fx.auto_dub)              /* an ending's: all of it (a KICK build's roll too), the kick and the bass less */
         send += 1.8f * (upper_l + upper_r) + 0.5f * (*l - upper_l + *r - upper_r);
     /* RISER: a band of noise, rising over two bars while held */
-    fx.riser_g += ((fx.held >> FX_RISER & 1u ? 1.0f : 0.0f) - fx.riser_g) * 0.003f;
+    fx.riser_g += ((fx_on(FX_RISER) ? 1.0f : 0.0f) - fx.riser_g) * 0.003f;
     if (fx.riser_g > 0.0005f) {
         float p = fm_clampf(fx.riser_t / (tick_len * (float)(8u * PS_TPB)), 0.0f, 1.0f), f, x;
         fx.riser_t += 1.0f;

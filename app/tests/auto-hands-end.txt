@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY's hands (PERFORM): set 7, at 100. Its parts out, its effects and its throws are beside the player's, and end
+# with PLAY, with a section called by hand and with AUTO off (bar 24..40: the LINE out; bar 16..48: the motif)
+wait 3000   # the logo, then the play
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 7
+wait 30
+turn K4 -60
+wait 30
+expect perform 0
+turn K4 50
+wait 30
+expect perform 100
+turn K1 1
+wait 30
+tap PLAY
+wait 46000
+expect hd_out 8
+expect hd_throws >10
+expect muted 0
+expect out 0
+expect take 0
+# resting: none; the set from its top, none of the old ones
+tap PLAY
+wait 600
+expect playing 0
+expect hd_out 0
+expect hd_fx 0
+tap PLAY
+wait 46000
+expect hd_out 8
+# a build called by hand: none of them in it
+tap ARP
+wait 2500
+expect section 2
+expect hd_out 0
+expect hd_fx 0
+# again from the top; off: none, the music on
+tap PLAY
+wait 600
+tap PLAY
+wait 46000
+expect hd_out 8
+turn K1 -1
+wait 200
+expect autoplay 0
+expect playing 1
+expect hd_out 0
+expect hd_throws >10

@@ -20,7 +20,8 @@
  *   4 BUILD (SEQ again)      the builds: K1 Type (AUTO, or one held), K2 Ending (their last bar's: AUTO, or one held),
  *                            K3 Length (2, 4, 8 bars)
  *   5 AUTO (SEQ, a third)    AUTO PLAY (auto.h), a set played as a DJ would: K1 on or off, K2 its minutes (30, 60, 90,
- *                            endless), K3 its seed (0: a random one each time)
+ *                            endless), K3 its seed (0: a random one each time), K4 how much it plays the effects, the parts
+ *                            and the keys (hands.h)
  *   6 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body: short and tight, or long and full)
  *   7 BASS (SEL again)       K1..K4 Bite, Decay (how fast the bite closes), Length, Drive (as LINE's)
  *   8 PERC (ENV)             K1..K4 Hats, Open (the open hat's length), Clap, Tone (all of it brighter, darker)
@@ -65,13 +66,14 @@
 #include "logo.h"
 #include "face.h"
 
-#define SET_MAGIC 0x39544852u            /* "RHT9": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
+#define SET_MAGIC 0x41544852u            /* "RHTA": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
                                           * 4: PHASE's four, the breaks' switch gone into BREAKS; 5: MIX's TOP; 6: the
                                           * percussion's and the line's sends, TOP gone; 7: the sounds' new eight; 8:
                                           * BREAK's MORPH, the last; 9: AUTO's two, after the parameters: a 7's and an
-                                          * 8's taken, what they lack at its default) */
+                                          * 8's taken, what they lack at its default; A: PERFORM, the last: a 9's too) */
 #define SET_MAGIC7 0x37544852u           /* "RHT7" */
 #define SET_MAGIC8 0x38544852u           /* "RHT8" */
+#define SET_MAGIC9 0x39544852u           /* "RHT9" */
 typedef struct {
     uint32_t magic;
     uint8_t world;
@@ -80,6 +82,7 @@ typedef struct {
     uint8_t flags;                       /* SET_MIDI */
     int16_t par[P_NPARAMS];
     uint8_t auto_len, auto_set;          /* AUTO PLAY's: 30, 60, 90 minutes, without end; its seed (0: a random one) */
+    uint8_t auto_perf;                   /* its hands, how much (0..100) */
 } settings_t;
 static settings_t set;
 #define SET_MIDI 2u                      /* MIDI in: notes throw events, start / stop / clock followed */
@@ -137,6 +140,7 @@ static void settings_defaults(void)
         set.par[p] = ps_param(p)->def;
     set.auto_len = 1;                    /* AUTO: 60 minutes, a random seed */
     set.auto_set = 0;
+    set.auto_perf = 50;
 }
 
 static void settings_apply(void)
@@ -152,22 +156,26 @@ void app_init(void)
 {
     int p, ok;
     ps_init();
-    {   /* (an 8's: without AUTO's two; a 7's: without MORPH too, the last parameter) */
+    {   /* (a 9's: without PERFORM; an 8's: without AUTO's two too; a 7's: without MORPH too, the last parameter) */
         int n = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
         uint32_t end8 = (uint32_t)((char *)&set.par[P_NPARAMS] - (char *)&set), end7 = end8 - (uint32_t)sizeof set.par[0];
         int old7 = n == (int)((end7 + 3u) & ~3u) && set.magic == SET_MAGIC7,
-            old8 = n == (int)((end8 + 3u) & ~3u) && set.magic == SET_MAGIC8;
-        ok = old7 || old8 || (n == (int)sizeof set && set.magic == SET_MAGIC);
+            old8 = n == (int)((end8 + 3u) & ~3u) && set.magic == SET_MAGIC8,
+            old9 = n == (int)((end8 + 2u + 3u) & ~3u) && set.magic == SET_MAGIC9;
+        ok = old7 || old8 || old9 || (n == (int)sizeof set && set.magic == SET_MAGIC);
         if (old7)
             set.par[P_MORPH] = ps_param(P_MORPH)->def;
         if (old7 || old8) {
-            set.magic = SET_MAGIC;
             set.auto_len = 1;
             set.auto_set = 0;
         }
+        if (old7 || old8 || old9) {
+            set.magic = SET_MAGIC;
+            set.auto_perf = 50;
+        }
     }
     ok = ok && set.world < PS_NWORLD && set.lights <= 2u && set.theme < NTHEME &&
-         (set.flags & ~SET_MIDI) == 0u && set.auto_len < 4u && set.auto_set <= 99u;
+         (set.flags & ~SET_MIDI) == 0u && set.auto_len < 4u && set.auto_set <= 99u && set.auto_perf <= 100u;
     for (p = 0; ok && p < P_NPARAMS; p++)
         ok = set.par[p] >= ps_param(p)->lo && set.par[p] <= ps_param(p)->hi;
     if (!ok)
@@ -211,7 +219,7 @@ static int page_par(int p, int k)
         {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
         {P_BREAKS, P_BREAK_LEN, P_GAP, P_MORPH},         /* BREAK: the breaks, and the kit changing on its own */
         {-1, -1, P_BUILD_LEN, -1},                       /* BUILD: K1 the builds' type, K2 their ending, K3 their bars */
-        {-1, -1, -1, -1},                                /* AUTO: K1 on, K2 the set's minutes, K3 its seed */
+        {-1, -1, -1, -1},                                /* AUTO: K1 on, K2 the set's minutes, K3 its seed, K4 PERFORM */
         {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, P_KICK_DECAY},   /* (the levels and the sends: MIX's) */
         {P_BASS_BITE, P_BASS_DECAY, P_BASS_LEN, P_BASS_DRIVE},   /* (as LINE's) */
         {P_HATS, P_PERC_OPEN, P_CLAP, P_HAT_TONE},   /* (TONE: all of it, the clap's too) */
@@ -383,7 +391,7 @@ static const char *knob_name(int page, int k)
     if (page == PG_BUILD)
         return k == 0 ? "TYPE" : k == 1 ? "ENDING" : k == 2 ? "LENGTH" : "";
     if (page == PG_AUTO)
-        return k == 0 ? "AUTO PLAY" : k == 1 ? "MINUTES" : k == 2 ? "SEED" : "";
+        return k == 0 ? "AUTO PLAY" : k == 1 ? "MINUTES" : k == 2 ? "SEED" : "PERFORM";
     if (page == PG_MIX)
         return k == 0 ? "TRACK" : k == 1 ? "LEVEL" : k == 2 ? (TRACK_SEND[mix_track % NTRACK] < 0 ? "" : "SEND")
              : "MUTE";                   /* (no send: no SEND) */
@@ -447,6 +455,12 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
         *span = k == 0 ? PS_NBUILD - 1 : PS_NEND - 1;
         return;
     }
+    if (page == PG_AUTO && k == 3) {     /* its hands */
+        int_text(set.auto_perf, t);
+        *pos = set.auto_perf;
+        *span = 100;
+        return;
+    }
     if (page == PG_AUTO && k < 3) {      /* AUTO PLAY: on, how long, which set (on: the one that plays) */
         static const char *const LEN[AU_NLEN] = {"30", "60", "90", "ENDLESS"};
         int n = au.on ? au.nset : set.auto_set, l = au.on ? au.len : set.auto_len;
@@ -499,11 +513,15 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
         host_auto_log = !strcmp(a, "on");
         return 1;
     }
-    if (!strcmp(cmd, "oldset")) {        /* the settings saved as an older version's (8, 7): a reboot takes them */
+    if (!strcmp(cmd, "oldset")) {        /* the settings saved as an older version's (9, 8, 7): a reboot takes them */
         settings_t o = set;
         int v7 = !strcmp(a, "7");
         uint32_t end = (uint32_t)((char *)&o.par[P_NPARAMS - v7] - (char *)&o);
         o.magic = v7 ? SET_MAGIC7 : SET_MAGIC8;
+        if (!strcmp(a, "9")) {
+            o.magic = SET_MAGIC9;
+            end += 2u;
+        }
         plat_store_save(OBJ_SETTINGS, &o, (end + 3u) & ~3u);
         return 1;
     }
@@ -513,6 +531,22 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
     return 1;
 }
 #endif
+
+/* a detent's step on a wide knob (0..100, FEEDBACK's 0..90): one, faster as it turns faster (two a detent under 80 ms
+ * apart, four under 35) */
+static int knob_step(uint32_t since, int32_t d, int range)
+{
+    uint32_t per = (since > 250u ? 250u : since) / (uint32_t)(d < 0 ? -d : d);
+    int step = per < 35u ? 4 : per < 80u ? 2 : 1;
+#ifdef PLAT_HOST
+    if (!host_knobs_live)                /* (the scripts' default: as they were, two a detent on 0..100) */
+        step = range >= 100 ? 2 : 1;
+    else if (plat_host_exact)            /* (live, a script's spin: one a detent) */
+        step = 1;
+#endif
+    (void)range;
+    return step;
+}
 
 static void knob_turn(int k, int32_t d)
 {
@@ -551,8 +585,6 @@ static void knob_turn(int k, int32_t d)
         app_say(knob_name(page, k), t);
         return;
     } else if (page == PG_AUTO) {        /* AUTO PLAY: on, off; its minutes and its seed, while off */
-        if (k == 3)
-            return;
         if (k == 0) {
             if ((d > 0) == au.on)
                 return;
@@ -563,11 +595,15 @@ static void knob_turn(int k, int32_t d)
             app_say("AUTO PLAY", !au.on ? "OFF" : ps_playing() ? "ON" : "PLAY: BEGIN");
             return;
         }
-        if (au.on) {
+        if (au.on && k < 3) {
             app_say("AUTO PLAY", "IS ON");
             return;
         }
-        if (k == 1)
+        if (k == 3) {
+            set.auto_perf = (uint8_t)clamp(set.auto_perf + knob_step(since, d, 100) * d, 0, 100);
+            if (!set.auto_perf)
+                hd_clear(255u);
+        } else if (k == 1)
             set.auto_len = (uint8_t)clamp(set.auto_len + d, 0, AU_NLEN - 1);
         else
             set.auto_set = (uint8_t)clamp(set.auto_set + d, 0, 99);
@@ -583,6 +619,7 @@ static void knob_turn(int k, int32_t d)
         int tr = mix_track % NTRACK, pt = TRACK_PART[tr], mu = pf.muted >> pt & 1u;
         if ((d > 0) == mu)
             return;
+        hd_hand_part(pt);
         ps_mute(pt);
         pf.muted ^= (uint8_t)(1u << pt);
         app_say(TRACK_NAME[tr], mu ? "BACK" : "MUTED");
@@ -593,16 +630,8 @@ static void knob_turn(int k, int32_t d)
         int step = 1;                    /* one a detent; the wide ones (0..100, FEEDBACK's 0..90) faster as they turn
                                           * faster: two a detent under 80 ms apart, four under 35 */
         int32_t v;
-        if (pi->hi - pi->lo >= 50) {
-            uint32_t per = (since > 250u ? 250u : since) / (uint32_t)(d < 0 ? -d : d);
-            step = per < 35u ? 4 : per < 80u ? 2 : 1;
-#ifdef PLAT_HOST
-            if (!host_knobs_live)        /* (the scripts' default: as they were, two a detent on 0..100) */
-                step = pi->hi - pi->lo >= 100 ? 2 : 1;
-            else if (plat_host_exact)    /* (live, a script's spin: one a detent) */
-                step = 1;
-#endif
-        }
+        if (pi->hi - pi->lo >= 50)
+            step = knob_step(since, d, pi->hi - pi->lo);
         if (p < 0)
             return;
         if (au_owns(p)) {                /* AUTO PLAY's: the hand's a while, the settings as they were */
@@ -668,6 +697,7 @@ static void knobs_default(void)          /* every page's knobs where they began 
     }
     set.auto_len = 1;
     set.auto_set = 0;
+    set.auto_perf = 50;
     if (au.on)                           /* (AUTO PLAY's as the set has them) */
         au_push();
     set_dirty = 1;
@@ -697,6 +727,7 @@ static void key_down(int k, int vel)
 {
     if (!grid_mode()) {
         pf.role[k] = ROLE_EVENT;
+        hd_hand_key();
         ps_key(k, 1, vel);
         return;
     }
@@ -704,6 +735,7 @@ static void key_down(int k, int vel)
         int id = key_place(k);
         pf.role[k] = ROLE_FX;
         pf.fx_held |= (uint16_t)(1u << id);
+        hd_hand_fx();
         ps_fx(id, 1);
         app_say(FX_ROW[id / 4], ps_fx_name(id));
         return;
@@ -713,26 +745,33 @@ static void key_down(int k, int vel)
         int b = key_place(k), p;
         if (b < BK_FILL) {
             p = BK_PART[b];
+            hd_hand_part(p);
             ps_mute(p);
             pf.muted ^= (uint8_t)(1u << p);
             app_say(PART_NAME[p], pf.muted >> p & 1u ? "MUTED" : "BACK");
         } else if (b == BK_FILL) {
+            hd_hand_fx();
             ps_fill();
             app_say("FILL", "NEXT BEAT");
         } else if (b == BK_HALF) {       /* half time while held */
+            hd_hand_fx();
             ps_half(1);
             app_say("HALF", "TIME");
         } else if (b == BK_GAP) {        /* the bar's last beat silent */
+            hd_hand_fx();
             ps_gap();
             app_say("GAP", "LAST BEAT");
         } else if (b == BK_NOLOW) {      /* the kick and the bass out together: a break while held */
+            hd_hand_fx();
             ps_out(PART_KICK, 1);
             ps_out(PART_BASS, 1);
             app_say("KICK+BASS", "OUT");
         } else if (b == BK_ALL) {
             for (p = 0; p < NPART; p++)
-                if (pf.muted >> p & 1u)
+                if (pf.muted >> p & 1u) {
+                    hd_hand_part(p);
                     ps_mute(p);
+                }
             pf.muted = 0;
             app_say("ALL", "BACK");
         }
@@ -828,6 +867,7 @@ static void midi_poll(void)
                 k -= 12;
             if ((st & 0xF0u) == 0x90u && d2) {
                 md.down |= 1u << k;
+                hd_hand_key();
                 ps_key(k, 1, (int)d2);
             } else if (md.down >> k & 1u) {
                 md.down &= ~(1u << k);
@@ -914,6 +954,7 @@ static void input(void)
     } else if ((up & 1u << B_REC) && !ui.rec_held) {
         int st = ps_rec_state(), of, b = ps_rec_bar(&of);
         char t[8] = "1 BAR";
+        hd_hand_key();
         ps_rec(1);
         if (st == 2 && b > 1) {              /* taking: it ends with this bar, a loop of its bars */
             t[0] = (char)('0' + (b < of ? b : of));
@@ -1248,7 +1289,7 @@ static void draw_grid(void)
         int32_t y = 6 + r * 24;
         cv_text(8, y + 4, &FONT_XS, FX_ROW[r], part_txt(LANE_HUE[r], 220));
         for (c = 0; c < 4; c++) {
-            int id = (int)(r * 4 + c), on = pf.fx_held >> id & 1u;
+            int id = (int)(r * 4 + c), on = (pf.fx_held | (unsigned)ps_stat(9)) >> id & 1u;   /* (or AUTO PLAY's) */
             int32_t x = 56 + c * 46, tw = text_w(&FONT_XS, ps_fx_name(id));
             cv_rect(x, y, 44, 18, part_col(LANE_HUE[r] + c * 40, on ? 255 : c == 0 ? 105 : 60));
             cv_text(x + (44 - tw) / 2, y + 4, &FONT_XS, ps_fx_name(id), on ? C_BLACK : C_WHITE);
@@ -1257,7 +1298,7 @@ static void draw_grid(void)
     for (i = 0, c = 8; i < BK_FILL; i++) {   /* the parts, in the black keys' order (c: x) */
         int pt = BK_PART[i], mu = ps_ui.muted >> pt & 1u;
         int32_t tw = text_w(&FONT_XS, PART_NAME[pt]);
-        cv_text(c, 106, &FONT_XS, PART_NAME[pt], mu ? C_LINE : part_txt(PART_HUE[pt], 240));
+        cv_text(c, 106, &FONT_XS, PART_NAME[pt], mu || (ps_stat(10) >> pt & 1) ? C_LINE : part_txt(PART_HUE[pt], 240));
         if (mu)
             cv_rect(c, 110, tw, 1, C_GRAY);
         c += tw + 10;
@@ -1702,6 +1743,14 @@ int app_expect(const char *what, int *got)
         *got = set.auto_len;
     else if (!strcmp(what, "chapters"))
         *got = au.nch;
+    else if (!strcmp(what, "hd_fx"))         /* its hands: its effects, its parts out, its throws so far */
+        *got = ps_stat(9);
+    else if (!strcmp(what, "hd_out"))
+        *got = ps_stat(10);
+    else if (!strcmp(what, "hd_throws"))
+        *got = ps_stat(12);
+    else if (!strcmp(what, "perform"))
+        *got = set.auto_perf;
     else if (!strcmp(what, "au_min"))        /* its minutes */
         *got = (int)(au.total + au.min);
     else if (!strcmp(what, "root"))

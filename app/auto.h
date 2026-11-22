@@ -14,6 +14,8 @@
  * set keeps those. Off: the music goes on from where it is, the knobs where the set left them. A set done: its last
  * break fades, the music rests, and everything is the hand's again.
  *
+ * Its hands (the effects, the parts out, the keys): hands.h, as much as PERFORM (K4).
+ *
  * Its dice are its own (never the engine's): the same seed draws the same set; what the generator plays within it is
  * its own each time. */
 #define AU_HOLD 32                       /* bars a thing touched stays the hand's */
@@ -54,6 +56,8 @@ static uint32_t au_rnd(uint32_t n)       /* 0..n-1 */
 static float au_rndf(float lo, float hi) { return lo + (hi - lo) * (float)au_rnd(1024u) / 1023.0f; }
 static int au_owns(int p) { return au.on && (p <= P_DRIFT || p == P_TEMPO || p == P_ROOT || p == P_BREAKS || p == P_BUILD_LEN); }
 static int au_held(int p) { return au.bar < au.hold[p]; }
+
+#include "hands.h"                        /* its effects, its parts out, its keys */
 
 /* how high the set stands at x (0..1): a curve's points, straight between */
 #define AU_NCURVE 6
@@ -224,6 +228,7 @@ static void au_top(void)                 /* from the set's own beginning (nothin
     ps_auto_root(au.ch[0].root);
     au_push();
     au_segment();
+    hd_begin();
 }
 static int au_bar_now(void) { uint32_t t = ps_ui.tick; return t < 4u ? 0 : (int)((t - 4u) / (4u * PS_TPB)); }
 static void au_start(void)
@@ -249,14 +254,15 @@ static void au_start(void)
     for (k = 0; k < P_NPARAMS; k++)
         au.hold[k] = 0;
     au.bar = au_bar_now();
-    au.drop_bar = au.bar / 8 * 8;
     au.sec = ps_section();
+    au.drop_bar = au.bar - (au.sec == SEC_MAIN ? ps_ui.sec_bar : 0);   /* (the phrases the engine's) */
     au.sec_at = au.bar;
     au.drops = ps_ui.drops;
     au.begun = 1;
     ps_auto_root(ps_root());
     au_push();
     au_segment();
+    hd_begin();
 }
 static void au_stop(int keep)            /* off: keep, the music goes on, the knobs where they stand; else the hand's */
 {
@@ -264,6 +270,7 @@ static void au_stop(int keep)            /* off: keep, the music goes on, the kn
     if (!au.on)
         return;
     au.on = 0;
+    hd_clear(255u);
     ps_stage(-1, 0);
     if (keep) {
         for (k = P_ENERGY; k <= P_DRIFT; k++)
@@ -344,6 +351,7 @@ static void au_bar(int sec)              /* a bar has begun */
         au.ours = 0;
         if (au.staged) {
             au_chapter(au.staged == 2u ? 0 : au.cur + 1);
+            hd_chapter();
             c = &au.ch[au.cur];
         }
         au_segment();
@@ -376,6 +384,7 @@ static void au_bar(int sec)              /* a bar has begun */
     } else if (sec == SEC_BREAK) {
         if (au.ours && au.last && !au_more()) {   /* the end */
             au.closing = 1;
+            hd_clear(255u);
         } else if (at + 1 >= (au.ours ? au.brk : AU_HOLD))   /* (one called by hand: the hand's build, or in time) */
             ps_cue(PS_CUE_BUILD);
     } else if (au.last && au_more() && ps_ui.sec_bar + 1 >= ps_ui.sec_len && !au.staged) {   /* a build's last bar */
@@ -397,6 +406,8 @@ static void au_bar(int sec)              /* a bar has begun */
         ps_kit(2);
     }
     au_push();
+    if (!au.closing)
+        hd_bar(sec, at);
 #ifdef PLAT_HOST
     if (host_auto_log)
         printf("AU %d min %.2f ch %d/%d world %d bpm %.3f set %.3f root %d sec %d rb %d mac %d %d %d %d last %d\n", au.bar,
@@ -414,6 +425,18 @@ static void au_tick(void)                /* each frame */
     }
     if (!au.on && !au_rested && au_fade < 1.0f)   /* (the last break left by hand: back in a second or so) */
         au_fade = fm_clampf(au_fade + 0.015f, 0.0f, 1.0f);
+#ifdef PLAT_HOST
+    if (host_auto_log) {
+        static int st[4];
+        int now[4] = {ps_stat(9), ps_stat(10), ps_stat(11), ps_stat(12)}, k, ch = 0;
+        for (k = 0; k < 4; k++) {
+            ch |= now[k] != st[k];
+            st[k] = now[k];
+        }
+        if (ch)
+            printf("ST %u sec %d fx %d out %d half %d throws %d\n", (unsigned)ps_ui.tick, ps_section(), st[0], st[1], st[2], st[3]);
+    }
+#endif
     if (!au.on)
         return;
     if (!ps_playing()) {                 /* resting: the set waits at its beginning */

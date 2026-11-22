@@ -409,6 +409,7 @@ static int build_breath(uint32_t beat);
 #include "events.c"
 #include "fx.c"
 #include "line.c"
+#include "hands.c"
 
 /* the queue's commands: bits 16.. the kind (0 a key, 1 an effect, 2 a mute, 3 out, 4 a fill) */
 enum { CMD_KEY, CMD_FX, CMD_MUTE, CMD_OUT, CMD_FILL, CMD_TYPE, CMD_REC, CMD_HALF, CMD_GAP };
@@ -521,7 +522,7 @@ void ps_kit(int turns)
 static uint32_t kit_heard(void)        /* the parts heard now, 1 << PART_* (and the groove's, where AUTO's) */
 {
     uint32_t m = (1u << (NPART + 1)) - 1u, bar = s.tick / TPBAR;
-    m &= ~(uint32_t)(fx.muted | fx.out);
+    m &= ~(uint32_t)(fx.muted | fx.out | fx.auto_out);
     if (s.sec == SEC_BREAK)
         m &= ~(1u << PART_KICK | 1u << PART_BASS);
     if (!ln.playing)
@@ -832,7 +833,7 @@ int ps_lane(int lane, uint8_t out[24])
         }
         if (groove || gro)
             for (i = 0; i < 16u; i++)
-                if ((fx.half || half_build() ? i % 8u == 0u : kick_at(rb, i / 4u, (i % 4u) * 6u)) && !build_breath(i / 4u))
+                if ((fx.half || fx.auto_half || half_build() ? i % 8u == 0u : kick_at(rb, i / 4u, (i % 4u) * 6u)) && !build_breath(i / 4u))
                     out[i] = 3;   /* (HALF: on 1 and 3) */
         if (fake)
             out[0] = 3;
@@ -845,7 +846,7 @@ int ps_lane(int lane, uint8_t out[24])
         }
         if (!groove && !gro && !fake)
             break;
-        if (fx.half || half_build()) {                 /* HALF: an eighth's roll after the kick on 1 and 3 */
+        if (fx.half || fx.auto_half || half_build()) {                 /* HALF: an eighth's roll after the kick on 1 and 3 */
             for (i = 0; i < 16u; i++)
                 out[i] = i % 8u && !(i & 1u) && !build_breath(i / 4u) ? 2 : 0;
             break;
@@ -991,6 +992,9 @@ int ps_stat(int which)
         return fx.out;
     if (which == 8)
         return s.gap | fx.gap_req << 1 | fx.half << 2;
+    if (which >= 9)
+        return which == 9 ? fx.auto_held | (fx.auto_key >= 0 ? 1 << fx.auto_key : 0) : which == 10 ? fx.auto_out
+               : which == 11 ? fx.auto_half : (int)ag_thrown;
     if (which <= 3)
         return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : which == 2 ? ev.last_type : (int)ln.drawn;
     for (i = 0; i < LN_STEPS; i++)     /* the line's steps as heard now: 4 on, 5 the highest note, 6 sliding */
@@ -1232,6 +1236,7 @@ static void enter(int sec, uint32_t len)
     s.sec_bar = 0;
     s.sec_len = len;
     s.kit_bars = 0;                    /* (the kit's shape: the groove's only) */
+    ag_section(sec);
 }
 
 static void enter_build(const world_t *w)   /* a build: BUILD's bars, its kind (AUTO: by the world's leaning, not the
@@ -1340,6 +1345,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     uint32_t kf;
     if (s.tick % TPBAR == 0u)
         section_bar(w, bar);
+    ag_step();                         /* AUTO PLAY's hands */
     {   /* STUTTER: the music repeated, a quarter, then an eighth, a sixteenth, a 32nd of it (the buffer's, fx.c) */
         static const uint8_t SL[4] = {24, 12, 6, 3};
         fx.auto_slice = s.sec == SEC_BUILD && s.bk == PS_BUILD_STUTTER && !build_breath(beat)
@@ -1425,7 +1431,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         }
         return;
     }
-    if (fx.half || half_build()) {     /* HALF (a black key held, or a build): half time, the kick on 1 and 3, the bass's roll over
+    if (fx.half || fx.auto_half || half_build()) {     /* HALF (a black key held, or a build): half time, the kick on 1 and 3, the bass's roll over
                                         * two beats (K-B-B-B, an eighth each); the kick's twists not */
         uint32_t ht = (beat & 1u) * TPB + t;
         if (ht == 0u) {
@@ -1909,12 +1915,14 @@ void ps_render(float *outl, float *outr, uint32_t n)
         ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */
         take.n = take.arm = take.rec = 0;   /* (the keys' loop gone) */
         stage = 0;
+        ag_reset();
     }
     while (cmd_r != cmd_w) {           /* the keys, the effects, the parts */
         uint32_t c = cmd_q[cmd_r % CMD_N];
         cmd_r++;
         cmd_do(c);
     }
+    ag_drain();
     tempo(w);
     if (!playing) {                    /* resting: no STUTTER's repeat going on */
         fx.auto_slice = fx.auto_buf = fx.auto_dub = fx.auto_gate = 0;
@@ -1924,9 +1932,9 @@ void ps_render(float *outl, float *outr, uint32_t n)
     if (dub_on()) {                    /* DUB: the echo longer and darker (its time stretching: below); FREEZE: it
                                         * takes in the music for one echo's time, then keeps it (below) */
         fb = 0.9f;
-        tone = fx.held >> FX_DUB & 1u ? 0.16f : fm_maxf(tone, 0.4f);   /* (an ending's throw: not so dark) */
+        tone = fx_on(FX_DUB) ? 0.16f : fm_maxf(tone, 0.4f);   /* (an ending's throw: not so dark) */
     }
-    if (fx.held >> FX_FREEZE & 1u) {
+    if (fx_on(FX_FREEZE)) {
         fb = 1.0f;
         tone = 1.0f;
         send_g = 0.0f;
@@ -1978,7 +1986,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
             uint32_t d;
             int k;
             for (k = 0; k < NPART; k++)        /* the parts' gains glide to their mutes (~3 ms) */
-                pg[k] += (((fx.muted | fx.out) >> k & 1u ? 0.0f : 1.0f) - pg[k]) * 0.008f;
+                pg[k] += (((fx.muted | fx.out | fx.auto_out) >> k & 1u ? 0.0f : 1.0f) - pg[k]) * 0.008f;
             s.hp_hz += (hp_to - s.hp_hz) * 0.001f;   /* ~23 ms */
             hp_g = fm_clampf((s.hp_hz - 10.0f) / 30.0f, 0.0f, 1.0f);   /* (in and out by degrees: no step) */
             if (s.hp_hz > 10.0f) {     /* FILTER: the bass thinned from under (a Chamberlin's high, 12 dB an octave) */
@@ -2071,7 +2079,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
                     wl = soft(wl * g) / g;
                     wr = soft(wr * g) / g;
                 }
-                if (fx.held >> FX_FREEZE & 1u) {   /* FREEZE: for one echo's time what is above the kick and the
+                if (fx_on(FX_FREEZE)) {   /* FREEZE: for one echo's time what is above the kick and the
                                                     * bass (the sample before's) taken in, both sides as they are,
                                                     * its ends ~2 ms slopes (the loop's seam: no click); then the echo
                                                     * as it is, again and again */
