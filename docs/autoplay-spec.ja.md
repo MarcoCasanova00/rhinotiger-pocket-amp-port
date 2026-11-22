@@ -43,7 +43,7 @@ AUTO PLAY は、1本のセットを自動で鳴らす機能です。セットは
 | スレッド | 周期 | 動くもの |
 | --- | --- | --- |
 | UI（`app_frame`、約 60 回/秒） | フレームごと | `input()` → `au_tick()` → `au_see()` → 描画。`au_tick` が小節の変わり目を検出して `au_bar` を呼び、`au_bar` が `hd_bar`、`ps_cue`、`ps_stage`、`ps_set`、`ps_auto_bpm`、`ps_auto_root` を呼ぶ。`hd_*` は `ps_auto_do`（キュー `aq[]` への書き込み）を呼ぶ |
-| オーディオ割り込み（`app_render` → `ps_render`） | 256 フレーム（5.8 ms）ごと | ブロックの先頭で `ag_drain`（`aq[]` を `ag[]` へ移す）。tick ごとに `step()`（`section_bar` → `ag_step` → `fx_sixteenth`）。小節の先頭で `stage` を取り込む |
+| オーディオ割り込み（`app_render` → `ps_render`） | 256 フレーム（5.8 ms）ごと | ブロックの先頭で `ag_drain`（`aq[]` を `ag[]` へ移す）。tick ごとに `step()`（`section_bar` → `ag_step` → `fx_sixteenth`）。ドロップの小節の先頭で `stage` を取り込む |
 
 UI からエンジンへ渡るもの: `ps_set` で書くパラメータ（16 ビット単位）、`auto_bpm`、`auto_root`、`stage`（以上 `volatile`）、`aq[]`（先入れ先出し、32 個）、モチーフ用の 2 面のバッファ `ag_mot[2]`。
 エンジンから UI へ渡るもの: `ps_ui`（`tick`、`section`、`sec_bar`、`sec_len`、`drops`、`muted`、`cued`）と `ps_stat(9..14)`。
