@@ -196,6 +196,9 @@ static volatile int want_world, want_play;
 static volatile uint32_t restart_n;    /* restarts asked for, counted */
 static uint32_t restart_seen;
 static volatile float ext_bpm;         /* a MIDI clock's tempo (0: the world's) */
+static volatile float auto_bpm;        /* AUTO PLAY's tempo (0: the world's), its root (0: the world's), and the world */
+static volatile int auto_root;         /* and the root it takes as the next bar begins (1 + world, the root << 8; 0: none) */
+static volatile uint32_t stage;
 static int world, playing;
 
 static struct {
@@ -957,8 +960,18 @@ void ps_restart(void) { restart_n++; }
 void ps_ext_bpm(float bpm) { ext_bpm = bpm; }
 int ps_playing(void) { return playing; }
 int ps_bar(void) { return (int)(s.tick / TPBAR); }
-int ps_bpm(void) { return ext_bpm > 0.0f ? (int)(ext_bpm + 0.5f) : (int)(W[want_world].bpm + (float)par[P_TEMPO]); }
-int ps_root(void) { return W[want_world].root + par[P_ROOT]; }
+int ps_bpm(void)
+{
+    float e = ext_bpm, a = auto_bpm;
+    return e > 0.0f ? (int)(e + 0.5f) : a > 0.0f ? (int)(a + 0.5f) : (int)(W[want_world].bpm + (float)par[P_TEMPO]);
+}
+int ps_root(void) { return auto_root ? auto_root : W[want_world].root + par[P_ROOT]; }
+void ps_auto_bpm(float bpm) { auto_bpm = bpm; }
+void ps_auto_root(int note) { auto_root = note; }
+void ps_stage(int w, int root) { stage = w < 0 ? 0u : 1u + (unsigned)w % PS_NWORLD + ((uint32_t)root << 8); }
+int ps_world_now(void) { return want_world; }
+int ps_world_bpm(int w) { return (int)W[(unsigned)w % PS_NWORLD].bpm; }
+int ps_world_root(int w) { return W[(unsigned)w % PS_NWORLD].root; }
 void ps_cue(int how)
 {
     if (how == PS_CUE_DROP)
@@ -1003,8 +1016,8 @@ static void mods(const world_t *w)     /* the macros and the moved tempo and roo
     m.detail = (float)(par[P_DETAIL] - 50) / 50.0f;
     m.dark = (float)(par[P_DARK] - 50) / 50.0f;
     m.drift = (float)par[P_DRIFT] / 100.0f;
-    m.root = w->root + par[P_ROOT];
-    m.bpm = ext_bpm > 0.0f ? ext_bpm : w->bpm + (float)par[P_TEMPO];
+    m.root = auto_root ? auto_root : w->root + par[P_ROOT];
+    m.bpm = ext_bpm > 0.0f ? ext_bpm : auto_bpm > 0.0f ? auto_bpm : w->bpm + (float)par[P_TEMPO];
 }
 
 /* a build's bars but FAKE's last (its false drop's) */
@@ -1895,6 +1908,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.kf = KF_NONE;
         ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */
         take.n = take.arm = take.rec = 0;   /* (the keys' loop gone) */
+        stage = 0;
     }
     while (cmd_r != cmd_w) {           /* the keys, the effects, the parts */
         uint32_t c = cmd_q[cmd_r % CMD_N];
@@ -1935,6 +1949,13 @@ void ps_render(float *outl, float *outr, uint32_t n)
         }
         if (playing) {
             if (s.next <= 0.0f) {                  /* a tick begins on this sample */
+                if (s.tick % TPBAR == 0u && stage) {   /* AUTO PLAY's next world and root, together */
+                    uint32_t st = stage;
+                    want_world = (int)((st & 255u) - 1u);
+                    auto_root = (int)(st >> 8);
+                    stage = 0;
+                    tempo(w);
+                }
                 if (s.tick % TPBAR == 0u && want_world != world) {   /* a world changes as a bar begins */
                     world = want_world;
                     w = &W[world];

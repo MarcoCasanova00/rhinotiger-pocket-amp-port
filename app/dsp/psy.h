@@ -59,6 +59,14 @@ void ps_set(int p, int v);
 int ps_get(int p);
 int ps_bpm(void);                      /* the tempo now (the world's, moved) */
 int ps_root(void);                     /* the root now, MIDI note of the bass */
+/* AUTO PLAY (app/auto.h): a tempo and a root of its own over the worlds' and the knobs' (0: theirs), and a world and a
+ * root taken together as the next bar begins */
+void ps_auto_bpm(float bpm);
+void ps_auto_root(int note);
+void ps_stage(int world, int root);    /* (world < 0: none after all) */
+int ps_world_now(void);                /* the world chosen (the next bar's, if it changes) */
+int ps_world_bpm(int w);               /* a world's own */
+int ps_world_root(int w);
 const char *ps_echo_time_name(int v);  /* P_ECHO_TIME's values */
 const char *ps_phase_name(int p, int v);   /* P_BREAKS .. P_GAP's values as the screen says them */
 

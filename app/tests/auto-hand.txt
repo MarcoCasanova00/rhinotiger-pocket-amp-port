@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY played along with: the tempo, the root and the world by hand; DEFAULTS; PLAY off and on, the set from its top
+wait 3000   # the logo, then the play
+jack in
+listen
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 7
+wait 30
+turn K1 1
+wait 30
+tap PLAY
+wait 8000
+expect setworld 2
+# PRESETS: this chapter's, the settings as they were
+expect world 3
+turn PRESET 1
+wait 3000
+expect world 4
+expect setworld 2
+# GROOVE: Tempo, Root: from where they stand, kept 32 bars, then the tempo glides back (a tenth a bar), the root stays its
+# chapter; the settings as they were
+tap HOME
+wait 30
+tap HOME
+wait 30
+expect page 1
+expect bpm 151
+expect root 31
+turn K1 6
+wait 500
+turn K2 1
+wait 500
+expect bpm 157
+expect root 32
+expect param4 0
+wait 40000
+expect bpm 157
+expect root 32
+wait 60000
+expect bpm <155
+expect root 32
+# GLOBAL held: the hand's at their beginnings, the set's as they are
+tap GLO
+wait 30
+press SAVE
+wait 1700
+release SAVE
+wait 100
+expect autoplay 1
+expect playing 1
+expect param2 50
+expect engine2 <50
+expect engine36 0
+# rest and play: from the set's top
+tap PLAY
+wait 1000
+expect playing 0
+expect au_min 0
+tap PLAY
+wait 8000
+expect playing 1
+expect autoplay 1
+expect chapter 0
+# off while resting: everything the hand's
+tap PLAY
+wait 500
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K1 -1
+wait 100
+said AUTO PLAY OFF
+expect autoplay 0
+expect world 2
+expect engine2 50
+expect engine36 50

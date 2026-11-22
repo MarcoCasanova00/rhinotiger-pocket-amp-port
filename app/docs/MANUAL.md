@@ -71,10 +71,10 @@ white on the first beat of a bar. For a moment after you do something (turn a kn
 what happened instead.
 
 At the bottom are the four knobs, each with its name, its value and a thin bar. A knob you have just turned lights
-up. Above them runs a rule, and on the rule sits a short strip: the name of the page you are on, and a row of 14 small
+up. Above them runs a rule, and on the rule sits a short strip: the name of the page you are on, and a row of 15 small
 bars, one for each page, with the shown one lit. Turn SELECT to walk through the pages one by one, or press a button to
 jump to its page. At the left of the rule is whatever the page can be set to by ALGORITHM, shown by name (see 4.
-Controls), or what needs saying: `REC: NEXT BAR` while REC waits and `REC: BAR 1/4` while it takes, and `SAVE: KEEP IT` on GLOBAL when something is not saved.
+Controls), or what needs saying: `REC: NEXT BAR` while REC waits and `REC: BAR 1/4` while it takes, the minutes gone while AUTO PLAY is on (see 5.5), and `SAVE: KEEP IT` on GLOBAL when something is not saved.
 
 Between the two is the page itself. On most pages it is the same picture, the lanes. There are five rows, KICK,
 BASS, PERC, EVENTS and LINE, and each shows the bar that is playing, one cell for every sixteenth: a taller block is a
@@ -84,11 +84,11 @@ bars, the phrase: eight bars make a phrase, and the one playing is lit. In a bre
 bars instead (see 8. Sections), and when a section is cued, `BREAK >`, `BUILD >` or `DROP >` waits there until the
 next bar. When you throw an event from the keys, its name appears at the lower right (see 6. The keys).
 
-Two pages have a picture of their own. On MIX it is the mixer, six strips (see 5.12). On ECHO it is the grid of
+Two pages have a picture of their own. On MIX it is the mixer, six strips (see 5.13). On ECHO it is the grid of
 sixteen effects and the six parts (see 7. The performance).
 
 The colours move with the music. The hues sway slowly together, sink in a break, spin faster and faster through a
-build and jump at the drop. THEME, on the global page, chooses the palette (see 5.14).
+build and jump at the drop. THEME, on the global page, chooses the palette (see 5.15).
 
 Every button glows dim. The button of the page you are on is lit. PLAY is lit while it plays. SAVE is lit on the
 global page when something is not saved, and elsewhere while a break is cued or on. ARP is lit while a build or a drop
@@ -101,9 +101,9 @@ quickly while it waits for the next bar, on the beats while it takes, and is lit
 
 | Control | What it does |
 | --- | --- |
-| SELECT | Turns through the 14 pages in order, from MAIN to GLOBAL. It stops at the ends. |
+| SELECT | Turns through the 15 pages in order, from MAIN to GLOBAL. It stops at the ends. |
 | HOME | Goes to MAIN. Press again for GROOVE. Press again to go back. |
-| SEQ | Goes to BREAK: the sections. Press again for BUILD. Press again to go back. |
+| SEQ | Goes to BREAK: the sections. Press again for BUILD. Again for AUTO. Again to go back. |
 | SEL | Goes to KICK. Press again for BASS. Press again to go back. |
 | ENV | Goes to PERC. Press again for EVENTS. Press again to go back. |
 | LFO | Goes to LINE. Press again for LINE SEQ. Again for ATMOS. Again to go back. On LINE and LINE SEQ, hold it for half a second and the line's phrase is drawn anew from the next bar, instead of moving on. |
@@ -125,7 +125,7 @@ ALGORITHM does something different on each page. On MAIN it changes the kit. Tur
 or a few of the sounding parts take another type from the next bar; the more you turn within a bar, the more parts
 change, up to three. Turn it back for the kit before, up to eight steps. On GROOVE it picks the shape of the bass. On ECHO it picks the kind of echo. On KICK, BASS, PERC, EVENTS, LINE, LINE SEQ and ATMOS it picks the type of
 that part, one of four to six, and the new type begins from the part's next note. On MIX it picks the type of the
-track TRACK has chosen. On BREAK, BUILD and GLOBAL it does nothing. The name
+track TRACK has chosen. On BREAK, BUILD, AUTO and GLOBAL it does nothing. The name
 of the choice shows at the left of the rule. Types and shapes are listed on the pages they belong to. They are not
 saved (see 10. Saving).
 
@@ -133,7 +133,7 @@ saved (see 10. Saving).
 
 ## 5. The pages
 
-There are 14. The four knobs always belong to the page you are on. Each knob is listed with what you hear as it turns
+There are 15. The four knobs always belong to the page you are on. Each knob is listed with what you hear as it turns
 and the value it starts at. A part's level and its send into the echo are on MIX only.
 
 ### 5.1 MAIN
@@ -242,7 +242,35 @@ The endings:
 - ECHO: the third beat is thrown into the echo, and the last beat is silent but for its repeats.
 - PICKUP: the last beat is silent but for its last sixteenth, where the kick and the bass step into the drop.
 
-### 5.5 KICK
+### 5.5 AUTO
+
+![The AUTO page: Auto play OFF, Minutes 60, Set NEW](img/screen-auto.png "AUTO")
+
+SEQ, a third time. AUTO PLAY plays a whole set by itself, as a DJ would: it goes through the worlds, moves the tempo and
+the key, calls the breaks and the builds, and raises and lowers the music along a curve of its own.
+
+- AUTO PLAY: right for ON, left for OFF. OFF.
+- MINUTES: how long the set is: 30, 60, 90, or ENDLESS. 60.
+- SET: which set. Each number from 1 to 99 is a plan of its own: the worlds, the tempos, the keys, where it rises and
+  falls. The same number and the same MINUTES plan the same set again; the sounds in it still come out different each
+  time. NEW takes another number each time, and shows it while the set plays. NEW.
+
+Turn it on while the music rests and the set waits at its beginning for PLAY. Turn it on while the music plays and the
+set goes on from there. MINUTES and SET can be turned only while it is off. On MAIN, BREAK and AUTO the rule shows how
+many minutes have gone.
+
+A set is made of chapters of some minutes each. A new chapter comes in on a drop, with its world and its key. The tempo
+glides all the way through. A set of 30, 60 or 90 minutes ends in a break that fades out, and then the music rests.
+
+You can play along. What you turn of what the set moves (the four knobs of MAIN, TEMPO, ROOT, BREAKS, the LENGTH of
+builds) stays yours for 32 bars, then goes back to the set: ROOT at the next chapter, the rest by degrees. A world you
+choose with PRESETS stays until the next chapter. Breaks, builds and drops you call are followed. Everything else is
+yours as always.
+
+Turn it off and the music goes on as it is, with the knobs where the set left them. What SAVE keeps during a set is
+your own settings, not the set's. When a set has run out, your own come back.
+
+### 5.6 KICK
 
 ![The KICK page: SOLID in the rule, Tune 0, Drive 50, Punch 50, Decay 50, the KICK lane brightest](img/screen-kick.png "KICK")
 
@@ -257,7 +285,7 @@ ALGORITHM picks the type: SOLID is the world's own; HARD falls faster, with a lo
 with wood under the boom; ZIP falls from higher and slower, the zip of a dark kick; CRACK falls fast and tight, with a
 burst of bright noise on top, the snap of a hi-tech kick.
 
-### 5.6 BASS
+### 5.7 BASS
 
 ![The BASS page: ROUND in the rule, Bite 50, Decay 50, Length 50, Drive 50](img/screen-bass.png "BASS")
 
@@ -271,7 +299,7 @@ SEL again.
 ALGORITHM picks the type, the bass's colour: ROUND, BITTEN, METAL, HOLLOW, SNAP (a hard click on each note, round under
 it) or NASAL (a hollow, reedy buzz). Most drops pick another on its own; with DRIFT lower, more of them keep it.
 
-### 5.7 PERC
+### 5.8 PERC
 
 ![The PERC page: HISS in the rule, Hats 50, Open 50, Clap 50, Tone 50](img/screen-perc.png "PERC")
 
@@ -287,7 +315,7 @@ ALGORITHM picks the type: HISS is the world's own; TIN rings longer, a small che
 GRIT is the noise held in steps, dust in the machine; SEED
 is a narrow, lower band of noise that swells in slowly and crackles in sparse grains, a shaker's seeds.
 
-### 5.8 EVENTS
+### 5.9 EVENTS
 
 ![The EVENTS page: ALIVE in the rule, Density 50, Runs 50, Pitch 0, Spread 50](img/screen-events.png "EVENTS")
 
@@ -306,7 +334,7 @@ wobbling slower and deeper; SHARD is short and harsh, broken glass or a machine'
 swelling out of nothing and cut at their height, a sound sucked in; RATCHET chops them on and off twenty to thirty times
 a second and lets them last longer, a machine's teeth.
 
-### 5.9 LINE
+### 5.10 LINE
 
 ![The LINE page: ACID in the rule, Bite 50, Decay 50, Length 50, Drive 0](img/screen-line.png "LINE")
 
@@ -325,7 +353,7 @@ so above, rubbery; CRUSH breaks the sound into coarse steps, a broken machine.
 
 Hold LFO on this page and the phrase is drawn anew from the next bar. The message is `NEW PHRASE`.
 
-### 5.10 LINE SEQ
+### 5.11 LINE SEQ
 
 ![The LINE SEQ page: ACID in the rule, Density 50, Mutate 50, Range 50, Slide 50](img/screen-line-seq.png "LINE SEQ")
 
@@ -338,7 +366,7 @@ LFO again. The phrase itself. Its 32 steps show at once, so you hear a change st
 
 ALGORITHM picks the type, as on LINE. Holding LFO draws the phrase anew here too (`NEW PHRASE`).
 
-### 5.11 ATMOS
+### 5.12 ATMOS
 
 ![The ATMOS page: MIST in the rule, Colour 50, Air 50, Motion 50, Depth 50](img/screen-atmos.png "ATMOS")
 
@@ -356,7 +384,7 @@ ALGORITHM picks the type: MIST is the world's own, soft; CHIME is brighter, bell
 slow beating hum; GRAIN breaks the chord into grains with more air, a forest's crackle; PULSE cuts the chord in time
 with the music, in a pattern of sixteenths, a pad that breathes with the groove.
 
-### 5.12 MIX
+### 5.13 MIX
 
 ![The MIX page: six strips KICK, BASS, PERC, EVT, LINE and ATM with their meters, PERC framed, HISS at the left of the rule, and the knobs Track PERC, Level 80, Send 0, Mute OFF](img/screen-mix.png "MIX")
 
@@ -372,7 +400,7 @@ rule.
 - MUTE: turn right to mute the part, left to bring it back. OFF. It is the same as the black keys on ECHO (see 7. The
   performance).
 
-### 5.13 ECHO
+### 5.14 ECHO
 
 ![The ECHO page: the grid of sixteen effects and the six parts, PING-PONG in the rule, Feedback 42, Tone 50, Time 3/16, Level 50](img/screen-echo.png "ECHO")
 
@@ -387,7 +415,7 @@ for events: see 7. The performance.
 ALGORITHM picks the kind of echo, changing by degrees: PING-PONG repeats left and right in turn; STRAIGHT puts both
 repeats in the middle; TAPE wavers, darker and slightly driven; SMEAR blurs each repeat more, towards a reverb.
 
-### 5.14 GLOBAL
+### 5.15 GLOBAL
 
 ![The GLOBAL page: SAVE: KEEP IT and GLOBAL in the rule, Lights HIGH, Theme NEON, CPU 0%, MIDI IN ON](img/screen-global.png "GLOBAL, with changes not saved")
 
@@ -438,7 +466,7 @@ F5 is TWEET and G5 is SPARK.
 
 A sound starts on the next sixteenth, so it stays in the groove. It starts from the pitch of the key. Press harder, or land harder, and it bites more. Hold the key and it repeats on every sixteenth, the sound
 turning a little each time round. One sound plays at a time: press another key and it takes over from the one before. What you throw is remembered, and now and then the music's own events take it up.
-With ALGORITHM on the EVENTS page you change the type of all of them (see 5.8).
+With ALGORITHM on the EVENTS page you change the type of all of them (see 5.9).
 
 **The black keys.** There are 11, F#3 to F#5. Hold one and it becomes a rhythm: the white key held with it throws on its
 beats instead of on every sixteenth. The eighths, the triplets and the thirty-seconds fall on their own places in the beat, and GALLOP
@@ -554,7 +582,7 @@ phrase are drawn anew, and the colours jump. The music never comes back exactly 
 
 **By itself.** If BREAKS is above 0 and DRIFT is above 0, a break may come as a block of 32 bars begins, and not
 sooner than about GAP bars after the last drop. It lasts as many bars as LENGTH on BREAK sets (or the world's own), then a build, then the drop come on
-their own. How likely it is depends on BREAKS and DRIFT together: at the defaults, about once in three blocks. See 5.3.
+their own. How likely it is depends on BREAKS and DRIFT together: at the defaults, about once in three blocks. See 5.3. During AUTO PLAY the set calls them (see 5.5).
 
 **You call them.** All of them wait for the next bar, and they work only while the music is playing.
 
@@ -602,7 +630,7 @@ On GLOBAL, tap SAVE to keep everything: the world, every knob of every page, Lig
 the next time the FM-1 starts. While something is not saved, the rule there says `SAVE: KEEP IT` and SAVE stays lit, and the header says
 `SAVED` when it is done. Elsewhere SAVE calls a break (see 8. Sections), so go to GLOBAL to save.
 
-The types and shapes that ALGORITHM picks, the muted parts, the octave and the keys' loop are not saved: the music
+The types and shapes that ALGORITHM picks, the muted parts, the octave, the keys' loop and AUTO PLAY being on are not saved: the music
 starts each time with the world's own sounds. If a newer version changes what is kept, the first start after the update
 may come back with the defaults.
 
@@ -626,6 +654,7 @@ channel.
 - Stop: rests.
 - Clock: the tempo follows it, between 125 and 220 BPM. The header shows the tempo it follows, and the TEMPO knob is
   moved aside. Only the speed is followed, not where the beat lies. When the clock stops, the world's tempo comes back.
+  AUTO PLAY follows the clock's tempo too, while there is one.
 
 Start, continue and stop also end the logo's silence at once (see 2. Starting up).
 
@@ -645,7 +674,7 @@ If you hear nothing, check that PLAY is lit and that MASTER is up. The logo is s
 
 If the colours seem lost, check THEME on GLOBAL: MONO has no colour.
 
-If the CPU reads `%!`, the music has made itself lighter for a while (see 5.14).
+If the CPU reads `%!`, the music has made itself lighter for a while (see 5.15).
 
 If the installer doesn't find the FM-1, use Chrome or Edge, allow MIDI when the browser asks, and close any other
 programs that use the FM-1's MIDI port.

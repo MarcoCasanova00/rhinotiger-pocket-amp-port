@@ -42,56 +42,61 @@ wait 40
 expect page 3
 wait 600
 shot screen-buildpage.png
-tap SEL
+tap SEQ
 wait 40
 expect page 4
 wait 600
-shot screen-kick.png
+shot screen-auto.png
 tap SEL
 wait 40
 expect page 5
 wait 600
-shot screen-bass.png
-tap ENV
+shot screen-kick.png
+tap SEL
 wait 40
 expect page 6
 wait 600
-shot screen-perc.png
+shot screen-bass.png
 tap ENV
 wait 40
 expect page 7
 wait 600
-shot screen-events.png
-tap LFO
+shot screen-perc.png
+tap ENV
 wait 40
 expect page 8
 wait 600
-shot screen-line.png
+shot screen-events.png
 tap LFO
 wait 40
 expect page 9
 wait 600
-shot screen-line-seq.png
+shot screen-line.png
 tap LFO
 wait 40
 expect page 10
 wait 600
+shot screen-line-seq.png
+tap LFO
+wait 40
+expect page 11
+wait 600
 shot screen-atmos.png
 tap EDIT
 wait 40
-expect page 11
+expect page 12
 turn K1 2
 wait 600
 shot screen-mix.png
 expect track 2
 tap FX
 wait 40
-expect page 12
+expect page 13
 wait 600
 shot screen-echo.png
 tap GLO
 wait 40
-expect page 13
+expect page 14
 turn K4 1
 turn K1 1
 wait 600

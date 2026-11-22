@@ -11,19 +11,19 @@ expect page 0
 # LFO: LINE, LINE SEQ, ATMOS, again LINE, LINE SEQ
 tap LFO
 wait 50
-expect page 8
-tap LFO
-wait 50
 expect page 9
 tap LFO
 wait 50
 expect page 10
 tap LFO
 wait 50
-expect page 8
+expect page 11
 tap LFO
 wait 50
 expect page 9
+tap LFO
+wait 50
+expect page 10
 # LINE SEQ's knobs: K3 is Range (param40) and nothing else
 expect param33 50
 expect param35 50
@@ -68,7 +68,7 @@ said BUILD
 # LFO from BUILD: the first of its own, LINE
 tap LFO
 wait 50
-expect page 8
+expect page 9
 # SEQ from LINE: BREAK
 tap SEQ
 wait 50
@@ -90,19 +90,13 @@ wait 50
 expect page 2
 tap SEL
 wait 30
-expect page 4
-tap SEQ
-wait 50
-expect page 2
-tap SEL
-wait 30
-tap SEL
-wait 30
 expect page 5
 tap SEQ
 wait 50
 expect page 2
-tap ENV
+tap SEL
+wait 30
+tap SEL
 wait 30
 expect page 6
 tap SEQ
@@ -110,37 +104,43 @@ wait 50
 expect page 2
 tap ENV
 wait 30
+expect page 7
+tap SEQ
+wait 50
+expect page 2
 tap ENV
 wait 30
-expect page 7
+tap ENV
+wait 30
+expect page 8
 tap SEQ
 wait 50
 expect page 2
 tap EDIT
 wait 30
-expect page 11
+expect page 12
 tap SEQ
 wait 50
 expect page 2
 tap FX
 wait 30
-expect page 12
+expect page 13
 tap SEQ
 wait 50
 expect page 2
 tap GLO
 wait 30
-expect page 13
+expect page 14
 tap SEQ
 wait 50
 expect page 2
 # held for 700 ms: only the page, nothing said but BREAK, nothing else changed
 tap LFO
 wait 50
-expect page 8
+expect page 9
 tap LFO
 wait 50
-expect page 9
+expect page 10
 said LINE SEQ
 said_none
 press SEQ

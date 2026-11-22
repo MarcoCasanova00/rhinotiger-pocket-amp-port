@@ -19,22 +19,24 @@
  *                            (how often the kit changes on its own: at a drop, or a long groove's 32-bar block)
  *   4 BUILD (SEQ again)      the builds: K1 Type (AUTO, or one held), K2 Ending (their last bar's: AUTO, or one held),
  *                            K3 Length (2, 4, 8 bars)
- *   5 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body: short and tight, or long and full)
- *   6 BASS (SEL again)       K1..K4 Bite, Decay (how fast the bite closes), Length, Drive (as LINE's)
- *   7 PERC (ENV)             K1..K4 Hats, Open (the open hat's length), Clap, Tone (all of it brighter, darker)
- *   8 EVENTS (ENV again)     K1..K4 Density, Runs, Pitch (semitones), Spread (0 the middle; up, wider, and each
+ *   5 AUTO (SEQ, a third)    AUTO PLAY (auto.h), a set played as a DJ would: K1 on or off, K2 its minutes (30, 60, 90,
+ *                            endless), K3 its number (0: a new one each time)
+ *   6 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body: short and tight, or long and full)
+ *   7 BASS (SEL again)       K1..K4 Bite, Decay (how fast the bite closes), Length, Drive (as LINE's)
+ *   8 PERC (ENV)             K1..K4 Hats, Open (the open hat's length), Clap, Tone (all of it brighter, darker)
+ *   9 EVENTS (ENV again)     K1..K4 Density, Runs, Pitch (semitones), Spread (0 the middle; up, wider, and each
  *                            crossing to the other side)
- *   9 LINE (LFO)             K1..K4 Bite (the modulation's height), Decay (its fall), Length, Drive
- *  10 LINE SEQ (LFO again)   K1..K4 Density, Mutate, Range (how far the notes go up), Slide (how many)
+ *  10 LINE (LFO)             K1..K4 Bite (the modulation's height), Decay (its fall), Length, Drive
+ *  11 LINE SEQ (LFO again)   K1..K4 Density, Mutate, Range (how far the notes go up), Slide (how many)
  *                            On either LINE page LFO acts as it is let go (tapped: the next); held, the line's
  *                            phrase drawn anew from the next bar
- *  11 ATMOS (LFO, a third)   K1..K4 Colour, Air, Motion (its sway's speed; past the middle the sway also opens and
+ *  12 ATMOS (LFO, a third)   K1..K4 Colour, Air, Motion (its sway's speed; past the middle the sway also opens and
  *                            closes it, more), Depth (how far)
- *  12 MIX (EDIT)             K1 the track (the six parts, as the pages), K2 its level, K3 its send into the echo
+ *  13 MIX (EDIT)             K1 the track (the six parts, as the pages), K2 its level, K3 its send into the echo
  *                            (the kick and the bass: none, not shown), K4 its mute (right on, left off); a strip a
  *                            track, its meter, its level and its send
- *  13 ECHO (FX)              K1..K4 Feedback, Tone, Time, Level (the return)
- *  14 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme (the screen's colours and how they move: NEON,
+ *  14 ECHO (FX)              K1..K4 Feedback, Tone, Time, Level (the return)
+ *  15 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme (the screen's colours and how they move: NEON,
  *                            ACID, INFRA, ICE, MONO); K3 shows the audio's load (CPU); K4 MIDI in
  *                            (off by default); SAVE here keeps it all (tapped: as it is let go); held 1.5 s, every
  *                            knob of every page back where it began (the world's own sound: the knobs move from it),
@@ -63,11 +65,13 @@
 #include "logo.h"
 #include "face.h"
 
-#define SET_MAGIC 0x38544852u            /* "RHT8": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
+#define SET_MAGIC 0x39544852u            /* "RHT9": the settings record (2: the atmos's four; 3: the line's, 8 worlds;
                                           * 4: PHASE's four, the breaks' switch gone into BREAKS; 5: MIX's TOP; 6: the
                                           * percussion's and the line's sends, TOP gone; 7: the sounds' new eight; 8:
-                                          * BREAK's MORPH, the last: a 7's taken, MORPH at its default) */
+                                          * BREAK's MORPH, the last; 9: AUTO's two, after the parameters: a 7's and an
+                                          * 8's taken, what they lack at its default) */
 #define SET_MAGIC7 0x37544852u           /* "RHT7" */
+#define SET_MAGIC8 0x38544852u           /* "RHT8" */
 typedef struct {
     uint32_t magic;
     uint8_t world;
@@ -75,6 +79,7 @@ typedef struct {
     uint8_t theme;                       /* THEME (the screen's colours and their movement) */
     uint8_t flags;                       /* SET_MIDI */
     int16_t par[P_NPARAMS];
+    uint8_t auto_len, auto_set;          /* AUTO PLAY's: 30, 60, 90 minutes, without end; its set (0: a new one) */
 } settings_t;
 static settings_t set;
 #define SET_MIDI 2u                      /* MIDI in: notes throw events, start / stop / clock followed */
@@ -88,13 +93,14 @@ static const char *theme_name(int t);
 /* ------------------------------------------------------------------ audio --- */
 static float eng_l[APP_BLOCK], eng_r[APP_BLOCK];
 static float gain_now;                   /* glides to MASTER: no step at a block's edge */
+static volatile float au_fade = 1.0f;    /* AUTO PLAY's set ending (auto.h) */
 
 static volatile uint8_t boot_hold;       /* at boot, till the logo goes (or PLAY or MIDI's start, stop or continue):
                                          * the engine held, silent, so the play begins whole as the logo leaves */
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
     uint32_t i;
-    float gain = (float)master_q12 / 4096.0f * 8388000.0f;   /* MASTER, read once a block: the engine's 1.0 (its
+    float gain = au_fade * (float)master_q12 / 4096.0f * 8388000.0f;   /* MASTER, read once a block: the engine's 1.0 (its
                                                                 * limit) is full scale at the top */
     if (boot_hold) {                         /* the logo: silence, the engine not yet begun (it starts as it went) */
         for (i = 0; i < 2u * n; i++)
@@ -129,6 +135,8 @@ static void settings_defaults(void)
     set.theme = 0;                       /* NEON */
     for (p = 0; p < P_NPARAMS; p++)
         set.par[p] = ps_param(p)->def;
+    set.auto_len = 1;                    /* AUTO: 60 minutes, a new set */
+    set.auto_set = 0;
 }
 
 static void settings_apply(void)
@@ -144,18 +152,22 @@ void app_init(void)
 {
     int p, ok;
     ps_init();
-    {   /* (a 7's: one parameter fewer at the end, MORPH) */
+    {   /* (an 8's: without AUTO's two; a 7's: without MORPH too, the last parameter) */
         int n = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
-        ok = (n == (int)sizeof set && set.magic == SET_MAGIC) ||
-             (n == (int)(((uint32_t)((char *)&set.par[P_NPARAMS - 1] - (char *)&set) + 3u) & ~3u) &&
-              set.magic == SET_MAGIC7);
-        if (ok && set.magic == SET_MAGIC7) {
-            set.magic = SET_MAGIC;
+        uint32_t end8 = (uint32_t)((char *)&set.par[P_NPARAMS] - (char *)&set), end7 = end8 - (uint32_t)sizeof set.par[0];
+        int old7 = n == (int)((end7 + 3u) & ~3u) && set.magic == SET_MAGIC7,
+            old8 = n == (int)((end8 + 3u) & ~3u) && set.magic == SET_MAGIC8;
+        ok = old7 || old8 || (n == (int)sizeof set && set.magic == SET_MAGIC);
+        if (old7)
             set.par[P_MORPH] = ps_param(P_MORPH)->def;
+        if (old7 || old8) {
+            set.magic = SET_MAGIC;
+            set.auto_len = 1;
+            set.auto_set = 0;
         }
     }
     ok = ok && set.world < PS_NWORLD && set.lights <= 2u && set.theme < NTHEME &&
-         (set.flags & ~SET_MIDI) == 0u;
+         (set.flags & ~SET_MIDI) == 0u && set.auto_len < 4u && set.auto_set <= 99u;
     for (p = 0; ok && p < P_NPARAMS; p++)
         ok = set.par[p] >= ps_param(p)->lo && set.par[p] <= ps_param(p)->hi;
     if (!ok)
@@ -165,14 +177,14 @@ void app_init(void)
 }
 
 /* ------------------------------------------------------------------ pages --- */
-/* the pages in the panel's order: HOME the whole (MAIN, GROOVE); SEQ the sections (BREAK, BUILD); the top row's middle four the sounds (SEL the
+/* the pages in the panel's order: HOME the whole (MAIN, GROOVE); SEQ the sections (BREAK, BUILD) and AUTO PLAY (AUTO); the top row's middle four the sounds (SEL the
  * kick and the bass, ENV the percussion, LFO the line, EDIT the events and the atmos); FX the echo; GLO the global.
  * A button with two or three pages steps through them */
-enum { PG_MAIN, PG_GROOVE, PG_BREAK, PG_BUILD, PG_KICK, PG_BASS, PG_PERC, PG_EVENTS, PG_LINE, PG_LINE_SEQ, PG_ATMOS, PG_MIX,
+enum { PG_MAIN, PG_GROOVE, PG_BREAK, PG_BUILD, PG_AUTO, PG_KICK, PG_BASS, PG_PERC, PG_EVENTS, PG_LINE, PG_LINE_SEQ, PG_ATMOS, PG_MIX,
        PG_ECHO, PG_GLOBAL, NPAGE };
-static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "BREAK", "BUILD", "KICK", "BASS", "PERC", "EVENTS", "LINE",
+static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "BREAK", "BUILD", "AUTO", "KICK", "BASS", "PERC", "EVENTS", "LINE",
                                              "LINE SEQ", "ATMOS", "MIX", "ECHO", "GLOBAL"};
-static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEQ, B_SEL, B_SEL, B_ENV, B_ENV, B_LFO, B_LFO, B_LFO, B_EDIT,
+static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEQ, B_SEQ, B_SEL, B_SEL, B_ENV, B_ENV, B_LFO, B_LFO, B_LFO, B_EDIT,
                                         B_FX, B_GLO};
 /* MIX's tracks: the parts (PART_*), each its level, its send into the echo (-1: none, the kick's and the bass's low
  * end kept out of it) and its mute */
@@ -199,6 +211,7 @@ static int page_par(int p, int k)
         {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
         {P_BREAKS, P_BREAK_LEN, P_GAP, P_MORPH},         /* BREAK: the breaks, and the kit changing on its own */
         {-1, -1, P_BUILD_LEN, -1},                       /* BUILD: K1 the builds' type, K2 their ending, K3 their bars */
+        {-1, -1, -1, -1},                                /* AUTO: K1 on, K2 the set's minutes, K3 its number */
         {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, P_KICK_DECAY},   /* (the levels and the sends: MIX's) */
         {P_BASS_BITE, P_BASS_DECAY, P_BASS_LEN, P_BASS_DRIVE},   /* (as LINE's) */
         {P_HATS, P_PERC_OPEN, P_CLAP, P_HAT_TONE},   /* (TONE: all of it, the clap's too) */
@@ -357,6 +370,11 @@ static void page_button(int b)           /* a page's button: its first page, or 
     page_go(PAGE_BTN[ui.page] == b && p < NPAGE && PAGE_BTN[p] == b ? p : first);
 }
 
+#ifdef PLAT_HOST
+static uint8_t host_auto_log;            /* "autolog on" */
+#endif
+#include "auto.h"                        /* AUTO PLAY */
+
 /* the knobs of a page: K1..K4's names, values and positions ("": none) */
 static const char *knob_name(int page, int k)
 {
@@ -364,6 +382,8 @@ static const char *knob_name(int page, int k)
         return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "MIDI IN";
     if (page == PG_BUILD)
         return k == 0 ? "TYPE" : k == 1 ? "ENDING" : k == 2 ? "LENGTH" : "";
+    if (page == PG_AUTO)
+        return k == 0 ? "AUTO PLAY" : k == 1 ? "MINUTES" : k == 2 ? "SET" : "";
     if (page == PG_MIX)
         return k == 0 ? "TRACK" : k == 1 ? "LEVEL" : k == 2 ? (TRACK_SEND[mix_track % NTRACK] < 0 ? "" : "SEND")
              : "MUTE";                   /* (no send: no SEND) */
@@ -427,6 +447,21 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
         *span = k == 0 ? PS_NBUILD - 1 : PS_NEND - 1;
         return;
     }
+    if (page == PG_AUTO && k < 3) {      /* AUTO PLAY: on, how long, which set (on: the one that plays) */
+        static const char *const LEN[AU_NLEN] = {"30", "60", "90", "ENDLESS"};
+        int n = au.on ? au.nset : set.auto_set, l = au.on ? au.len : set.auto_len;
+        if (k == 0)
+            str_put(t, 12, au.on ? "ON" : "OFF");
+        else if (k == 1)
+            str_put(t, 12, LEN[l]);
+        else if (n)
+            int_text(n, t);
+        else
+            str_put(t, 12, "NEW");
+        *pos = k == 0 ? au.on : k == 1 ? l : n;
+        *span = k == 0 ? 1 : k == 1 ? AU_NLEN - 1 : 99;
+        return;
+    }
     if (page == PG_MIX && k == 0) {      /* the track */
         str_put(t, 12, TRACK_NAME[mix_track % NTRACK]);
         *pos = mix_track;
@@ -449,8 +484,8 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
             return;
         }
         d = ps_param(p);
-        par_text(p, set.par[p], t);
-        *pos = set.par[p] - d->lo;
+        par_text(p, ps_get(p), t);       /* (AUTO PLAY's, while it holds it) */
+        *pos = ps_get(p) - d->lo;
         *span = d->hi - d->lo;
     }
 }
@@ -460,6 +495,18 @@ static uint8_t host_knobs_live;          /* "knobs live": the knobs' speed as th
 int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d)
 {
     (void)b, (void)c, (void)d;
+    if (!strcmp(cmd, "autolog")) {       /* AUTO PLAY, a line a bar (a probe's) */
+        host_auto_log = !strcmp(a, "on");
+        return 1;
+    }
+    if (!strcmp(cmd, "oldset")) {        /* the settings saved as an older version's (8, 7): a reboot takes them */
+        settings_t o = set;
+        int v7 = !strcmp(a, "7");
+        uint32_t end = (uint32_t)((char *)&o.par[P_NPARAMS - v7] - (char *)&o);
+        o.magic = v7 ? SET_MAGIC7 : SET_MAGIC8;
+        plat_store_save(OBJ_SETTINGS, &o, (end + 3u) & ~3u);
+        return 1;
+    }
     if (strcmp(cmd, "knobs"))
         return 0;
     host_knobs_live = !strcmp(a, "live");
@@ -503,6 +550,27 @@ static void knob_turn(int k, int32_t d)
         knob_value(page, k, t, &pos, &span);
         app_say(knob_name(page, k), t);
         return;
+    } else if (page == PG_AUTO) {        /* AUTO PLAY: on, off; its minutes and its set, while off */
+        if (k == 3)
+            return;
+        if (k == 0) {
+            if ((d > 0) == au.on)
+                return;
+            if (d > 0)
+                au_start();
+            else
+                au_stop(ps_playing());       /* (resting: all the hand's again) */
+            app_say("AUTO PLAY", !au.on ? "OFF" : ps_playing() ? "ON" : "PLAY: BEGIN");
+            return;
+        }
+        if (au.on) {
+            app_say("AUTO PLAY", "IS ON");
+            return;
+        }
+        if (k == 1)
+            set.auto_len = (uint8_t)clamp(set.auto_len + d, 0, AU_NLEN - 1);
+        else
+            set.auto_set = (uint8_t)clamp(set.auto_set + d, 0, 99);
     } else if (page == PG_MIX && k == 0) {   /* the track */
         int32_t tr = clamp(mix_track + d, 0, NTRACK - 1);
         if (tr == mix_track)
@@ -537,6 +605,13 @@ static void knob_turn(int k, int32_t d)
         }
         if (p < 0)
             return;
+        if (au_owns(p)) {                /* AUTO PLAY's: the hand's a while, the settings as they were */
+            if (!au_turn(p, step * d))
+                return;
+            knob_value(page, k, t, &pos, &span);
+            app_say(knob_name(page, k), t);
+            return;
+        }
         v = clamp(set.par[p] + step * d, pi->lo, pi->hi);
         if (v == set.par[p])
             return;
@@ -557,16 +632,19 @@ static void knob_turn(int k, int32_t d)
 
 static void world_step(int32_t d)
 {
-    set.world = (uint8_t)(((int32_t)set.world + d % PS_NWORLD + PS_NWORLD) % PS_NWORLD);
-    set_dirty = 1;
-    ps_world(set.world);
+    int w = (int)(((int32_t)ps_world_now() + d % PS_NWORLD + PS_NWORLD) % PS_NWORLD);
+    if (!au.on) {                        /* (AUTO PLAY: this chapter's, the settings as they were) */
+        set.world = (uint8_t)w;
+        set_dirty = 1;
+    }
+    ps_world(w);
     ui.msg_until = 0;                    /* no message: the header's own name changes, white a moment, the BPM stays */
     ui.world_until = plat_ms() + 400u;
     ui.redraw = 1;
     if (ann_on()) {
         char line[50];
         uint32_t k = str_put(line, sizeof line, "WORLD ");
-        str_put(line + k, sizeof line - k, ps_world_name(set.world));
+        str_put(line + k, sizeof line - k, ps_world_name(ps_world_now()));
         ann_say(line, 0, ANN_NOW);
     }
 }
@@ -588,6 +666,10 @@ static void knobs_default(void)          /* every page's knobs where they began 
         set.par[p] = ps_param(p)->def;
         ps_set(p, set.par[p]);
     }
+    set.auto_len = 1;
+    set.auto_set = 0;
+    if (au.on)                           /* (AUTO PLAY's as the set has them) */
+        au_push();
     set_dirty = 1;
     app_say("DEFAULTS", "SAVE: KEEP IT");
 }
@@ -1092,15 +1174,15 @@ static void draw_header(uint32_t now)
     } else {
         uint32_t tick = ps_ui.tick, beat = tick / PS_TPB % 4u;
         if (now < ui.world_until)            /* just turned to */
-            cv_text(10, 6, &FONT_B, ps_world_name(set.world), C_WHITE);
+            cv_text(10, 6, &FONT_B, ps_world_name(ps_world_now()), C_WHITE);
         else if (ps_playing()) {             /* the world's name, a rainbow drifting with the hues and flowing to the
                                               * right with the beat: a sextant a beat, most of it as the beat lands */
             float f = (float)(tick % PS_TPB) / (float)PS_TPB, e = 1.0f - (1.0f - f) * (1.0f - f) * (1.0f - f);
             int32_t flow = (int32_t)(((float)(tick / PS_TPB % 6u) + e) * (float)(HUE_FULL / 6));   /* (round in six) */
-            text_rainbow(10, 6, &FONT_B, ps_world_name(set.world), HUE_MAGENTA + hue.shift - flow, -70, 150, 255);
+            text_rainbow(10, 6, &FONT_B, ps_world_name(ps_world_now()), HUE_MAGENTA + hue.shift - flow, -70, 150, 255);
         }
         else
-            cv_text(10, 6, &FONT_B, ps_world_name(set.world), C_GRAY);
+            cv_text(10, 6, &FONT_B, ps_world_name(ps_world_now()), C_GRAY);
         int_text(ps_bpm(), t);
         x = 230 - text_w(&FONT_B, t) - 14;
         cv_text(x, 6, &FONT_B, t, C_WHITE);
@@ -1325,6 +1407,8 @@ static void draw_rule(void)
     }
     else if (ui.page == PG_GLOBAL && set_dirty)
         ctx = "SAVE: KEEP IT";
+    else if (au.on && (ui.page == PG_MAIN || ui.page == PG_BREAK || ui.page == PG_AUTO))
+        ctx = au_text();
     if (ctx)
         xs = cv_text(6, 0, &FONT_XS, ctx, C_AMB) + 6;
     else if (ui.page == PG_BUILD && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0) {   /* in a build: this
@@ -1518,6 +1602,7 @@ void app_frame(void)
 {
     uint32_t now = plat_ms();
     input();
+    au_tick();
     ann_tick(now);
     marks_update();
     hue_update();
@@ -1560,7 +1645,7 @@ void app_frame(void)
 int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "world"))
-        *got = set.world;
+        *got = ps_world_now();
     else if (!strcmp(what, "page"))          /* 0 MAIN .. 11 MIX, 12 GLOBAL (PG_*) */
         *got = ui.page;
     else if (!strcmp(what, "bar"))           /* bars since PLAY */
@@ -1609,6 +1694,20 @@ int app_expect(const char *what, int *got)
         *got = ps_take();
     else if (!strcmp(what, "rec"))           /* REC: 0, 1 armed (the next bar), 2 taking */
         *got = ps_rec_state();
+    else if (!strcmp(what, "autoplay"))      /* AUTO PLAY on */
+        *got = au.on;
+    else if (!strcmp(what, "chapter"))       /* its chapter, 0.. */
+        *got = au.cur;
+    else if (!strcmp(what, "auto_len"))      /* AUTO PLAY's minutes as the settings keep them, 0..3 */
+        *got = set.auto_len;
+    else if (!strcmp(what, "chapters"))
+        *got = au.nch;
+    else if (!strcmp(what, "au_min"))        /* its minutes */
+        *got = (int)(au.total + au.min);
+    else if (!strcmp(what, "root"))
+        *got = ps_root();
+    else if (!strcmp(what, "setworld"))      /* the world as the settings keep it */
+        *got = set.world;
     else if (!strcmp(what, "lines"))         /* the line's notes so far */
         *got = (int)ps_ui.hits[HIT_LINE];
     else if (!strcmp(what, "gap"))           /* GAP: 1 its beat silent now, 2 cued */

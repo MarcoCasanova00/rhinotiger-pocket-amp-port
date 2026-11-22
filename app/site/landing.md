@@ -5,8 +5,8 @@
 RhinoTiger is a generative psytrance firmware for the M-VAVE FM-1, from dark psy to hi-tech. It plays by itself, and
 you steer it: four macro knobs, a mixer with mutes, and keys that throw one-shot sounds into the music. A rolling FM
 bass, percussion, a repeating line, zaps and gurgles, and an atmosphere under it all; breaks, builds and drops that
-come on their own or when you call them; sixteen effects to play on the keys; and eight worlds, from slow and wet to
-fast and fine.
+come on their own or when you call them; sixteen effects to play on the keys; eight worlds, from slow and wet to fast and
+fine; and AUTO PLAY, which plays a whole set through them by itself.
 
 ![RhinoTiger playing: COLD SIGNAL at 152, the five lanes of the bar and the four macros](manual/img/screen-playing.png "RhinoTiger on the FM-1's screen")
 

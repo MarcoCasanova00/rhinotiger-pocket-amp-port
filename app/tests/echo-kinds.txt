@@ -7,7 +7,7 @@ jack in
 wait 600
 tap FX
 wait 30
-expect page 12
+expect page 13
 expect echo_kind 0
 listen
 wait 1000
