@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The knobs' speed (as on the device: "knobs live"): a wide knob (0..100, FEEDBACK's 0..90) moves one a detent turned
+# slowly, two a detent under 80 ms apart, four under 35; the narrow ones one a detent however fast. MAIN's DRIFT
+# (param3, 50) and GROOVE's ROOT (param5, 0).
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+knobs live
+wait 600
+expect page 0
+expect param3 50
+# slowly: one a detent
+turn K4 1 300
+expect param3 51
+turn K4 3 300
+expect param3 54
+turn K4 -2 300
+expect param3 52
+# quicker (60 ms apart): two a detent but the first (the knob still)
+wait 400
+turn K4 4 60
+expect param3 59
+# fast (20 ms apart): four a detent but the first
+wait 400
+turn K4 -5 20
+expect param3 42
+# a narrow knob, fast: one a detent
+tap HOME
+wait 30
+expect page 1
+turn K2 3 20
+expect param5 3
+# a spin (a script's, all at once): one a detent
+tap HOME
+wait 30
+spin K4 5
+wait 30
+expect param3 47

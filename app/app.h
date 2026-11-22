@@ -30,3 +30,7 @@ void app_say(const char *a, const char *b);   /* a short message on the screen a
 /* the host simulator's checks: world, page, bar, playing, dirty, section, drops, colour, auto, lines, muted, fx, lights, bpm, events, thrown, paramN, engineN */
 #define APP_HOST_EXPECT
 int app_expect(const char *what, int *got);
+/* the host simulator's commands: "knobs live" (the wide knobs faster as they turn faster, as on the device) or
+ * "knobs fixed" (the scripts' default: two a detent on the 0..100 ones, one on the rest, however fast) */
+#define APP_HOST_CMD
+int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d);

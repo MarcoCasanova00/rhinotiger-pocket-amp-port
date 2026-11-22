@@ -452,11 +452,24 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
     }
 }
 
+#ifdef PLAT_HOST
+static uint8_t host_knobs_live;          /* "knobs live": the knobs' speed as the device's (else fixed) */
+int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d)
+{
+    (void)b, (void)c, (void)d;
+    if (strcmp(cmd, "knobs"))
+        return 0;
+    host_knobs_live = !strcmp(a, "live");
+    return 1;
+}
+#endif
+
 static void knob_turn(int k, int32_t d)
 {
     int page = ui.page;
     char t[16];
     int32_t pos, span;
+    uint32_t since = plat_ms() - ui.turned_at[k];   /* (since its last detent: how fast it turns) */
     ui.turned_at[k] = plat_ms();
     ui.redraw = 1;
     if (page == PG_GLOBAL) {
@@ -506,8 +519,19 @@ static void knob_turn(int k, int32_t d)
     } else {
         int p = page_par(page, k);
         const ps_param_t *pi = ps_param(p < 0 ? 0 : p);
-        int step = pi->hi - pi->lo >= 100 ? 2 : 1;   /* 0..100 two a detent, the rest (tempo, root, ...) one */
+        int step = 1;                    /* one a detent; the wide ones (0..100, FEEDBACK's 0..90) faster as they turn
+                                          * faster: two a detent under 80 ms apart, four under 35 */
         int32_t v;
+        if (pi->hi - pi->lo >= 50) {
+            uint32_t per = (since > 250u ? 250u : since) / (uint32_t)(d < 0 ? -d : d);
+            step = per < 35u ? 4 : per < 80u ? 2 : 1;
+#ifdef PLAT_HOST
+            if (!host_knobs_live)        /* (the scripts' default: as they were, two a detent on 0..100) */
+                step = pi->hi - pi->lo >= 100 ? 2 : 1;
+            else if (plat_host_exact)    /* (live, a script's spin: one a detent) */
+                step = 1;
+#endif
+        }
         if (p < 0)
             return;
         v = clamp(set.par[p] + step * d, pi->lo, pi->hi);

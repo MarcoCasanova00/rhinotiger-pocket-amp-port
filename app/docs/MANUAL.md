@@ -117,7 +117,7 @@ while the keys' loop plays. Lights, on the global page, sets how bright the glow
 | GLO | Goes to GLOBAL. |
 | PRESETS | Picks the world. Eight worlds. The new one begins from the next bar. |
 | ALGORITHM | Picks a type, for the page you are on (see below). |
-| K1 to K4 | The four knobs of the page that is shown. Knobs that run from 0 to 100 move two at a step. |
+| K1 to K4 | The four knobs of the page that is shown. Knobs with a wide range (0 to 100, and FEEDBACK) move one at a step when turned slowly, and two or four at a step when turned faster. |
 | PLAY | Plays, or rests. After a rest it begins again from the top. |
 | SAVE | On GLOBAL: tap to keep everything, hold for 1.5 seconds for the defaults (see 10. Saving). On other pages: calls a break (see 8. Sections). |
 | ARP | Calls a build, then the drop (see 8. Sections). |
