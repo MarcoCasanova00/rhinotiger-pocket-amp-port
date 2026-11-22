@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# REC is the keys' loop: tapped, it is armed, and from the next bar the keys' throws are taken (each at its tick of
-# two bars); after the two bars they play again each time round. Tapped while armed: not armed; tapped while taking:
-# done there, it loops. Held: the loop gone. PLAY's rest clears it. COLD SIGNAL, 152: a bar is 1.58 s, the loop 3.16 s.
+# REC is the keys' loop: tapped, it is armed, and from the next bar the keys' throws are taken (each at its tick),
+# four bars at most; tapped while taking, the take ends with that bar, the loop as long as the bars till then. Then it
+# plays again each time round. Tapped while armed: not armed. Held: the loop gone. PLAY's rest clears it.
+# COLD SIGNAL, 152: a bar is 1579 ms. Each part begins with PLAY (a rest, then again): the bars from there.
 wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 jack in
 listen
-wait 3000
+wait 1000
 # the generator's events quiet (EVENTS density 0), so what sounds after is the loop's
 tap ENV
 wait 30
@@ -15,15 +16,18 @@ wait 30
 turn K1 -30
 wait 30
 expect param21 0
-wait 400
 expect take 0
 expect rec 0
-# tapped: armed till the next bar (at most a bar), then two bars taken
+# four bars, left to run: armed till bar 1 (1579), taken till bar 5 (7895)
+tap PLAY
+wait 100
+tap PLAY
+wait 200
 tap REC
 wait 30
 said REC NEXT BAR
 expect rec 1
-wait 1620
+wait 1470
 expect rec 2
 tapkey w0
 wait 300
@@ -33,15 +37,23 @@ tapkey w14
 wait 30
 expect take 3
 expect throws 3
-# the take done (at most a bar and two after the tap): it loops, the keys no more taken
-wait 2800
+expect events 3
+wait 1500
+expect rec 2
+wait 3800
+expect events 3
+wait 300
 expect rec 0
 expect take 3
 expect events >2
-expect events <7
-wait 3160
-expect events >5
-expect events <10
+expect events <5
+# it loops four bars: once round after it (the keys at 121, 421, 721 ms into its first bar), not again two bars on, again four on
+wait 1000
+expect events 6
+wait 3000
+expect events 6
+wait 3200
+expect events 9
 expect throws 3
 tapkey w3
 wait 300
@@ -55,22 +67,52 @@ expect take 0
 release REC
 wait 50
 expect rec 0
-# tapped while taking: done there, what it took loops
-tap REC
-wait 1650
-expect rec 2
-tapkey w2
+# REC again in the second bar (3158..4737): a loop of two
+tap PLAY
 wait 100
+tap PLAY
+wait 200
+tap REC
+wait 1600
+tapkey w2
+wait 1700
 tap REC
 wait 30
-said REC LOOPING
+said REC 2 BARS
+expect rec 2
+wait 1400
 expect rec 0
 expect take 1
+# REC again in the first bar: a loop of one
+tap PLAY
+wait 100
+tap PLAY
+wait 200
+tap REC
+wait 1600
+tapkey w2
+wait 200
+tap REC
+wait 30
+said REC 1 BAR
+wait 1400
+expect rec 0
+expect take 1
+# tapped twice: armed, then not
+tap PLAY
+wait 100
+tap PLAY
+wait 200
+tap REC
+wait 30
+expect rec 1
+tap REC
+wait 30
+said REC OFF
+expect rec 0
+wait 1700
+expect rec 0
 # a take with a rhythm: a black key held, a white key with it, throws on its beats
-press REC
-wait 600
-said REC CLEARED
-release REC
 tap REC
 wait 1650
 expect rec 2
@@ -89,21 +131,6 @@ wait 200
 expect playing 0
 expect take 0
 expect rec 0
-# tapped twice (a bar from PLAY, far from its next): armed, then not
-tap PLAY
-wait 200
-tap REC
-wait 30
-expect rec 1
-tap REC
-wait 30
-said REC OFF
-expect rec 0
-wait 1700
-expect rec 0
-tap PLAY
-wait 200
-expect playing 0
 # a key a sixteenth early (a bar from PLAY, less 50 ms) begins the take with it
 tap PLAY
 wait 30
@@ -114,4 +141,8 @@ wait 1490
 tapkey w9
 wait 10
 expect rec 2
+expect take 1
+tap REC
+wait 1600
+expect rec 0
 expect take 1

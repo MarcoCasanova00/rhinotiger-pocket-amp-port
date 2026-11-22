@@ -102,27 +102,45 @@ static struct {
     int last_type;                     /* the latest thrown (the host's checks) */
 } ev;
 
-#define TAKE_TICKS (8u * TPB)          /* the keys' loop: two bars */
+#define TAKE_BARS 4u                   /* the keys' loop: at most four bars (REC again: the bars till then) */
 #define TAKE_N 96u
 static struct {
     struct {
         recipe_t r;
-        uint8_t pos;                   /* its tick in the two bars */
+        int16_t pos;                   /* its tick in the loop (taking: from its first bar, a key early below 0) */
         uint8_t bite;                  /* x100 */
     } e[TAKE_N];
     uint8_t n;
     uint8_t arm;                       /* REC tapped: a take from the next bar */
     uint8_t rec;                       /* the take going: the throws go in, till end */
-    uint32_t end;                      /* (s.tick) */
+    uint32_t start, end;               /* (s.tick) its first bar's, and where it ends (four bars on, or REC again:
+                                        * the bar's end) */
+    uint32_t len;                      /* the loop's ticks, once taken */
 } take;
 
-/* a take begins: the loop before gone, two bars from the bar at or after tick t */
+/* a take begins: the loop before gone, from the bar at or after tick t, four bars at most */
 static void take_begin(uint32_t t)
 {
     take.n = 0;
     take.arm = 0;
     take.rec = 1;
-    take.end = (t + TPBAR - 1u) / TPBAR * TPBAR + TAKE_TICKS;
+    take.start = (t + TPBAR - 1u) / TPBAR * TPBAR;
+    take.end = take.start + TAKE_BARS * TPBAR;
+}
+
+/* REC tapped while taking: it ends with this bar (the bars till then, the loop's length) */
+static void take_close(void)
+{
+    uint32_t e = (s.tick < take.start ? take.start : s.tick) / TPBAR * TPBAR + TPBAR;
+    if (e < take.end)
+        take.end = e;
+}
+
+/* the tick's place in the take (taking: from its first bar; looping: round its length) */
+static int32_t take_pos(void)
+{
+    int32_t p = (int32_t)(s.tick - take.start);
+    return take.rec ? p : (int32_t)((s.tick - take.start) % take.len);
 }
 
 static int key_black(int k) { int pc = (k + 5) % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
@@ -458,7 +476,8 @@ static void key_throw(int k, int stepped)   /* key k's sound now (its cycle on; 
     if (take.arm && TPBAR - s.tick % TPBAR <= 6u)   /* armed, a key a sixteenth early: the take begins with it */
         take_begin(s.tick);
     {   /* the keys' loop: the same sound on the same tick already in it (a key held round again): it plays, once */
-        uint32_t pos = s.tick % TAKE_TICKS, i;
+        int32_t pos = take.n || take.rec ? take_pos() : 0;
+        uint32_t i;
         for (i = 0; i < take.n; i++)
             if (take.e[i].pos == pos && take.e[i].r.snd == r.snd && take.e[i].r.note == r.note)
                 break;
@@ -466,7 +485,7 @@ static void key_throw(int k, int stepped)   /* key k's sound now (its cycle on; 
             ev_start(&r, bite, 1.0f);
             if (take.rec && take.n < TAKE_N) {   /* into the keys' loop, where it fell */
                 take.e[take.n].r = r;
-                take.e[take.n].pos = (uint8_t)pos;
+                take.e[take.n].pos = (int16_t)pos;
                 take.e[take.n].bite = (uint8_t)(bite * 100.0f);
                 take.n++;
             }
@@ -484,8 +503,14 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
     if (t == 0u && pos16 % 16u == 0u && bar % 8u == 0u)   /* a phrase's first tick */
         ev_phrase(bar);
     ev.density = (uint8_t)ev_density_now(w);
-    if (take.rec && s.tick >= take.end)   /* the take's two bars done: it loops */
+    if (take.rec && s.tick >= take.end) {   /* the take's bars done: it loops, so long (a key early: at its end) */
+        uint32_t i;
         take.rec = 0;
+        take.len = take.end - take.start;
+        for (i = 0; i < take.n; i++)
+            if (take.e[i].pos < 0)
+                take.e[i].pos = (int16_t)(take.e[i].pos + (int32_t)take.len);
+    }
     if (take.arm && s.tick % TPBAR == 0u)   /* armed: the take begins with the bar */
         take_begin(s.tick);
     for (k = 0; k < 4; k++)
@@ -494,8 +519,9 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
             ev.run[k].wait = ev.run[k].step;
             ev.run[k].left--;
         }
-    if (take.n) {                      /* the keys' loop (before the keys: a throw taken now plays next time round) */
-        uint32_t pos = s.tick % TAKE_TICKS, i;
+    if (take.n && !take.rec) {         /* the keys' loop (before the keys: a throw taken now plays next time round) */
+        int32_t pos = take_pos();
+        uint32_t i;
         for (i = 0; i < take.n; i++)
             if (take.e[i].pos == pos) {
                 ev_start(&take.e[i].r, (float)take.e[i].bite / 100.0f, 1.0f);

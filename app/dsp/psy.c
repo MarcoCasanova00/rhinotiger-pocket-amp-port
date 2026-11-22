@@ -681,6 +681,13 @@ void ps_gap(void) { cmd_post((uint32_t)CMD_GAP << 16); }
 void ps_rec(int on) { cmd_post((uint32_t)CMD_REC << 16 | (uint32_t)(on != 0)); }
 int ps_take(void) { return take.n; }
 int ps_rec_state(void) { return take.rec ? 2 : take.arm ? 1 : 0; }
+int ps_rec_bar(int *of)
+{
+    uint32_t st = take.start, en = take.end, t = s.tick;
+    if (of)
+        *of = (int)((en - st) / TPBAR);
+    return t < st ? 1 : (int)((t - st) / TPBAR) + 1;
+}
 
 static void cmd_do(uint32_t c)         /* (render, as a block begins) */
 {
@@ -712,12 +719,12 @@ static void cmd_do(uint32_t c)         /* (render, as a block begins) */
         if ((c >> 8 & 7u) < NPART && (c & 7u) < ntypes((int)(c >> 8 & 7u)))
             s.type[c >> 8 & 7u] = (uint8_t)(c & 7u);
         break;
-    case CMD_REC:                      /* 1 (a tap): armed, from the next bar (armed: not; taking: done, it loops);
-                                        * 0 (held): the loop gone */
+    case CMD_REC:                      /* 1 (a tap): armed, from the next bar (armed: not; taking: it ends with the
+                                        * bar, the loop so long); 0 (held): the loop gone */
         if (!(c & 1u))
             take.n = take.arm = take.rec = 0;
         else if (take.rec)
-            take.rec = 0;
+            take_close();
         else
             take.arm = (uint8_t)!take.arm;
         break;

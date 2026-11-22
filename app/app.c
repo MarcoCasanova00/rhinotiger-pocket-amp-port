@@ -43,9 +43,9 @@
  * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
  * those heard another type as the next bar begins, more turns more parts, and the groove another shape for four
  * bars, GROOVE's staying; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC tapped:
- * the keys' throws taken into a loop of two bars from the next bar (blinking on the eighths till then, on the beats
- * while it takes; a key a sixteenth early begins it; tapped again: armed, not; taking, done there), then it loops,
- * lit; held: the loop gone.
+ * the keys' throws taken into a loop from the next bar, four bars at most (blinking on the eighths till then, on the
+ * beats while it takes, the rule counting its bars; a key a sixteenth early begins it; tapped again: armed, not;
+ * taking, it ends with that bar, the loop as long as its bars), then it loops, lit; held: the loop gone.
  * SAVE and ARP, side by side, the sections (but on GLOBAL, where SAVE keeps the settings): SAVE down, a break from
  * the next bar (in a break or a build: nothing); ARP up, a build from the next bar (from the groove or a break), the
  * drop after it (in a build: the drop at the next bar); ARP held, the drop at the next bar. SAVE lit in a break, ARP
@@ -830,9 +830,14 @@ static void input(void)
         ps_rec(0);
         app_say("REC", "CLEARED");
     } else if ((up & 1u << B_REC) && !ui.rec_held) {
-        int st = ps_rec_state();
+        int st = ps_rec_state(), of, b = ps_rec_bar(&of);
+        char t[8] = "1 BAR";
         ps_rec(1);
-        app_say("REC", st == 2 ? "LOOPING" : st == 1 ? "OFF" : "NEXT BAR");
+        if (st == 2 && b > 1) {              /* taking: it ends with this bar, a loop of its bars */
+            t[0] = (char)('0' + (b < of ? b : of));
+            memcpy(t + 1, " BARS", 6);
+        }
+        app_say("REC", st == 2 ? t : st == 1 ? "OFF" : "NEXT BAR");
     }
     if ((down & 1u << B_LFO) && (ui.page == PG_LINE || ui.page == PG_LINE_SEQ)) {   /* LFO on LINE: tap or hold */
         ui.lfo_at = plat_ms();
@@ -1307,9 +1312,17 @@ static void draw_lanes(uint32_t now)
 static void draw_rule(void)
 {
     const char *ctx = 0, *name = PAGE_NAME[ui.page];
+    static char rec_t[16];
     int32_t xd = 231 - NPAGE * 5, xt = xd - 6 - text_w(&FONT_XS, name), xs = 0, i;
-    if (ps_rec_state())
-        ctx = ps_rec_state() == 1 ? "REC: NEXT BAR" : "REC: THE KEYS";
+    if (ps_rec_state() == 1)
+        ctx = "REC: NEXT BAR";
+    else if (ps_rec_state() == 2) {          /* taking: its bar, of its bars */
+        int of, b = ps_rec_bar(&of);
+        memcpy(rec_t, "REC: BAR 1/4", 13);
+        rec_t[9] = (char)('0' + (b > 9 ? 9 : b));
+        rec_t[11] = (char)('0' + of);
+        ctx = rec_t;
+    }
     else if (ui.page == PG_GLOBAL && set_dirty)
         ctx = "SAVE: KEEP IT";
     if (ctx)

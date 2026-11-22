@@ -79,7 +79,7 @@ At the bottom are the four knobs, each with its name, its value and a thin bar. 
 up. Above them runs a rule, and on the rule sits a short strip: the name of the page you are on, and a row of 14 small
 bars, one for each page, with the shown one lit. Turn SELECT to walk through the pages one by one, or press a button to
 jump to its page. At the left of the rule is whatever the page can be set to by ALGORITHM, shown by name (see 4.
-Controls), or what needs saying: `REC: NEXT BAR` and `REC: THE KEYS` while REC is waiting and taking, and `SAVE: KEEP IT` on GLOBAL when something is not saved.
+Controls), or what needs saying: `REC: NEXT BAR` while REC waits and `REC: BAR 1/4` while it takes, and `SAVE: KEEP IT` on GLOBAL when something is not saved.
 
 Between the two is the page itself. On most pages it is the same picture, the lanes. There are five rows, KICK,
 BASS, PERC, EVENTS and LINE, and each shows the bar that is playing, one cell for every sixteenth: a taller block is a
@@ -121,7 +121,7 @@ quickly while it waits for the next bar, on the beats while it takes, and is lit
 | PLAY | Plays, or rests. After a rest it begins again from the top. |
 | SAVE | On GLOBAL: tap to keep everything, hold for 1.5 seconds for the defaults (see 10. Saving). On other pages: calls a break (see 8. Sections). |
 | ARP | Calls a build, then the drop (see 8. Sections). |
-| REC | Tap it and, from the next bar, what the keys throw is taken into a loop of two bars. Hold it and the loop is gone (see 6. The keys). |
+| REC | Tap it and, from the next bar, what the keys throw is taken into a loop of up to four bars; tap again to end it sooner. Hold it and the loop is gone (see 6. The keys). |
 | OCT− · OCT+ | Move the octave of the keys' sounds, one octave at a time, from one down to two up. OCT− lights while it is below 0, OCT+ while it is above. |
 | MASTER | The volume. |
 | Keys | Throw sounds into the music. On the ECHO page they are the performance instead. |
@@ -473,14 +473,17 @@ of the event's name.
 **OCT− and OCT+** move the octave of all of it, from one octave down to two up. The header says OCTAVE and the
 number.
 
-**REC.** Tap REC and it waits for the next bar: the rule says `REC: NEXT BAR` and REC blinks quickly. From that bar,
-for two bars, the rule says `REC: THE KEYS` and REC blinks on the beats: what the keys throw goes into a loop, each
-where it fell. A key played just before the bar begins counts as its first. After the two bars the loop plays on, again
-and again, and REC is lit. Tap REC again for a new take: from the next bar the old loop is gone and the new one is
-taken. Tap it while it waits and it doesn't (`OFF`); tap it while it takes and the take ends there and loops
-(`LOOPING`). Hold REC and the loop is gone (`CLEARED`). Resting with PLAY clears it too.
+**REC.** Tap REC and it waits for the next bar: the rule says `REC: NEXT BAR` and REC blinks quickly. From that bar
+REC blinks on the beats and what the keys throw goes into a loop, each where it fell; the rule counts the bars,
+`REC: BAR 1/4` up to `4/4`. A key played just before the bar begins counts as its first. After four bars the loop plays
+on, again and again, and REC is lit. Tap REC while it takes and the take ends with that bar: the loop is as many bars
+as you played, one to four (the message says how many, `2 BARS`), and the rule's count shows where it will end. A
+loop of three bars drifts against the groove's fours.
 
-![A take: REC: THE KEYS at the left of the rule, SPRING at the lower right](img/screen-rec.png "A take, a key thrown")
+Tap REC again for a new take: from the next bar the old loop is gone and the new one is taken. Tap it while it waits
+and it doesn't (`OFF`). Hold REC and the loop is gone (`CLEARED`). Resting with PLAY clears it too.
+
+![A take: REC: BAR 1/4 at the left of the rule, SPRING at the lower right](img/screen-rec.png "A take, a key thrown")
 
 ---
 
