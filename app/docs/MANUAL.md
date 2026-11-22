@@ -252,8 +252,8 @@ the key, calls the breaks and the builds, and raises and lowers the music along 
 - AUTO PLAY: right for ON, left for OFF. OFF.
 - MINUTES: how long the set is: 30, 60, 90, or ENDLESS. 60.
 - SET: which set. Each number from 1 to 99 is a plan of its own: the worlds, the tempos, the keys, where it rises and
-  falls. The same number and the same MINUTES plan the same set again; the sounds in it still come out different each
-  time. NEW takes another number each time, and shows it while the set plays. NEW.
+  falls. Started from rest, the same number and the same MINUTES plan the same set again; the sounds in it
+  still come out different each time. NEW takes another number each time, and shows it while the set plays. NEW.
 
 Turn it on while the music rests and the set waits at its beginning for PLAY. Turn it on while the music plays and the
 set goes on from there. MINUTES and SET can be turned only while it is off. On MAIN, BREAK and AUTO the rule shows how
@@ -261,6 +261,7 @@ many minutes have gone.
 
 A set is made of chapters of some minutes each. A new chapter comes in on a drop, with its world and its key. The tempo
 glides all the way through. A set of 30, 60 or 90 minutes ends in a break that fades out, and then the music rests.
+ARP in that last break calls the music back: AUTO PLAY turns off and it goes on.
 
 You can play along. What you turn of what the set moves (the four knobs of MAIN, TEMPO, ROOT, BREAKS, the LENGTH of
 builds) stays yours for 32 bars, then goes back to the set: ROOT at the next chapter, the rest by degrees. A world you

@@ -277,9 +277,7 @@ static void au_stop(int keep)            /* off: keep, the music goes on, the kn
         ps_set(k, set.par[k]);
     ps_world(set.world);
     ps_auto_root(0);
-    ps_auto_bpm(0.0f);
-    if (keep)
-        au_fade = 1.0f;
+    ps_auto_bpm(0.0f);                   /* (a fade: au_tick brings it back) */
 }
 
 /* a knob of the set's turned by hand: from where it stands, the hand's a while */
@@ -288,7 +286,7 @@ static int au_turn(int p, int step)
     int v, w = ps_world_now();
     au.hold[p] = au.bar + AU_HOLD;
     if (p == P_TEMPO) {
-        au.bpm = fm_clampf(au.bpm + (float)step, (float)ps_world_bpm(w) - 20.0f, (float)ps_world_bpm(w) + 20.0f);
+        au.bpm = fm_clampf(au.bpm + (float)step, 125.0f, 206.0f);   /* (all the worlds' reach) */
         au.bpm = (float)(int)(au.bpm + 0.5f);
         au_push();
         return 1;
@@ -414,6 +412,8 @@ static void au_tick(void)                /* each frame */
         au_rested = 0;
         au_fade = 1.0f;
     }
+    if (!au.on && !au_rested && au_fade < 1.0f)   /* (the last break left by hand: back in a second or so) */
+        au_fade = fm_clampf(au_fade + 0.015f, 0.0f, 1.0f);
     if (!au.on)
         return;
     if (!ps_playing()) {                 /* resting: the set waits at its beginning */
