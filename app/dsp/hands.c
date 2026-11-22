@@ -16,6 +16,8 @@ static volatile uint32_t aq_w, aq_r;
 static ps_motif_t ag_mot[2];           /* the UI fills the one not handed over last */
 static volatile uint8_t ag_mot_w;
 static uint32_t ag_thrown;             /* (the host's checks) */
+static uint32_t ag_lit[16];            /* each sound's latest throw (its tick + 1; 0 none): the keys' lights */
+static uint8_t ag_do;                  /* for the screen: 1 half time, 2 a fill, 4 a gap, now */
 
 static void aq_post(const ps_ag_t *g)
 {
@@ -48,6 +50,9 @@ static void ag_none(void)
     uint32_t k;
     for (k = 0; k < AG_N; k++)
         ag[k].t1 = 0;
+    for (k = 0; k < 16u; k++)
+        ag_lit[k] = 0;
+    ag_do = 0;
     fx.auto_held = 0;
     fx.auto_key = -1;
     fx.auto_out = fx.auto_half = 0;
@@ -114,6 +119,7 @@ static void ag_throw(uint32_t snd, int semi, float bite, uint32_t i)   /* a whit
     ev.live_next = 2;
     ev_start(&r, bite, 0.85f);
     ag_thrown++;
+    ag_lit[snd & 15u] = s.tick + 1u;
     ps_ui.hits[HIT_EVENT]++;
 }
 
@@ -121,7 +127,7 @@ static void ag_step(void)              /* a tick: what is on */
 {
     uint32_t t = s.tick, k, i, at = 0;
     uint16_t held = 0;
-    uint8_t out = 0, half = 0;
+    uint8_t out = 0, now = 0;
     int8_t key = -1;
     for (k = 0; k < AG_N; k++) {
         const ps_ag_t *g = &ag[k];
@@ -146,12 +152,14 @@ static void ag_step(void)              /* a tick: what is on */
             }
             break;
         case PS_AG_HALF:
-            half = 1;
+            now |= 1u;
             break;
         case PS_AG_FILL:
+            now |= 2u;
             fx.fill_req |= t == g->t0;
             break;
         case PS_AG_GAP:
+            now |= 4u;
             fx.gap_req |= t == g->t0;
             break;
         case PS_AG_THROW:
@@ -171,5 +179,15 @@ static void ag_step(void)              /* a tick: what is on */
     fx.auto_held = held;
     fx.auto_key = key;
     fx.auto_out = out;
-    fx.auto_half = half;
+    fx.auto_half = now & 1u;
+    ag_do = now;
+}
+
+static uint32_t ag_lights(void)        /* the sounds thrown just now, 1 << the white key's */
+{
+    uint32_t k, m = 0, t = s.tick;
+    for (k = 0; k < 16u; k++)
+        if (ag_lit[k] && t - ag_lit[k] < 5u)
+            m |= 1u << k;
+    return m;
 }

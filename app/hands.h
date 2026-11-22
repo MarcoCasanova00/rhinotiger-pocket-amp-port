@@ -248,12 +248,12 @@ static int hd_move(uint32_t e, int size, int last)
     case MV_STAIRS: hd_do(PS_AG_FX, HF_STAIRS, e - (size ? 48u : 24u), e, 0); return 1;
     case MV_TAPE: hd_do(PS_AG_FX, HF_TAPE, e - 48u, e, 0); return 1;
     case MV_BAND: hd_do(PS_AG_FX, HF_BAND, e - (size ? 96u : 48u), e, 0); return 0;
-    case MV_GAP: hd_do(PS_AG_GAP, 0, e - 24u, e - 23u, 0); return 1;
+    case MV_GAP: hd_do(PS_AG_GAP, 0, e - 24u, e, 0); return 1;
     case MV_KICK: hd_do(PS_AG_OUT, 1 << PART_KICK, e - (size ? 96u : 48u), e, 0); return 0;
     case MV_KB: hd_do(PS_AG_OUT, 1 << PART_KICK | 1 << PART_BASS, e - (size == 2 ? 96u : size ? 48u : 24u), e, 0); return 0;
     case MV_BASS: hd_do(PS_AG_OUT, 1 << PART_BASS, e - (size == 2 ? 192u : 96u), e, 0); return 0;
     case MV_HALF: hd_do(PS_AG_HALF, 0, e - (size == 2 ? 384u : 192u), e, 0); return 0;
-    case MV_FILL: hd_do(PS_AG_FILL, 0, e - 24u, e - 23u, 0); return 0;
+    case MV_FILL: hd_do(PS_AG_FILL, 0, e - 24u, e, 0); return 0;
     case MV_DUB: hd_do(PS_AG_FX, HF_DUB, e - (last ? 24u : 48u), last ? e + 192u : e, last ? PS_AG_BREAK : 0); return 0;
     case MV_WASH: hd_do(PS_AG_FX, HF_WASH, e - 24u, e + 192u, PS_AG_BREAK); return 0;
     case MV_FREEZE: hd_do(PS_AG_FX, HF_FREEZE, e - 24u, e + 192u, PS_AG_BREAK); return 0;

@@ -65,7 +65,7 @@ void ps_auto_bpm(float bpm);
 void ps_auto_root(int note);
 void ps_stage(int world, int root);    /* (world < 0: none after all) */
 /* and its hands (hands.c): things from a tick to a tick (since PLAY; t1 not in it) beside the player's own: an effect
- * (id: the grid's), parts out (id: 1 << PART_*), half time, a fill (t0 a beat), a gap (t0 a bar's last beat), a throw
+ * (id: the grid's), parts out (id: 1 << PART_*), half time, a fill (t0 a beat), a gap (t0 a bar's last beat; both a beat long), a throw
  * (id: a white key's sound 0..15, semi over the root's nearest, bite x100), a motif (id: ps_auto_motif's) over and
  * over. A section's change ends them, but PS_AG_BREAK's as a break begins, and PS_AG_DROP's that begin with a drop. */
 enum { PS_AG_FX, PS_AG_OUT, PS_AG_HALF, PS_AG_FILL, PS_AG_GAP, PS_AG_THROW, PS_AG_MOTIF, PS_AG_N };
@@ -191,7 +191,8 @@ int ps_stat(int which);                /* 0 events begun, 1 thrown and remembere
                                         * highest note (over the register), 6 sliding; 7 the parts out
                                         * while a black key is held (1 << PART_*); 8 GAP sounding (1), cued
                                         * (2), HALF held (4); AUTO PLAY's hands: 9 its effects (1 << the grid's), 10 its
-                                        * parts out, 11 its half time, 12 its throws so far */
+                                        * parts out, 11 half time (1), a fill (2), a gap (4) of its now, 12 its throws so
+                                        * far, 13 the white keys' sounds it throws just now, 1 << 0..15 */
 const char *ps_event_name(int type);
 int ps_rhythm(void);                   /* the black key held whose rhythm the white keys throw on (-1: none) */
 void ps_rec(int on);                   /* REC: tapped (1), a take of the keys from the next bar, four bars at most (again

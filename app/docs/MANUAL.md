@@ -266,8 +266,9 @@ glides all the way through. A set of 30, 60 or 90 minutes ends in a break that f
 ARP in that last break calls the music back: AUTO PLAY turns off and it goes on.
 
 Each chapter has a few sounds of its own and a short motif that comes back through it. The effects and the parts move
-mostly at the ends of phrases, and the ECHO page shows them as they do: the effect is lit, the part out is dark. Tap the
-part's black key there to bring it back.
+mostly at the ends of phrases, and while they do, the effects of the ECHO page are shown in place of the lanes: the effect is lit, the
+part out is dark. The page you are on stays, with its knobs, and so does what the keys do; touch anything and the page's own picture is back. The keys AUTO PLAY plays
+light up as if they were pressed. On the ECHO page, tap a dark part's black key to bring the part back.
 
 You can play along. What you turn of what the set moves (the four knobs of MAIN, TEMPO, ROOT, BREAKS, the LENGTH of
 builds) stays yours for 32 bars, then goes back to the set: ROOT at the next chapter, the rest by degrees. A world you

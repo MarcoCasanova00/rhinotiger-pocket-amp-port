@@ -247,6 +247,12 @@ static struct {
     uint32_t msg_until;
     uint32_t world_until;                /* PRESETS turned: the header's name white till (0: none) */
     uint32_t keys, btn;
+    uint32_t klit;                       /* the keys lit (the host's checks) */
+    uint32_t touched_at;                 /* the hand's latest touch (a key, a button, a knob) */
+    uint32_t au_at;                      /* AUTO PLAY's latest effect (or half time, fill, gap, the kick or the bass out) */
+    uint32_t au_tap[NPART];              /* a part out or back by AUTO PLAY: its key's light (0: none) */
+    uint8_t au_out;                      /* its parts out, as last seen */
+    uint8_t au_show;                     /* its effects on the screen: the grid's picture, whatever the page */
     uint32_t turned_at[4];               /* each knob's last turn (the strip lights it) */
     uint32_t last_draw;
     uint32_t seen[NHIT];                 /* the engine's counts as last drawn */
@@ -889,6 +895,46 @@ static void midi_poll(void)
     }
 }
 
+/* AUTO PLAY's hands as the keys they would press: its effects and throws the white keys, its half time, fill, gap and
+ * the kick and the bass out together the black keys of ECHO's; a part out or back, a tap of its key */
+static uint32_t au_keys(void)
+{
+    uint32_t now = plat_ms(), w = (uint32_t)(ps_stat(9) | ps_stat(13)), m = 0, b = 0, k;
+    int doing = ps_stat(11), out = ps_stat(10), low = 1 << PART_KICK | 1 << PART_BASS, i;
+    for (i = 0; i < NPART; i++)
+        if ((out ^ ui.au_out) >> i & 1 && !(low >> i & 1 && ((out & low) == low || (ui.au_out & low) == low)))
+            ui.au_tap[i] = now | 1u;
+    ui.au_out = (uint8_t)out;
+    for (i = 0; i < BK_FILL; i++)
+        if (ui.au_tap[BK_PART[i]]) {
+            if (now - ui.au_tap[BK_PART[i]] < 150u)
+                b |= 1u << i;
+            else
+                ui.au_tap[BK_PART[i]] = 0;
+        }
+    b |= (doing & 1 ? 1u << BK_HALF : 0u) | (doing & 2 ? 1u << BK_FILL : 0u) | (doing & 4 ? 1u << BK_GAP : 0u) |
+         ((out & low) == low ? 1u << BK_NOLOW : 0u);
+    for (k = 0; k < NKEYS; k++)
+        if ((key_black((int)k) ? b : w) >> key_place((int)k) & 1u)
+            m |= 1u << k;
+    return m;
+}
+/* its effects on the screen: the grid in the lanes' place, the page and its knobs as they are; two seconds after the last,
+ * not while the hand is at it (three seconds) */
+static void au_see(void)
+{
+    uint32_t now = plat_ms();
+    int on = ps_stat(9) || ps_stat(11) || (ps_stat(10) & (1 << PART_KICK | 1 << PART_BASS));
+    uint8_t show;
+    if (au.on && on)
+        ui.au_at = now | 1u;
+    show = (uint8_t)(au.on && ui.au_at && now - ui.au_at < 2000u && now - ui.touched_at >= 3000u && !grid_mode());
+    if (show != ui.au_show) {
+        ui.au_show = show;
+        ui.redraw = 1;
+    }
+}
+
 /* ------------------------------------------------------------------ input --- */
 static void input(void)
 {
@@ -984,11 +1030,17 @@ static void input(void)
     for (k = 0; k < NB; k++)                 /* the pages' buttons */
         if (down >> k & 1u)
             page_button((int)k);
-    if ((e = plat_enc(EN_SELECT)) != 0)
+    if ((e = plat_enc(EN_SELECT)) != 0) {
         page_go((int)ui.page + (int)e);
-    if ((e = plat_enc(EN_PRESET)) != 0)
+        ui.touched_at = plat_ms();
+    }
+    if ((e = plat_enc(EN_PRESET)) != 0) {
         world_step(e);
-    if ((e = plat_enc(EN_ALGO)) != 0 && ui.page == PG_GROOVE) {   /* GROOVE: the bass's shape */
+        ui.touched_at = plat_ms();
+    }
+    if ((e = plat_enc(EN_ALGO)) != 0)
+        ui.touched_at = plat_ms();
+    if (e != 0 && ui.page == PG_GROOVE) {   /* GROOVE: the bass's shape */
         int c = (ps_bass_shape_now() + (int)e % PS_NSHAPE + PS_NSHAPE) % PS_NSHAPE;
         ps_bass_shape(c);
         app_say("BASS", ps_bass_shape_name(c));
@@ -1019,8 +1071,12 @@ static void input(void)
         app_say("OCTAVE", ui.oct ? t : "0");
     }
     for (k = 0; k < 4; k++)
-        if ((e = plat_enc((int)(EN_K1 + k))) != 0)
+        if ((e = plat_enc((int)(EN_K1 + k))) != 0) {
             knob_turn((int)k, e);
+            ui.touched_at = plat_ms();
+        }
+    if (keys | btn | ui.keys | ui.btn)
+        ui.touched_at = plat_ms();
     if (keys != ui.keys || btn != ui.btn)
         ui.redraw = 1;
     ui.keys = keys;
@@ -1045,12 +1101,16 @@ static void input(void)
                 int pl = key_place((int)k);
                 if (!key_black((int)k) && pl % 4 == 0)
                     kdim |= 1u << k;
-                if (key_black((int)k) && pl < BK_FILL && !(ps_ui.muted >> BK_PART[pl] & 1u))
+                if (key_black((int)k) && pl < BK_FILL && !((ps_ui.muted | (unsigned)ps_stat(10)) >> BK_PART[pl] & 1u))
                     klit |= 1u << k;
             }
             if (glow)
                 glow = 2;
         }
+        klit |= au_keys();                   /* (those AUTO PLAY plays) */
+        if (ui.au_show)
+            lit |= 1u << B_FX;
+        ui.klit = klit;
         plat_lights(lit, klit, dim, kdim, glow);
     }
 }
@@ -1309,7 +1369,15 @@ static void draw_grid(void)
             cv_rect(c, 110, tw, 1, C_GRAY);
         c += tw + 10;
     }
-    cv_text(8, 126, &FONT_XS, "BLACK: MUTE  FILL HALF GAP  OUT  ALL", C_DIM);
+    {   /* the other black keys, lit while they work (the hand's or AUTO PLAY's) */
+        static const char *const T[9] = {"BLACK: MUTE  ", "FILL", " ", "HALF", " ", "GAP", "  ", "OUT", "  ALL"};
+        int st = ps_stat(8), doing = ps_stat(11), low = 1 << PART_KICK | 1 << PART_BASS,
+            on[9] = {0, doing & 2, 0, (st & 4) | (doing & 1), 0, st & 3, 0, ps_stat(7) || (ps_stat(10) & low) == low, 0};
+        for (i = 0, c = 8; i < 9; i++) {
+            cv_text(c, 126, &FONT_XS, T[i], on[i] ? C_WHITE : C_DIM);
+            c += text_w(&FONT_XS, T[i]);
+        }
+    }
     cv_blit(0, 32);
 }
 
@@ -1514,7 +1582,9 @@ static void draw(void)
 {
     uint32_t now = plat_ms();
     draw_header(now);
-    if (ui.page == PG_MIX)
+    if (ui.au_show)
+        draw_grid();
+    else if (ui.page == PG_MIX)
         draw_mix(now);
     else if (grid_mode())
         draw_grid();
@@ -1650,6 +1720,7 @@ void app_frame(void)
     uint32_t now = plat_ms();
     input();
     au_tick();
+    au_see();
     ann_tick(now);
     marks_update();
     hue_update();
@@ -1755,6 +1826,12 @@ int app_expect(const char *what, int *got)
         *got = ps_stat(10);
     else if (!strcmp(what, "hd_throws"))
         *got = ps_stat(12);
+    else if (!strcmp(what, "hd_do"))         /* half time (1), a fill (2), a gap (4) of its */
+        *got = ps_stat(11);
+    else if (!strcmp(what, "keys_lit"))      /* the keys lit, 1 << 0..26 */
+        *got = (int)ui.klit;
+    else if (!strcmp(what, "au_show"))       /* AUTO PLAY's effects on the screen */
+        *got = ui.au_show;
     else if (!strcmp(what, "perform"))
         *got = set.auto_perf;
     else if (!strcmp(what, "au_min"))        /* its minutes */

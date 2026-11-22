@@ -994,7 +994,7 @@ int ps_stat(int which)
         return s.gap | fx.gap_req << 1 | fx.half << 2;
     if (which >= 9)
         return which == 9 ? fx.auto_held | (fx.auto_key >= 0 ? 1 << fx.auto_key : 0) : which == 10 ? fx.auto_out
-               : which == 11 ? fx.auto_half : (int)ag_thrown;
+               : which == 11 ? ag_do : which == 12 ? (int)ag_thrown : (int)ag_lights();
     if (which <= 3)
         return which == 0 ? (int)ev.fired : which == 1 ? ev.nmem : which == 2 ? ev.last_type : (int)ln.drawn;
     for (i = 0; i < LN_STEPS; i++)     /* the line's steps as heard now: 4 on, 5 the highest note, 6 sliding */
