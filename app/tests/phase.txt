@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The PHASE page (SEQ): K1 BREAKS, K2 BREAK, K3 BUILD, K4 GAP. COLD SIGNAL, 152: a bar is about 1.58 s.
+# The PHASE page (SEQ): K1 BREAKS, K2 BREAK, K3 GAP (the builds' length: BUILD's K3). COLD SIGNAL, 152: a bar is about 1.58 s.
 # Breaks on their own come only as a 32-bar block begins, GAP bars after the last drop at least, with a chance that
 # grows with Drift and BREAKS. Part 1: BREAKS at 0, Drift and all the rest as high as they go for it: no break in 90 bars.
 # Part 2: BREAKS up, BREAK at 4 bars: the break at bar 96 lasts 4 bars (the world's would be 16), then its build, the drop.
@@ -19,7 +19,7 @@ spin K1 -30
 wait 30
 expect param36 0
 expect auto 0
-spin K4 -10
+spin K3 -10
 wait 30
 expect param39 0
 wait 5455

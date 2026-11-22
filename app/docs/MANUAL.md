@@ -156,7 +156,8 @@ world is as it is.
   the middle, brings in harsher notes and lets the line creep and reach higher. Lower is lighter and more open. 50.
 - DRIFT: how much changes by itself. Higher redraws more of the one-shot sounds at each phrase, lets the bass open and
   close further, rewrites more of the line, lets breaks come on their own more often (see 8. Sections), lets FILLS,
-  BUILD, BREAK and GAP stray more often from their lengths to the next one down or up (see GROOVE and PHASE). At 0 nothing
+  BREAK, GAP and a build's LENGTH stray more often from their lengths to the next one down or up (see GROOVE, PHASE and
+  BUILD). At 0 nothing
   moves by itself, no break comes on its own, and those lengths are exact; higher, the bass changes its type at more
   of the drops. 50.
 
@@ -187,23 +188,21 @@ K-B-B-B holds the roll; GALLOP holds a gallop; OFFBEAT holds an offbeat. The new
 
 ### 5.3 PHASE
 
-![The PHASE page: Breaks 50, Break WORLD, Build 4, Gap 64](img/screen-phase.png "PHASE")
+![The PHASE page: Breaks 50, Break WORLD, Gap 64](img/screen-phase.png "PHASE")
 
-SEQ. How the music moves through breaks, builds and drops by itself. Press SAVE and ARP to call them yourself (see 8.
+SEQ. The breaks: how the music moves through breaks, builds and drops by itself. Press SAVE and ARP to call them yourself (see 8.
 Sections).
 
 - BREAKS: how often a break comes on its own. At 0 it says CUED: a break comes only when you call it. Higher is more
   often, and DRIFT scales it. 50.
 - BREAK: how long a break that comes on its own usually lasts. WORLD leaves it to the world; or 4, 8, 16 or 32 bars.
   Now and then a break is half or twice as long, more often with DRIFT higher. WORLD.
-- BUILD: how long a build usually lasts: 2, 4 or 8 bars. Now and then a build is one step longer, and more rarely one
-  step shorter, both more often with DRIFT higher. 4.
 - GAP: the fewest bars between a drop and the next break that comes on its own: 32, 64, 96 or 128. After some drops it
   is one step shorter or longer, more often with DRIFT higher. 64.
 
 ### 5.4 BUILD
 
-![The BUILD page: Type AUTO, Ending AUTO](img/screen-buildpage.png "BUILD")
+![The BUILD page: Type AUTO, Ending AUTO, Length 4](img/screen-buildpage.png "BUILD")
 
 SEQ again. What kind of build comes, and how it ends. Every build has its riser.
 
@@ -211,6 +210,8 @@ SEQ again. What kind of build comes, and how it ends. Every build has its riser.
   one twice running. AUTO.
 - ENDING: what happens in the build's last bar (in FAKE, the bar before its short drop). AUTO chooses one of the others
   each time, never the same one twice running. AUTO.
+- LENGTH: how long a build usually lasts: 2, 4 or 8 bars. Now and then a build is one step longer, and more rarely one
+  step shorter, both more often with DRIFT higher. 4.
 
 While a build plays, the left of the rule says `NOW` and the type and ending it is playing, so you can tell what AUTO
 chose.

@@ -14,9 +14,10 @@
  *   1 MAIN (HOME)            the macros: K1..K4 Energy, Detail, Dark, Drift
  *   2 GROOVE (HOME again)    K1..K4 Tempo (the world's, moved), Root, Fills (how often), Sit out (how often a part
  *                            rests a phrase)
- *   3 PHASE (SEQ)            K1..K4 Breaks (how often one comes on its own; 0: only when cued), Break (its bars: the
- *                            world's, 4..32), Build (2, 4, 8 bars), Gap (bars after a drop before one comes on its own)
- *   4 BUILD (SEQ again)      K1 Type (the builds': AUTO, or one held), K2 Ending (their last bar's: AUTO, or one held)
+ *   3 PHASE (SEQ)            the breaks: K1..K3 Breaks (how often one comes on its own; 0: only when cued), Break (its
+ *                            bars: the world's, 4..32), Gap (bars after a drop before one comes on its own)
+ *   4 BUILD (SEQ again)      the builds: K1 Type (AUTO, or one held), K2 Ending (their last bar's: AUTO, or one held),
+ *                            K3 Length (2, 4, 8 bars)
  *   5 KICK (SEL)             K1..K4 Tune, Drive, Punch, Decay (its body: short and tight, or long and full)
  *   6 BASS (SEL again)       K1..K4 Bite, Decay (how fast the bite closes), Length, Drive (as LINE's)
  *   7 PERC (ENV)             K1..K4 Hats, Open (the open hat's length), Clap, Tone (all of it brighter, darker)
@@ -183,8 +184,8 @@ static int page_par(int p, int k)
     static const int8_t PAR[NPAGE][4] = {
         {P_ENERGY, P_DETAIL, P_DARK, P_DRIFT},
         {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
-        {P_BREAKS, P_BREAK_LEN, P_BUILD_LEN, P_GAP},
-        {-1, -1, -1, -1},                                /* BUILD: K1 the builds' type, K2 their ending */
+        {P_BREAKS, P_BREAK_LEN, P_GAP, -1},              /* PHASE: the breaks */
+        {-1, -1, P_BUILD_LEN, -1},                       /* BUILD: K1 the builds' type, K2 their ending, K3 their bars */
         {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, P_KICK_DECAY},   /* (the levels and the sends: MIX's) */
         {P_BASS_BITE, P_BASS_DECAY, P_BASS_LEN, P_BASS_DRIVE},   /* (as LINE's) */
         {P_HATS, P_PERC_OPEN, P_CLAP, P_HAT_TONE},   /* (TONE: all of it, the clap's too) */
@@ -347,7 +348,7 @@ static const char *knob_name(int page, int k)
     if (page == PG_GLOBAL)
         return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "MIDI IN";
     if (page == PG_BUILD)
-        return k == 0 ? "TYPE" : k == 1 ? "ENDING" : "";
+        return k == 0 ? "TYPE" : k == 1 ? "ENDING" : k == 2 ? "LENGTH" : "";
     if (page == PG_MIX)
         return k == 0 ? "TRACK" : k == 1 ? "LEVEL" : k == 2 ? (TRACK_SEND[mix_track % NTRACK] < 0 ? "" : "SEND")
              : "MUTE";                   /* (no send: no SEND) */
@@ -458,7 +459,7 @@ static void knob_turn(int k, int32_t d)
                 midi_off();
         } else
             return;
-    } else if (page == PG_BUILD) {       /* the builds' type (K1), their ending (K2): AUTO at the left */
+    } else if (page == PG_BUILD && k < 2) {   /* the builds' type (K1), their ending (K2): AUTO at the left */
         int32_t c;
         if (k == 0) {
             c = clamp(ps_build_kind_now() + d, 0, PS_NBUILD - 1);
@@ -470,8 +471,7 @@ static void knob_turn(int k, int32_t d)
             if (c == ps_build_end_now())
                 return;
             ps_build_end((int)c);
-        } else
-            return;
+        }
         knob_value(page, k, t, &pos, &span);
         app_say(knob_name(page, k), t);
         return;

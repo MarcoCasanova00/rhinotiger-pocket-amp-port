@@ -1,13 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# The PHASE page's K3 (BUILD) at its lowest, 2 bars: a break cued with SAVE, ARP for its build, which lasts 2 bars (not
+# The BUILD page's K3 (LENGTH) at its lowest, 2 bars: a break cued with SAVE, ARP for its build, which lasts 2 bars (not
 # the 4 of sections.txt), then the drop. COLD SIGNAL, 152: a bar is about 1.58 s.
 wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 jack in
 wait 1500
 tap SEQ
-wait 60
-expect page 2
+wait 30
+tap SEQ
+wait 30
+expect page 3
 spin K3 -5
 wait 30
 expect param38 0
