@@ -1,5 +1,5 @@
 {
-  "what": "A generative psytrance firmware, from dark psy to hi-tech. A kick, a rolling FM bass, percussion, a repeating line and an atmosphere play by themselves in eight worlds. You steer it with four macro knobs and mutes; the keys throw one-shot sounds into the music, or play sixteen effects. AUTO PLAY plays a whole set.",
+  "what": "A generative psytrance firmware, from dark psy to hi-tech. A kick, a rolling FM bass, percussion, a repeating line and an atmosphere play by themselves in eight worlds. Steer with four macro knobs and mutes; throw one-shot sounds or play sixteen effects on the keys. AUTO PLAY plays a whole set.",
   "author": "hacha",
   "kinds": ["synth"],
   "play": "https://hacha.github.io/rhinotiger/emu/",
