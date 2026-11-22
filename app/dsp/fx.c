@@ -75,6 +75,8 @@ static struct {
     uint8_t auto_slice;                /* a STUTTER build's repeat, ticks (0: none): psy.c sets it a tick */
     uint8_t auto_buf;                  /* a build's ending's buffer effect, FX_TAPE or FX_REVERSE (0: none): so too */
     uint8_t auto_dub;                  /* a build's ending thrown into the echo, as DUB held: so too */
+    uint8_t auto_gate, ag_len;         /* a GATE build's slice, ticks (0: none): so too; the latest's */
+    float ag_el, ag_g, ag_s;           /* frames since its slice began (psy.c: 0 as it does), its depth, the cut heard */
 } fx = {.buf_want = -1, .cur = {.id = -1}, .old = {.id = -1}};
 
 /* the read: frame position p (a count, fractional), channel ch, between two samples */
@@ -306,6 +308,14 @@ static float fx_render(float tick_len, float *l, float *r, float upper_l, float 
         dl -= cut * (dl - (1.0f - fx.wet) * (*l - upper_l));   /* (*l: the music as it came; less its upper, the kick
                                                                  * and the bass, untouched unless replayed) */
         dr -= cut * (dr - (1.0f - fx.wet) * (*r - upper_r));
+    }
+    /* a GATE build's: all of it, open the first half of each slice; ~0.75 ms slopes */
+    fx.ag_g += ((fx.auto_gate ? 1.0f : 0.0f) - fx.ag_g) * 0.003f;
+    fx.ag_el += 1.0f;
+    if (fx.ag_g > 0.0005f) {
+        fx.ag_s += ((fx.ag_el < tick_len * 0.5f * (float)fx.ag_len ? 0.0f : 1.0f) - fx.ag_s) * 0.03f;
+        dl *= 1.0f - fx.ag_g * fx.ag_s;
+        dr *= 1.0f - fx.ag_g * fx.ag_s;
     }
     /* WASH and FREEZE (its taking in is psy.c's): what is above the kick and the bass sinking beneath the hall, the
      * echo (~10 ms down, ~40 ms back; a buffer's replay, all of it, stays) */

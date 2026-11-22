@@ -75,10 +75,13 @@ enum { PS_CUE_BREAK = 1, PS_CUE_DROP, PS_CUE_BUILD };
  * sixteenth triplets, rising), STUTTER (the groove on, repeated: a quarter of it, an eighth, a sixteenth, a 32nd),
  * POLY (the kick on dotted eighths against the bar, closing to dotted sixteenths, then sixteenths; the clap on 2 and
  * 4), SINK (the other way: a clap rolling sixteenths, eighths, quarters, falling, the rest closing from above, the
- * riser falling), FAKE (a ROLL, then a drop for a beat, cut short: a bar of the clap's sixteenths, then the drop).
- * Each its riser. Taken as the build begins. */
+ * riser falling), FAKE (a ROLL, then a drop for a beat, cut short: a bar of the clap's sixteenths, then the drop),
+ * HALF (the groove in half time: the kick on 1 and 3, the clap on 3), ACID (the kick out, the bass alone on every
+ * sixteenth, an octave up every third, its bite opening and screaming, the hats on the offbeats), STAIRS (the groove
+ * on, the bass, the line, the atmos a minor third higher each quarter of it), GATE (the groove on, all of it cut:
+ * quarters, eighths, sixteenths, 32nds, the first half of each heard). Each its riser. Taken as the build begins. */
 enum { PS_BUILD_AUTO, PS_BUILD_ROLL, PS_BUILD_KICK, PS_BUILD_FILTER, PS_BUILD_TRIP, PS_BUILD_STUTTER, PS_BUILD_POLY,
-       PS_BUILD_SINK, PS_BUILD_FAKE, PS_NBUILD };
+       PS_BUILD_SINK, PS_BUILD_FAKE, PS_BUILD_HALF, PS_BUILD_ACID, PS_BUILD_STAIRS, PS_BUILD_GATE, PS_NBUILD };
 void ps_build_kind(int k);
 /* a build's ending (ALGORITHM on PHASE with SEQ held; AUTO: each build one of them, not the last one again), its
  * last bar (FAKE: before its false drop): BREATH (its last beat silent), RUSH (none: the roll twice as fast through its

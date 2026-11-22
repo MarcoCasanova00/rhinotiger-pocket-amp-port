@@ -408,7 +408,7 @@ static recipe_t ev_resolve(const world_t *w, uint32_t i)   /* what slot i plays 
     r.type = (uint8_t)((sl->fam < low ? EV_DIVE : sl->fam < low + mid ? EV_ZAP : EV_CHIRP) + sl->sub);
     if ((float)sl->lean < 60.0f * (dk < 0.0f ? -dk : dk))         /* Dark leans the note one way or the other */
         deg = dk < 0.0f ? OPEN[sl->deg % 4u] : SHADE[sl->deg % 4u];
-    r.note = (int8_t)(m.root + 36 + deg + (r.type >= EV_CHIRP ? 12 : r.type <= EV_GROWL ? -12 : 0));
+    r.note = (int8_t)(m.root + s.lift + 36 + deg + (r.type >= EV_CHIRP ? 12 : r.type <= EV_GROWL ? -12 : 0));
     r.run = sl->run < (uint32_t)ev_runs_now(w) ? (r.type <= EV_GROWL ? RUN_ROLL : RUN_STAIRS) : RUN_ONE;
     r.var = sl->var;
     r.snd = r.cyc = 0;

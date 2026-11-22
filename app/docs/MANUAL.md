@@ -215,6 +215,11 @@ same one twice running; in a build, the rule shows the one it chose in its place
   and 4.
 - SINK: the other way: a clap rolling sixteenths, eighths, quarters, slowing and falling, the rest closing from above.
 - FAKE: a ROLL, then a drop for a beat that is cut short, then a bar of the clap's sixteenths before the real drop.
+- HALF: the groove drops to half time, the kick on 1 and 3 and the clap on 3, and the drop snaps back to full speed.
+- ACID: the kick drops out and the bass plays alone on every sixteenth, an octave up on every third, its bite opening
+  wider and wider until it screams. The hats tick on the offbeats.
+- STAIRS: the groove goes on, and the bass, the line and the atmosphere climb a minor third at each quarter of the build.
+- GATE: the groove goes on, chopped: quarters, then eighths, sixteenths and 32nds, only the first half of each heard.
 
 Every build has its riser. Hold SEQ and turn ALGORITHM to pick how builds end: what happens in the last bar (in FAKE,
 the bar before its short drop). AUTO chooses one of the others each time, never the same one twice running. The rule
@@ -549,7 +554,7 @@ their own. How likely it is depends on BREAKS and DRIFT together: at the default
 
 ![In the break: the lanes nearly bare, BREAK under them](img/screen-break.png "In the break")
 
-![In a build, on the PHASE page: BUILD under the lanes, FAKE and REVERSE in grey at the left of the rule: the kind and the ending AUTO chose](img/screen-build.png "In a build")
+![In a build, on the PHASE page: BUILD under the lanes, KICK and REVERSE in grey at the left of the rule: the kind and the ending AUTO chose](img/screen-build.png "In a build")
 
 ---
 

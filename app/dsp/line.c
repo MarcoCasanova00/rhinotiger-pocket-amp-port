@@ -145,7 +145,7 @@ static void ln_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t rb, uin
     if (!ln.playing || !ln_on(w, i) || build_breath(s.tick / TPB % 4u))
         return;
     {
-        float f = note_hz(m.root + w->line_oct + ln_note(w, i)) / PS_SR;
+        float f = note_hz(m.root + s.lift + w->line_oct + ln_note(w, i)) / PS_SR;
         int sounding = ln.t >= 0.0f, glide = ln_slide(w, (i + LN_STEPS - 1u) % LN_STEPS) && sounding;
         float bite = (float)par[P_LINE_BITE] / 50.0f, d = (float)par[P_LINE_DECAY],   /* (50: the world's, as it was) */
               ms = w->line_ms * (d >= 50.0f ? 1.0f + (d - 50.0f) / 12.5f : 0.25f + 0.75f * d / 50.0f);   /* x0.25 .. x5 */
