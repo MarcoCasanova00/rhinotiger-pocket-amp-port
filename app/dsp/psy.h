@@ -160,8 +160,10 @@ int ps_stat(int which);                /* 0 events begun, 1 thrown and remembere
                                         * (2), HALF held (4) */
 const char *ps_event_name(int type);
 int ps_rhythm(void);                   /* the black key held whose rhythm the white keys throw on (-1: none) */
-void ps_rec(int on);                   /* REC: pressed (1), a take of the keys anew; let go (0), it loops (two bars) */
+void ps_rec(int on);                   /* REC: tapped (1), a take of the keys' two bars from the next bar (again while
+                                        * armed: not; while taking: done there), then it loops; held (0), the loop gone */
 int ps_take(void);                     /* the throws in the keys' loop (0: none) */
+int ps_rec_state(void);                /* 0, 1 armed (the next bar), 2 taking */
 const char *ps_rhythm_name(int k);
 
 /* for the screen: the bar now, lane by lane, as it will play (the parts are generated: this is the engine's plan for

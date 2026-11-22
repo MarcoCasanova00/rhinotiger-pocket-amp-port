@@ -680,6 +680,7 @@ void ps_half(int on) { cmd_post((uint32_t)CMD_HALF << 16 | (uint32_t)(on != 0) <
 void ps_gap(void) { cmd_post((uint32_t)CMD_GAP << 16); }
 void ps_rec(int on) { cmd_post((uint32_t)CMD_REC << 16 | (uint32_t)(on != 0)); }
 int ps_take(void) { return take.n; }
+int ps_rec_state(void) { return take.rec ? 2 : take.arm ? 1 : 0; }
 
 static void cmd_do(uint32_t c)         /* (render, as a block begins) */
 {
@@ -711,10 +712,14 @@ static void cmd_do(uint32_t c)         /* (render, as a block begins) */
         if ((c >> 8 & 7u) < NPART && (c & 7u) < ntypes((int)(c >> 8 & 7u)))
             s.type[c >> 8 & 7u] = (uint8_t)(c & 7u);
         break;
-    case CMD_REC:                      /* pressed: a take anew; let go: it plays on */
-        if (c & 1u)
-            take.n = 0;
-        take.rec = (uint8_t)(c & 1u);
+    case CMD_REC:                      /* 1 (a tap): armed, from the next bar (armed: not; taking: done, it loops);
+                                        * 0 (held): the loop gone */
+        if (!(c & 1u))
+            take.n = take.arm = take.rec = 0;
+        else if (take.rec)
+            take.rec = 0;
+        else
+            take.arm = (uint8_t)!take.arm;
         break;
     }
 }
@@ -1881,7 +1886,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.trip_at = 255;
         s.kf = KF_NONE;
         ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */
-        take.n = 0;                    /* (the keys' loop gone) */
+        take.n = take.arm = take.rec = 0;   /* (the keys' loop gone) */
     }
     while (cmd_r != cmd_w) {           /* the keys, the effects, the parts */
         uint32_t c = cmd_q[cmd_r % CMD_N];

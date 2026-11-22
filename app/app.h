@@ -27,7 +27,7 @@ void app_frame(void);                    /* the UI: input and a redraw, about 60
 void app_input_only(void);               /* between frames: input only */
 void app_say(const char *a, const char *b);   /* a short message on the screen and to a screen reader */
 
-/* the host simulator's checks: world, page, bar, playing, dirty, section, drops, colour, auto, lines, muted, fx, lights, bpm, events, thrown, paramN, engineN */
+/* the host simulator's checks: world, page, bar, playing, dirty, section, drops, colour, auto, lines, muted, fx, lights, bpm, events, thrown, take, rec, paramN, engineN */
 #define APP_HOST_EXPECT
 int app_expect(const char *what, int *got);
 /* the host simulator's commands: "knobs live" (the wide knobs faster as they turn faster, as on the device) or

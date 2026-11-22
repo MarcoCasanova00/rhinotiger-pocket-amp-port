@@ -42,9 +42,10 @@
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
  * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
  * those heard another type as the next bar begins, more turns more parts, and the groove another shape for four
- * bars, GROOVE's staying; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC held:
- * the keys' throws taken into a loop of two bars (pressed again: a take anew; tapped: the loop gone; lit while one
- * plays).
+ * bars, GROOVE's staying; back: the kit before); on GLOBAL none. OCT- / OCT+: the keys' events an octave down or up (-1..+2; both lit away from 0). REC tapped:
+ * the keys' throws taken into a loop of two bars from the next bar (blinking on the eighths till then, on the beats
+ * while it takes; a key a sixteenth early begins it; tapped again: armed, not; taking, done there), then it loops,
+ * lit; held: the loop gone.
  * SAVE and ARP, side by side, the sections (but on GLOBAL, where SAVE keeps the settings): SAVE down, a break from
  * the next bar (in a break or a build: nothing); ARP up, a build from the next bar (from the groove or a break), the
  * drop after it (in a build: the drop at the next bar); ARP held, the drop at the next bar. SAVE lit in a break, ARP
@@ -232,6 +233,8 @@ static struct {
     uint32_t thrown_at;                  /* a key's event named on the screen since (0: none) */
     uint32_t arp_at;                     /* ARP pressed at (tapped: a build, or in one the drop; held: the drop) */
     uint8_t arp_held;                    /* ARP held long enough: the drop cued */
+    uint32_t rec_at;                     /* REC pressed at (tapped: a take from the next bar; held: the loop gone) */
+    uint8_t rec_held;                    /* REC held long enough: the loop gone */
     uint32_t lfo_at;                     /* LFO pressed on a LINE page at (tapped: the next page; held: a phrase anew) */
     uint8_t lfo_wait;                    /* LFO down on a LINE page, neither yet */
     uint32_t save_at;                    /* SAVE pressed on GLOBAL at (tapped: saved; held: the knobs' defaults) */
@@ -818,13 +821,18 @@ static void input(void)
             app_say(build ? "BUILD" : "DROP", "NEXT BAR");
         }
     }
-    if (down & 1u << B_REC) {                /* the keys' loop: a take anew while held */
-        ps_rec(1);
-        app_say("REC", "TWO BARS");
+    if (down & 1u << B_REC) {                /* the keys' loop: tapped, two bars from the next bar; held, gone */
+        ui.rec_at = plat_ms();
+        ui.rec_held = 0;
     }
-    if (up & 1u << B_REC) {
+    if ((btn & 1u << B_REC) && !ui.rec_held && plat_ms() - ui.rec_at >= 500u) {
+        ui.rec_held = 1;
         ps_rec(0);
-        app_say("REC", ps_take() ? "LOOPING" : "CLEARED");
+        app_say("REC", "CLEARED");
+    } else if ((up & 1u << B_REC) && !ui.rec_held) {
+        int st = ps_rec_state();
+        ps_rec(1);
+        app_say("REC", st == 2 ? "LOOPING" : st == 1 ? "OFF" : "NEXT BAR");
     }
     if ((down & 1u << B_LFO) && (ui.page == PG_LINE || ui.page == PG_LINE_SEQ)) {   /* LFO on LINE: tap or hold */
         ui.lfo_at = plat_ms();
@@ -890,7 +898,9 @@ static void input(void)
                       : sec == SEC_BUILD ? tick % PS_TPB < PS_TPB / 2u : 0;   /* a build: on the beats */
         uint32_t lit = btn | 1u << PAGE_BTN[ui.page] | (save_lit ? 1u << B_SAVE : 0u) | (arp_lit ? 1u << B_ARP : 0u) |
                        (ps_playing() ? 1u << B_PLAY : 0u) |
-                       (ui.oct < 0 ? 1u << B_OCTDN : 0u) | (ps_take() ? 1u << B_REC : 0u) |
+                       (ui.oct < 0 ? 1u << B_OCTDN : 0u) | (ps_rec_state() == 1 ? tick % (PS_TPB / 2u) < PS_TPB / 4u   /* REC: armed, on the eighths; */
+                        : ps_rec_state() == 2 ? tick % PS_TPB < PS_TPB / 2u            /* taking, on the beats; */
+                        : ps_take() != 0) * (1u << B_REC) |                             /* a loop, lit */
                        (ui.oct > 0 ? 1u << B_OCTUP : 0u);
         uint32_t dim = 1u << B_HOME | 1u << B_SEL | 1u << B_ENV | 1u << B_LFO | 1u << B_EDIT | 1u << B_FX | 1u << B_GLO |
                        1u << B_SEQ | 1u << B_REC | 1u << B_SAVE | 1u << B_ARP | 1u << B_PLAY | 1u << B_OCTDN | 1u << B_OCTUP, klit = keys, kdim = 0;
@@ -1298,8 +1308,8 @@ static void draw_rule(void)
 {
     const char *ctx = 0, *name = PAGE_NAME[ui.page];
     int32_t xd = 231 - NPAGE * 5, xt = xd - 6 - text_w(&FONT_XS, name), xs = 0, i;
-    if (ui.btn & 1u << B_REC)
-        ctx = "REC: THE KEYS";
+    if (ps_rec_state())
+        ctx = ps_rec_state() == 1 ? "REC: NEXT BAR" : "REC: THE KEYS";
     else if (ui.page == PG_GLOBAL && set_dirty)
         ctx = "SAVE: KEEP IT";
     if (ctx)
@@ -1584,6 +1594,8 @@ int app_expect(const char *what, int *got)
         *got = ps_build_end_now();
     else if (!strcmp(what, "take"))          /* the throws in the keys' loop */
         *got = ps_take();
+    else if (!strcmp(what, "rec"))           /* REC: 0, 1 armed (the next bar), 2 taking */
+        *got = ps_rec_state();
     else if (!strcmp(what, "lines"))         /* the line's notes so far */
         *got = (int)ps_ui.hits[HIT_LINE];
     else if (!strcmp(what, "gap"))           /* GAP: 1 its beat silent now, 2 cued */

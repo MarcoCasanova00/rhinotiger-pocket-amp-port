@@ -111,8 +111,19 @@ static struct {
         uint8_t bite;                  /* x100 */
     } e[TAKE_N];
     uint8_t n;
-    volatile uint8_t rec;              /* REC held: the throws go in */
+    uint8_t arm;                       /* REC tapped: a take from the next bar */
+    uint8_t rec;                       /* the take going: the throws go in, till end */
+    uint32_t end;                      /* (s.tick) */
 } take;
+
+/* a take begins: the loop before gone, two bars from the bar at or after tick t */
+static void take_begin(uint32_t t)
+{
+    take.n = 0;
+    take.arm = 0;
+    take.rec = 1;
+    take.end = (t + TPBAR - 1u) / TPBAR * TPBAR + TAKE_TICKS;
+}
 
 static int key_black(int k) { int pc = (k + 5) % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
 
@@ -444,6 +455,8 @@ static void key_throw(int k, int stepped)   /* key k's sound now (its cycle on; 
     float bite = 0.5f * (float)ev.vel[k] / 127.0f + (float)ev.press[k] / 127.0f;
     r.note = (int8_t)clampi(r.note + stepped, 24, 108);
     r.cyc = (uint8_t)(1u + ev.kcyc[k]++ % 8u);
+    if (take.arm && TPBAR - s.tick % TPBAR <= 6u)   /* armed, a key a sixteenth early: the take begins with it */
+        take_begin(s.tick);
     {   /* the keys' loop: the same sound on the same tick already in it (a key held round again): it plays, once */
         uint32_t pos = s.tick % TAKE_TICKS, i;
         for (i = 0; i < take.n; i++)
@@ -471,6 +484,10 @@ static void ev_step(const world_t *w, uint32_t t, uint32_t bar, uint32_t pos16, 
     if (t == 0u && pos16 % 16u == 0u && bar % 8u == 0u)   /* a phrase's first tick */
         ev_phrase(bar);
     ev.density = (uint8_t)ev_density_now(w);
+    if (take.rec && s.tick >= take.end)   /* the take's two bars done: it loops */
+        take.rec = 0;
+    if (take.arm && s.tick % TPBAR == 0u)   /* armed: the take begins with the bar */
+        take_begin(s.tick);
     for (k = 0; k < 4; k++)
         if (ev.run[k].left && !--ev.run[k].wait) {
             ev_voice(&ev.run[k].r, ev.run[k].i++, ev.run[k].bite, 0.8f);

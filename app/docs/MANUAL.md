@@ -79,7 +79,7 @@ At the bottom are the four knobs, each with its name, its value and a thin bar. 
 up. Above them runs a rule, and on the rule sits a short strip: the name of the page you are on, and a row of 14 small
 bars, one for each page, with the shown one lit. Turn SELECT to walk through the pages one by one, or press a button to
 jump to its page. At the left of the rule is whatever the page can be set to by ALGORITHM, shown by name (see 4.
-Controls), or what needs saying: `REC: THE KEYS` while REC is held, and `SAVE: KEEP IT` on GLOBAL when something is not saved.
+Controls), or what needs saying: `REC: NEXT BAR` and `REC: THE KEYS` while REC is waiting and taking, and `SAVE: KEEP IT` on GLOBAL when something is not saved.
 
 Between the two is the page itself. On most pages it is the same picture, the lanes. There are five rows, KICK,
 BASS, PERC, EVENTS and LINE, and each shows the bar that is playing, one cell for every sixteenth: a taller block is a
@@ -97,8 +97,8 @@ build and jump at the drop. THEME, on the global page, chooses the palette (see 
 
 Every button glows dim. The button of the page you are on is lit. PLAY is lit while it plays. SAVE is lit on the
 global page when something is not saved, and elsewhere while a break is cued or on. ARP is lit while a build or a drop
-is cued, and flashes on the beats during a build. OCT− is lit while the keys' octave is below 0, OCT+ while it is above. REC is lit
-while the keys' loop plays. Lights, on the global page, sets how bright the glow is.
+is cued, and flashes on the beats during a build. OCT− is lit while the keys' octave is below 0, OCT+ while it is above. REC blinks
+quickly while it waits for the next bar, on the beats while it takes, and is lit while the keys' loop plays. Lights, on the global page, sets how bright the glow is.
 
 ---
 
@@ -121,7 +121,7 @@ while the keys' loop plays. Lights, on the global page, sets how bright the glow
 | PLAY | Plays, or rests. After a rest it begins again from the top. |
 | SAVE | On GLOBAL: tap to keep everything, hold for 1.5 seconds for the defaults (see 10. Saving). On other pages: calls a break (see 8. Sections). |
 | ARP | Calls a build, then the drop (see 8. Sections). |
-| REC | Hold it and what the keys throw is taken into a loop of two bars (see 6. The keys). |
+| REC | Tap it and, from the next bar, what the keys throw is taken into a loop of two bars. Hold it and the loop is gone (see 6. The keys). |
 | OCT− · OCT+ | Move the octave of the keys' sounds, one octave at a time, from one down to two up. OCT− lights while it is below 0, OCT+ while it is above. |
 | MASTER | The volume. |
 | Keys | Throw sounds into the music. On the ECHO page they are the performance instead. |
@@ -473,12 +473,14 @@ of the event's name.
 **OCT− and OCT+** move the octave of all of it, from one octave down to two up. The header says OCTAVE and the
 number.
 
-**REC.** Hold REC and the rule says `REC: THE KEYS`. What the keys throw goes into a loop of two bars, each where it
-fell. Let go, and it plays on, again and again; the message is `LOOPING`. REC is lit while a loop plays. Press REC
-again and a new take begins, and the old one is gone. Tap REC without playing anything and the loop is gone (`CLEARED`).
-Resting with PLAY clears it too.
+**REC.** Tap REC and it waits for the next bar: the rule says `REC: NEXT BAR` and REC blinks quickly. From that bar,
+for two bars, the rule says `REC: THE KEYS` and REC blinks on the beats: what the keys throw goes into a loop, each
+where it fell. A key played just before the bar begins counts as its first. After the two bars the loop plays on, again
+and again, and REC is lit. Tap REC again for a new take: from the next bar the old loop is gone and the new one is
+taken. Tap it while it waits and it doesn't (`OFF`); tap it while it takes and the take ends there and loops
+(`LOOPING`). Hold REC and the loop is gone (`CLEARED`). Resting with PLAY clears it too.
 
-![REC held: REC TWO BARS in the header, REC: THE KEYS at the left of the rule, SPRING at the lower right](img/screen-rec.png "REC held, a key thrown")
+![A take: REC: THE KEYS at the left of the rule, SPRING at the lower right](img/screen-rec.png "A take, a key thrown")
 
 ---
 

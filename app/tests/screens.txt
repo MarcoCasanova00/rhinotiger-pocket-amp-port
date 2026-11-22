@@ -128,14 +128,14 @@ shot screen-rhythm.png
 key w5 up
 key b3 up
 wait 400
-# REC: the keys' two bars
-press REC
-wait 100
+# REC: the keys' two bars (tapped: from the next bar)
+tap REC
+wait 1650
+expect rec 2
 tapkey w3
 wait 300
 shot screen-rec.png
-release REC
-wait 300
+wait 3300
 # a world, and back
 turn PRESET 1
 wait 150
