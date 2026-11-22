@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# LFO and SEQ. LFO cycles LINE (page 7), LINE SEQ (8) and ATMOS (9); SEQ goes to PHASE (2), and tapped again BUILD (3): SEQ is
+# LFO and SEQ. LFO cycles LINE (page 7), LINE SEQ (8) and ATMOS (9); SEQ goes to BREAK (2), and tapped again BUILD (3): SEQ is
 # not held-sensitive and draws no phrase (LFO held on a LINE page does: line-new). LINE SEQ's knobs: K1..K4 Density
 # (param33), Mutate (param35), Range (param40), Slide (param41), each changing its own parameter only; ALGO there is
 # the line's type.
@@ -54,12 +54,12 @@ wait 100
 expect line_type 2
 expect colour 0
 said LINE
-# SEQ from LINE SEQ: PHASE, and again BUILD
+# SEQ from LINE SEQ: BREAK, and again BUILD
 said_none
 tap SEQ
 wait 50
 expect page 2
-said PHASE
+said BREAK
 said_none
 tap SEQ
 wait 50
@@ -69,7 +69,7 @@ said BUILD
 tap LFO
 wait 50
 expect page 8
-# SEQ from LINE: PHASE
+# SEQ from LINE: BREAK
 tap SEQ
 wait 50
 expect page 2
@@ -134,7 +134,7 @@ expect page 13
 tap SEQ
 wait 50
 expect page 2
-# held for 700 ms: only the page, nothing said but PHASE, nothing else changed
+# held for 700 ms: only the page, nothing said but BREAK, nothing else changed
 tap LFO
 wait 50
 expect page 8
@@ -148,11 +148,11 @@ wait 700
 release SEQ
 wait 50
 expect page 2
-said PHASE
+said BREAK
 unsaid NEW PATTERN
 wait 600
 expect page 2
-# held from PHASE: BUILD (a page's button, as tapped), still no new pattern
+# held from BREAK: BUILD (a page's button, as tapped), still no new pattern
 said_none
 press SEQ
 wait 700

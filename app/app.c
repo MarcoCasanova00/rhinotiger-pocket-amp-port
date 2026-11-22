@@ -14,7 +14,7 @@
  *   1 MAIN (HOME)            the macros: K1..K4 Energy, Detail, Dark, Drift
  *   2 GROOVE (HOME again)    K1..K4 Tempo (the world's, moved), Root, Fills (how often), Sit out (how often a part
  *                            rests a phrase)
- *   3 PHASE (SEQ)            the breaks: K1..K3 Breaks (how often one comes on its own; 0: only when cued), Break (its
+ *   3 BREAK (SEQ)            the breaks: K1..K3 Breaks (how often one comes on its own; 0: only when cued), Length (its
  *                            bars: the world's, 4..32), Gap (bars after a drop before one comes on its own)
  *   4 BUILD (SEQ again)      the builds: K1 Type (AUTO, or one held), K2 Ending (their last bar's: AUTO, or one held),
  *                            K3 Length (2, 4, 8 bars)
@@ -152,12 +152,12 @@ void app_init(void)
 }
 
 /* ------------------------------------------------------------------ pages --- */
-/* the pages in the panel's order: HOME the whole (MAIN, GROOVE); SEQ the sections (PHASE, BUILD); the top row's middle four the sounds (SEL the
+/* the pages in the panel's order: HOME the whole (MAIN, GROOVE); SEQ the sections (BREAK, BUILD); the top row's middle four the sounds (SEL the
  * kick and the bass, ENV the percussion, LFO the line, EDIT the events and the atmos); FX the echo; GLO the global.
  * A button with two or three pages steps through them */
-enum { PG_MAIN, PG_GROOVE, PG_PHASE, PG_BUILD, PG_KICK, PG_BASS, PG_PERC, PG_EVENTS, PG_LINE, PG_LINE_SEQ, PG_ATMOS, PG_MIX,
+enum { PG_MAIN, PG_GROOVE, PG_BREAK, PG_BUILD, PG_KICK, PG_BASS, PG_PERC, PG_EVENTS, PG_LINE, PG_LINE_SEQ, PG_ATMOS, PG_MIX,
        PG_ECHO, PG_GLOBAL, NPAGE };
-static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "PHASE", "BUILD", "KICK", "BASS", "PERC", "EVENTS", "LINE",
+static const char *const PAGE_NAME[NPAGE] = {"MAIN", "GROOVE", "BREAK", "BUILD", "KICK", "BASS", "PERC", "EVENTS", "LINE",
                                              "LINE SEQ", "ATMOS", "MIX", "ECHO", "GLOBAL"};
 static const uint8_t PAGE_BTN[NPAGE] = {B_HOME, B_HOME, B_SEQ, B_SEQ, B_SEL, B_SEL, B_ENV, B_ENV, B_LFO, B_LFO, B_LFO, B_EDIT,
                                         B_FX, B_GLO};
@@ -184,7 +184,7 @@ static int page_par(int p, int k)
     static const int8_t PAR[NPAGE][4] = {
         {P_ENERGY, P_DETAIL, P_DARK, P_DRIFT},
         {P_TEMPO, P_ROOT, P_FILLS, P_SITOUT},
-        {P_BREAKS, P_BREAK_LEN, P_GAP, -1},              /* PHASE: the breaks */
+        {P_BREAKS, P_BREAK_LEN, P_GAP, -1},              /* BREAK: the breaks */
         {-1, -1, P_BUILD_LEN, -1},                       /* BUILD: K1 the builds' type, K2 their ending, K3 their bars */
         {P_KICK_TUNE, P_KICK_DRIVE, P_KICK_PUNCH, P_KICK_DECAY},   /* (the levels and the sends: MIX's) */
         {P_BASS_BITE, P_BASS_DECAY, P_BASS_LEN, P_BASS_DRIVE},   /* (as LINE's) */

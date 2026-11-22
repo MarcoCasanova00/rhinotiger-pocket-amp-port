@@ -2,8 +2,8 @@
 # Copyright (C) 2026 hacha
 # The buttons beyond the pages: ALGORITHM the type of the page's part (MAIN: the kit, kit.txt; GROOVE: the bass's
 # shape; ECHO: the echo's kind), OCT the keys' octave,
-# and the PHASE page's K1 (BREAKS): 0 the breaks only when cued, above 0 on their own (kept by SAVE on GLOBAL).
-# Pages: HOME (MAIN, GROOVE), SEQ (PHASE, BUILD), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ, ATMOS), ENV (PERC, EVENTS), EDIT (MIX), FX (ECHO), GLO.
+# and the BREAK page's K1 (BREAKS): 0 the breaks only when cued, above 0 on their own (kept by SAVE on GLOBAL).
+# Pages: HOME (MAIN, GROOVE), SEQ (BREAK, BUILD), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ, ATMOS), ENV (PERC, EVENTS), EDIT (MIX), FX (ECHO), GLO.
 wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 listen
 wait 1500
@@ -114,7 +114,7 @@ tap OCT-
 wait 30
 said OCTAVE
 expect auto 1
-# PHASE: BREAKS at 0 shows CUED and means breaks only when cued
+# BREAK: BREAKS at 0 shows CUED and means breaks only when cued
 tap SEQ
 wait 30
 expect page 2

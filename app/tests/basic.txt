@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
 # RhinoTiger in the host simulator: ./test.sh basic
-# It plays as the boot's logo goes (silent till then), on MAIN. Buttons: HOME (MAIN, GROOVE), SEQ (PHASE, BUILD), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ),
+# It plays as the boot's logo goes (silent till then), on MAIN. Buttons: HOME (MAIN, GROOVE), SEQ (BREAK, BUILD), SEL (KICK, BASS), ENV (PERC), LFO (LINE, LINE SEQ),
 # EDIT (MIX), FX (ECHO), GLO (GLOBAL); ENV also reaches EVENTS and LFO also ATMOS; SELECT steps through the pages in that order.
 # the logo (the face, the characters on it, the band: 0.5 s, 0.5 s, 1.4 s), silent, the engine held
 wait 600
@@ -16,8 +16,8 @@ expect held 0
 expect playing 1
 wait 700
 shot main.png
-# SELECT turns through every page (MAIN GROOVE PHASE BUILD KICK BASS PERC EVENTS LINE LINE-SEQ ATMOS MIX ECHO GLOBAL); the buttons jump
-# (HOME again: GROOVE, again MAIN; SEQ: PHASE, BUILD; SEL: KICK, BASS; ENV: PERC, EVENTS; LFO: LINE, LINE SEQ, ATMOS; EDIT: MIX; FX: ECHO; GLO: GLOBAL)
+# SELECT turns through every page (MAIN GROOVE BREAK BUILD KICK BASS PERC EVENTS LINE LINE-SEQ ATMOS MIX ECHO GLOBAL); the buttons jump
+# (HOME again: GROOVE, again MAIN; SEQ: BREAK, BUILD; SEL: KICK, BASS; ENV: PERC, EVENTS; LFO: LINE, LINE SEQ, ATMOS; EDIT: MIX; FX: ECHO; GLO: GLOBAL)
 turn SELECT 1
 wait 30
 expect page 1

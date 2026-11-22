@@ -36,7 +36,7 @@ enum { P_ENERGY, P_DETAIL, P_DARK, P_DRIFT,                  /* MAIN: the macros
        P_ECHO_LEVEL, P_ECHO_FB, P_ECHO_TONE, P_ECHO_TIME,    /* ECHO */
        P_ATMOS_LEVEL, P_ATMOS_COLOUR, P_ATMOS_AIR, P_ATMOS_WASH,   /* ATMOS */
        P_LINE_LEVEL, P_LINE_DENSITY, P_LINE_LEN, P_LINE_MUTATE,   /* LINE */
-       P_BREAKS, P_BREAK_LEN, P_BUILD_LEN, P_GAP,            /* PHASE: how often a break comes on its own (0: only
+       P_BREAKS, P_BREAK_LEN, P_BUILD_LEN, P_GAP,            /* BREAK, BUILD: how often a break comes on its own (0: only
                                                               * cued), its bars, its build's, the bars after a drop */
        P_LINE_RANGE, P_LINE_SLIDE, P_LINE_BITE, P_LINE_DECAY,  /* LINE: how far its notes go, how many slide (its
                                                               * pattern page); its modulation's height, its fall */

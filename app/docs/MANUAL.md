@@ -108,7 +108,7 @@ while the keys' loop plays. Lights, on the global page, sets how bright the glow
 | --- | --- |
 | SELECT | Turns through the 14 pages in order, from MAIN to GLOBAL. It stops at the ends. |
 | HOME | Goes to MAIN. Press again for GROOVE. Press again to go back. |
-| SEQ | Goes to PHASE: the sections. Press again for BUILD. Press again to go back. |
+| SEQ | Goes to BREAK: the sections. Press again for BUILD. Press again to go back. |
 | SEL | Goes to KICK. Press again for BASS. Press again to go back. |
 | ENV | Goes to PERC. Press again for EVENTS. Press again to go back. |
 | LFO | Goes to LINE. Press again for LINE SEQ. Again for ATMOS. Again to go back. On LINE and LINE SEQ, hold it for half a second and the line's phrase is drawn anew from the next bar, instead of moving on. |
@@ -130,7 +130,7 @@ ALGORITHM does something different on each page. On MAIN it takes the kit: forwa
 that are sounding, take another type from the next bar, and the more you turn in a bar the more change (up to three
 parts); back, the kit before, up to eight steps. On GROOVE it picks the shape of the bass. On ECHO it picks the kind of echo. On KICK, BASS, PERC, EVENTS, LINE, LINE SEQ and ATMOS it picks the type of
 that part, one of four to six, and the new type begins from the part's next note. On MIX it picks the type of the
-track TRACK has chosen. On PHASE, BUILD and GLOBAL it does nothing. The name
+track TRACK has chosen. On BREAK, BUILD and GLOBAL it does nothing. The name
 of the choice shows at the left of the rule. Types and shapes are listed on the pages they belong to. They are not
 saved (see 10. Saving).
 
@@ -156,8 +156,8 @@ world is as it is.
   the middle, brings in harsher notes and lets the line creep and reach higher. Lower is lighter and more open. 50.
 - DRIFT: how much changes by itself. Higher redraws more of the one-shot sounds at each phrase, lets the bass open and
   close further, rewrites more of the line, lets breaks come on their own more often (see 8. Sections), lets FILLS,
-  BREAK, GAP and a build's LENGTH stray more often from their lengths to the next one down or up (see GROOVE, PHASE and
-  BUILD). At 0 nothing
+  GAP and the LENGTH of breaks and builds stray more often from their lengths to the next one down or up (see GROOVE,
+  BREAK and BUILD). At 0 nothing
   moves by itself, no break comes on its own, and those lengths are exact; higher, the bass changes its type at more
   of the drops. 50.
 
@@ -186,16 +186,16 @@ ALGORITHM picks the shape of the bass. AUTO leaves it to the world: the kick on 
 three sixteenths after it, and now and then a gallop, an offbeat, or a bar of triplets in the worlds that have them.
 K-B-B-B holds the roll; GALLOP holds a gallop; OFFBEAT holds an offbeat. The new shape begins from the next bar.
 
-### 5.3 PHASE
+### 5.3 BREAK
 
-![The PHASE page: Breaks 50, Break WORLD, Gap 64](img/screen-phase.png "PHASE")
+![The BREAK page: Breaks 50, Length WORLD, Gap 64](img/screen-phase.png "BREAK")
 
 SEQ. The breaks: how the music moves through breaks, builds and drops by itself. Press SAVE and ARP to call them yourself (see 8.
 Sections).
 
 - BREAKS: how often a break comes on its own. At 0 it says CUED: a break comes only when you call it. Higher is more
   often, and DRIFT scales it. 50.
-- BREAK: how long a break that comes on its own usually lasts. WORLD leaves it to the world; or 4, 8, 16 or 32 bars.
+- LENGTH: how long a break that comes on its own usually lasts. WORLD leaves it to the world; or 4, 8, 16 or 32 bars.
   Now and then a break is half or twice as long, more often with DRIFT higher. WORLD.
 - GAP: the fewest bars between a drop and the next break that comes on its own: 32, 64, 96 or 128. After some drops it
   is one step shorter or longer, more often with DRIFT higher. 64.
@@ -551,7 +551,7 @@ phrase are drawn anew, and the colours jump. The music never comes back exactly 
 
 **By itself.** If BREAKS is above 0 and DRIFT is above 0, a break may come as a block of 32 bars begins, and not
 sooner than about GAP bars after the last drop. It lasts BREAK bars (or the world's own), then a build, then the drop come on
-their own. How likely it is depends on BREAKS and DRIFT together: at the defaults, about once in three blocks. See PHASE, 5.3.
+their own. How likely it is depends on BREAKS and DRIFT together: at the defaults, about once in three blocks. See BREAK, 5.3.
 
 **You call them.** All of them wait for the next bar, and they work only while the music is playing.
 
