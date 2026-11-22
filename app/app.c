@@ -1809,7 +1809,7 @@ int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "world"))
         *got = ps_world_now();
-    else if (!strcmp(what, "page"))          /* 0 MAIN .. 11 MIX, 12 GLOBAL (PG_*) */
+    else if (!strcmp(what, "page"))          /* 0 MAIN .. 12 MIX, 13 ECHO, 14 GLOBAL (PG_*) */
         *got = ui.page;
     else if (!strcmp(what, "bar"))           /* bars since PLAY */
         *got = ps_bar();

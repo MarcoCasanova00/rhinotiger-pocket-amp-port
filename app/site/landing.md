@@ -10,7 +10,7 @@ fine; and AUTO PLAY, which plays a whole set through them by itself.
 
 ![RhinoTiger playing: COLD SIGNAL at 152, the five lanes of the bar and the four macros](manual/img/screen-playing.png "RhinoTiger on the FM-1's screen")
 
-This is version {{VERSION}}. You install it at your own risk, and the installer can put M-VAVE's own firmware back.
+This is version {{VERSION}}. It reads nothing another firmware saved, so back that up first. You install it at your own risk, and the installer can put M-VAVE's own firmware back.
 
 - [Try it in the browser](emu/). Play it right here, with sound. It runs the same code as the FM-1, so you don't
   need one.

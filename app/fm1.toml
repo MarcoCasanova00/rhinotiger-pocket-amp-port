@@ -18,8 +18,8 @@ credits = "Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hü
 
 # firmware.json, for firmware hubs (fm1-base docs/FIRMWARE-JSON.md)
 author = "hacha"
-description = "RhinoTiger is a generative psytrance firmware for the M-VAVE FM-1, from dark psy to hi-tech. It plays by itself; you steer it."
-tags = ["generative", "fm"]
-install = ""
-site = ""
+description = "RhinoTiger is a generative psytrance firmware for the M-VAVE FM-1, from dark psy to hi-tech. A kick, a rolling FM bass, percussion, a repeating line and a held atmosphere play by themselves in eight worlds, with breaks, builds and drops. You steer it with four macro knobs and a mix with mutes; the keys throw one-shot sounds into the music, and on the echo page they play sixteen effects. AUTO PLAY plays a whole set, across the worlds."
+tags = ["generative", "fm", "synth"]
+install = "https://hacha.github.io/rhinotiger/install/"
+site = "https://hacha.github.io/rhinotiger/"
 screenshot = "app/docs/img/screen-playing.png"

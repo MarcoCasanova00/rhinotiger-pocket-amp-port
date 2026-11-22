@@ -176,9 +176,9 @@ static void fx_buffer(bufv_t *v, float tick_len, float *l, float *r, int *hold)
         } else {
             p = base + u;
         }
+        if (v->el < len)               /* the first time through: the music itself, written (its end softened too) */
+            w = len - u;
         w = fm_clampf(w / 64.0f, 0.0f, 1.0f);
-        if (v->el < len)               /* the first time through: the music itself, written */
-            w = 1.0f;
         *hold = v->el + 1.0f >= len;
     } else if (id == FX_REVERSE) {     /* the last beat backwards, again and again */
         len = fm_minf(tick_len * (float)PS_TPB, (float)(CAP_N - 256u));
