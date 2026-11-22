@@ -745,7 +745,12 @@ static void key_down(int k, int vel)
         int b = key_place(k), p;
         if (b < BK_FILL) {
             p = BK_PART[b];
+            int out = (ps_stat(10) >> p & 1) && !(pf.muted >> p & 1u);   /* (out by AUTO PLAY: back, not muted) */
             hd_hand_part(p);
+            if (out) {
+                app_say(PART_NAME[p], "BACK");
+                return;
+            }
             ps_mute(p);
             pf.muted ^= (uint8_t)(1u << p);
             app_say(PART_NAME[p], pf.muted >> p & 1u ? "MUTED" : "BACK");
@@ -767,11 +772,12 @@ static void key_down(int k, int vel)
             ps_out(PART_BASS, 1);
             app_say("KICK+BASS", "OUT");
         } else if (b == BK_ALL) {
-            for (p = 0; p < NPART; p++)
-                if (pf.muted >> p & 1u) {
+            for (p = 0; p < NPART; p++) {
+                if ((pf.muted | (unsigned)ps_stat(10)) >> p & 1u)
                     hd_hand_part(p);
+                if (pf.muted >> p & 1u)
                     ps_mute(p);
-                }
+            }
             pf.muted = 0;
             app_say("ALL", "BACK");
         }

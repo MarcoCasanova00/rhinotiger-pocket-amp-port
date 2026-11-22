@@ -31,6 +31,11 @@ void ps_auto_clear(uint32_t kinds)
     ps_ag_t g = {.kind = 255, .id = (uint8_t)kinds};
     aq_post(&g);
 }
+void ps_auto_back(int part)
+{
+    ps_ag_t g = {.kind = 254, .id = (uint8_t)(1u << part)};
+    aq_post(&g);
+}
 ps_motif_t *ps_auto_motif(int *id)
 {
     ag_mot_w ^= 1u;
@@ -63,6 +68,12 @@ static void ag_drain(void)             /* (render, as a block begins) */
         if (g.kind == 255) {
             for (k = 0; k < AG_N; k++)
                 if (ag[k].t1 && (g.id >> ag[k].kind & 1u))
+                    ag[k].t1 = 0;
+            continue;
+        }
+        if (g.kind == 254) {
+            for (k = 0; k < AG_N; k++)
+                if (ag[k].t1 && ag[k].kind == PS_AG_OUT && !(ag[k].id &= (uint8_t)~g.id))
                     ag[k].t1 = 0;
             continue;
         }

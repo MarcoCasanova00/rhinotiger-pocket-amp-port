@@ -83,14 +83,14 @@ static void hd_hand_part(int p)
     if (!au.on)
         return;
     hd.hold_part[p] = au.bar + AU_HOLD;
-    hd.out_to = 0;
-    hd_clear(1u << PS_AG_OUT);
+    ps_auto_back(p);
 }
 static void hd_hand_key(void)
 {
     if (!au.on)
         return;
-    hd.hold_keys = au.bar + AU_HOLD;
+    hd.hold_keys = hd.hold_part[PART_EVENTS] = au.bar + AU_HOLD;   /* (heard: the events not out) */
+    ps_auto_back(PART_EVENTS);
     hd.mot_to = 0;
     hd_clear(HD_KEY_KINDS);
 }
@@ -162,15 +162,13 @@ static void hd_begin(void)               /* a set begins */
     hd_chapter();
 }
 
-static void hd_motif(uint32_t t0, int bars, int soft)   /* the chapter's motif (each time a note or two of it other) */
+static void hd_motif(uint32_t t0, int bars, int soft)   /* the chapter's motif (each time a note or two of it other, for that time) */
 {
     int id;
     uint32_t k;
     ps_motif_t *mo;
     if (!hd.mn)
         return;
-    for (k = hd_rnd(3u); k; k--)
-        hd.m[hd_rnd(hd.mn)].semi = (int8_t)hd_scale((int)hd_rnd(8u));
     mo = ps_auto_motif(&id);
     mo->n = 0;
     mo->len = (uint16_t)(HD_BAR * hd.mlen);
@@ -183,6 +181,8 @@ static void hd_motif(uint32_t t0, int bars, int soft)   /* the chapter's motif (
         mo->e[mo->n].bite = (uint8_t)(soft ? hd.m[k].bite / 3u : hd.m[k].bite);
         mo->n++;
     }
+    for (k = mo->n ? hd_rnd(3u) : 0u; k; k--)
+        mo->e[hd_rnd(mo->n)].semi = (int8_t)hd_scale((int)hd_rnd(8u));
     hd_do(PS_AG_MOTIF, id, t0, t0 + HD_BAR * (uint32_t)bars, 0);
     hd.mot_to = (int)(t0 / HD_BAR) + bars;
     HD_LOG("HD motif bar %d bars %d notes %d\n", (int)(t0 / HD_BAR), bars, mo->n);
@@ -261,13 +261,14 @@ static int hd_move(uint32_t e, int size, int last)
     return 0;
 }
 
-static void hd_strip(uint32_t t0, int left, int flag)   /* a part left out from t0, left bars of the groove from there */
+static void hd_strip(uint32_t t0, int left, int flag, int thrown)   /* a part left out from t0, left bars of the groove
+                                                                     * from there (thrown: not the events, a throw on it) */
 {
     static const uint8_t PART[6] = {PART_LINE, PART_LINE, PART_EVENTS, PART_EVENTS, PART_PERC, PART_ATMOS};
     int p = PART[hd_rnd(6u)], bars = p == PART_PERC ? 4 : hd_rnd(2u) ? 16 : 8;
     if (bars > left - 8)
         bars = left - 8;
-    if (bars < 4 || !hd_part_ok(p) || (p == PART_EVENTS && hd.mot_to > (int)(t0 / HD_BAR)))
+    if (bars < 4 || !hd_part_ok(p) || (p == PART_EVENTS && (hd.mot_to > (int)(t0 / HD_BAR) || thrown || ps_take() || ps_rec_state())))
         return;
     hd_do(PS_AG_OUT, 1 << p, t0, t0 + HD_BAR * (uint32_t)bars, flag);
     hd.out_to = (int)(t0 / HD_BAR) + bars;
@@ -287,7 +288,7 @@ static void hd_groove(int rb)            /* a groove's bar (rb from its drop): a
     } else if (hd_keys_ok() && hd_ch(0.3f))
         hd_run(e);
     if (!last && hd.out_to <= au.drop_bar + end && hd_ch(0.2f))   /* the next phrase: a part out of it */
-        hd_strip(e, left, 0);
+        hd_strip(e, left, 0, 0);
     if (!hd_keys_ok())
         return;
     if (!last && hd.mot_to <= au.drop_bar + end && hd.out_to <= au.drop_bar + end && left >= 8 && hd_ch(0.3f))   /* the motif, from the next */
@@ -330,11 +331,12 @@ static void hd_break(int at)             /* a break's bar (at from its start) */
 static void hd_drop(int chapter)         /* a build's last bar: the drop to come */
 {
     uint32_t e = HD_BAR * (uint32_t)(au.bar + 1);
+    int thrown = hd_keys_ok() && hd_ch(0.5f);
     hd.out_to = hd.mot_to = 0;
-    if (hd_keys_ok() && hd_ch(0.5f))
+    if (thrown)
         hd_throw(hd_rnd(3u) ? hd.low : 12, 0, 60, e, PS_AG_DROP);
     if (hd_ch(chapter ? 0.5f : 0.2f))
-        hd_strip(e, 40, PS_AG_DROP);
+        hd_strip(e, 40, PS_AG_DROP, thrown);
 }
 
 static void hd_bar(int sec, int at)      /* a bar has begun */

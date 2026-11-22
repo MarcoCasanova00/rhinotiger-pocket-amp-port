@@ -77,6 +77,7 @@ typedef struct {
 } ps_ag_t;
 void ps_auto_do(const ps_ag_t *g);
 void ps_auto_clear(uint32_t kinds);    /* those of some kinds (1 << PS_AG_*) over, now */
+void ps_auto_back(int part);           /* a part out of theirs back, now */
 #define PS_MOTIF_N 32
 typedef struct {
     uint8_t n;

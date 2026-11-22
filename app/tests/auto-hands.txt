@@ -29,13 +29,16 @@ expect hd_throws >10
 expect muted 0
 expect out 0
 expect take 0
-# the LINE muted by hand (ECHO's D#4): the set lets go of it, the mute stays the hand's
+# the LINE, out by the set (dark on ECHO), tapped there: back, not muted; tapped again: muted, the hand's
 tap FX
 wait 30
 tapkey b4
 wait 100
-expect muted 8
+expect muted 0
 expect hd_out 0
+tapkey b4
+wait 100
+expect muted 8
 tapkey b4
 wait 100
 expect muted 0
