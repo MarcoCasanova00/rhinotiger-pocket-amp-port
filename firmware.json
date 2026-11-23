@@ -10,7 +10,7 @@
   "install": "https://hacha.github.io/rhinotiger/install/",
   "site": "https://hacha.github.io/rhinotiger/",
   "source": "https://github.com/hacha/rhinotiger",
-  "screenshot": "app/docs/img/screen-playing.png",
+  "screenshot": "app/docs/img/screen-logo.png",
   "hardware": {
     "models": ["FM-1"],
     "flash": ["856014", "B36014"],

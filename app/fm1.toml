@@ -22,4 +22,4 @@ description = "RhinoTiger is a generative psytrance firmware for the M-VAVE FM-1
 tags = ["generative", "fm", "synth"]
 install = "https://hacha.github.io/rhinotiger/install/"
 site = "https://hacha.github.io/rhinotiger/"
-screenshot = "app/docs/img/screen-playing.png"
+screenshot = "app/docs/img/screen-logo.png"

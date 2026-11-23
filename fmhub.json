@@ -4,6 +4,6 @@
   "kinds": ["synth"],
   "play": "https://hacha.github.io/rhinotiger/emu/",
   "cheat": "https://hacha.github.io/rhinotiger/manual/",
-  "image": "app/docs/img/screen-playing.png",
+  "image": "app/docs/img/screen-logo.png",
   "color": "#ff4fc8"
 }
