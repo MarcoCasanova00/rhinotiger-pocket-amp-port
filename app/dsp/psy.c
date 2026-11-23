@@ -39,6 +39,8 @@
 #include "fastmath.h"
 #include "plat.h"                     /* PLAT_POOL: the big buffers in the pool on the device */
 
+#define NTURN 5u                       /* the bass's turns (TURN) */
+
 typedef struct {
     const char *name;
     float bpm;
@@ -50,6 +52,8 @@ typedef struct {
     uint8_t gallop, off;               /* % of phrases in a gallop, an offbeat */
     uint8_t bk[PS_NBUILD - 1];         /* the builds' leaning (AUTO): ROLL, KICK, FILTER, TRIPLET, STUTTER, POLY, SINK,
                                         * FAKE, HALF, ACID, STAIRS, GATE, out of their sum */
+    uint8_t turn;                      /* % of phrases whose end the bass turns (leaves the root for a few notes) */
+    uint8_t tk[NTURN];                 /* the turns' leaning: STEP, FALL, CLIMB, FIFTH, JUMP (TURN), out of their sum */
     uint8_t skip, jump;                /* % of notes resting (a stutter), jumping (an octave or a fifth up) */
     float ratio;                       /* the bass's modulator to carrier */
     float index, index_ms;             /* the modulation at the note's start, and how fast it falls (ms to 1/e) */
@@ -85,6 +89,7 @@ typedef struct {
 static const world_t W[PS_NWORLD] = {
     /* low and muffled, a soft stuttering bass, wet clicks, a thick murmur */
     {.name = "SWAMP RADIO", .bpm = 145, .root = 29, .gallop = 20, .off = 15, .bk = {25, 15, 30, 5, 10, 5, 10, 10, 15, 15, 5, 5}, .skip = 9,
+     .turn = 35, .tk = {40, 30, 10, 10, 10},
      .ratio = 1.0f, .index = 1.8f, .index_ms = 22, .floor = 0.2f, .gate = 0.82f, .drive = 1.1f, .kick_len = 1.0f, .kick_bright = 0.5f,
      .hat_ms = 18, .open_ms = 70, .hat_hp = 0.70f, .clap_hz = 900,
      .ev_density = 6, .ev_low = 35, .ev_mid = 45, .ev_runs = 10, .atmos = 0.8f, .brk = 16,
@@ -92,6 +97,7 @@ static const world_t W[PS_NWORLD] = {
      .line_ratio = 1.0f, .line_index = 1.5f, .line_ms = 60, .line_gate = 0.6f, .line_wah = 0.3f},
     /* deep and long, a thick low bass, a growl now and then, sinking sounds, a dark swell; long breaks */
     {.name = "UNDER THE ROOTS", .bpm = 148, .root = 28, .gallop = 15, .off = 15, .bk = {25, 15, 30, 5, 10, 5, 10, 10, 15, 15, 5, 5},
+     .turn = 40, .tk = {40, 40, 15, 0, 5},
      .ratio = 0.5f, .index = 2.6f, .index_ms = 18, .floor = 0.3f, .gate = 0.8f, .drive = 1.5f, .kick_len = 1.0f, .kick_bright = 0.7f,
      .hat_ms = 14, .open_ms = 60, .hat_hp = 0.78f, .clap_hz = 1000,
      .ev_density = 4, .ev_low = 55, .ev_mid = 30, .ev_runs = 10, .atmos = 0.55f, .brk = 24,
@@ -99,6 +105,7 @@ static const world_t W[PS_NWORLD] = {
      .line_ratio = 1.5f, .line_index = 3.0f, .line_ms = 120, .line_gate = 0.9f, .line_wah = 0.2f},
     /* cold dark psy: hard, short sixteenths, a short phrase creeping in semitones, lasers, a thin band of noise */
     {.name = "COLD SIGNAL", .bpm = 152, .root = 30, .gallop = 15, .off = 10, .bk = {25, 25, 20, 5, 10, 10, 5, 10, 10, 10, 10, 10},
+     .turn = 50, .tk = {45, 35, 15, 0, 5},
      .ratio = 1.0f, .index = 3.2f, .index_ms = 14, .floor = 0.35f, .gate = 0.72f, .drive = 1.6f, .kick_len = 0.95f, .kick_bright = 1.0f,
      .hat_ms = 14, .open_ms = 55, .hat_hp = 0.80f, .clap_hz = 1100,
      .ev_density = 5, .ev_low = 30, .ev_mid = 55, .ev_runs = 15, .atmos = 0.2f, .brk = 16,
@@ -106,6 +113,7 @@ static const world_t W[PS_NWORLD] = {
      .line_ratio = 3.0f, .line_index = 2.5f, .line_ms = 25, .line_gate = 0.45f},
     /* bouncing: the bass jumps now and then, a talking FM line, gurgles; sudden turns */
     {.name = "RUBBER CIRCUS", .bpm = 156, .root = 31, .trip = 25, .gallop = 25, .off = 10, .bk = {20, 20, 15, 20, 10, 15, 5, 10, 10, 15, 15, 10}, .jump = 12,
+     .turn = 65, .tk = {10, 10, 25, 25, 30},
      .ratio = 1.0f, .index = 3.0f, .index_ms = 16, .floor = 0.3f, .gate = 0.6f, .drive = 1.4f, .kick_len = 0.9f, .kick_bright = 1.2f,
      .hat_ms = 12, .open_ms = 50, .hat_hp = 0.82f, .clap_hz = 1300,
      .ev_density = 7, .ev_low = 20, .ev_mid = 60, .ev_runs = 20, .atmos = 0.1f, .brk = 8,
@@ -113,6 +121,7 @@ static const world_t W[PS_NWORLD] = {
      .line_ratio = 1.0f, .line_index = 4.0f, .line_ms = 40, .line_gate = 0.6f, .line_wah = 0.8f},
     /* heavy, a distorted bass, a long dragging phrase, groans; big breaks */
     {.name = "BLACK UNDERTOW", .bpm = 160, .root = 28, .gallop = 15, .off = 10, .bk = {25, 25, 20, 5, 10, 5, 10, 10, 15, 15, 5, 10},
+     .turn = 45, .tk = {35, 45, 15, 5, 0},
      .ratio = 1.0f, .index = 3.6f, .index_ms = 20, .floor = 0.45f, .gate = 0.75f, .drive = 2.2f, .kick_len = 1.0f, .kick_bright = 1.1f,
      .hat_ms = 14, .open_ms = 55, .hat_hp = 0.78f, .clap_hz = 1000,
      .ev_density = 9, .ev_low = 50, .ev_mid = 35, .ev_runs = 15, .atmos = 0.25f, .brk = 16,
@@ -120,6 +129,7 @@ static const world_t W[PS_NWORLD] = {
      .line_ratio = 2.0f, .line_index = 3.5f, .line_ms = 200, .line_gate = 1.0f, .line_wah = 0.1f},
     /* tight, a short metallic repeat, the staircases begin; now and then a bar of triplets */
     {.name = "COPPER NERVE", .bpm = 168, .root = 29, .trip = 40, .gallop = 15, .off = 5, .bk = {20, 20, 15, 20, 10, 15, 5, 10, 5, 15, 10, 15},
+     .turn = 55, .tk = {25, 25, 20, 15, 15},
      .ratio = 2.0f, .index = 2.8f, .index_ms = 11, .floor = 0.3f, .gate = 0.72f, .drive = 1.5f, .kick_len = 0.93f, .kick_bright = 1.1f,
      .hat_ms = 11, .open_ms = 45, .hat_hp = 0.85f, .clap_hz = 1300, .ride = 1,
      .ev_density = 8, .ev_low = 20, .ev_mid = 45, .ev_runs = 30, .atmos = 0.1f, .brk = 8,
@@ -127,6 +137,7 @@ static const world_t W[PS_NWORLD] = {
      .line_ratio = 3.5f, .line_index = 2.5f, .line_ms = 18, .line_gate = 0.5f},
     /* bright hi-tech: clean sixteenths, a bright metallic lead, staircases flying left and right; short breaks */
     {.name = "GLASS INSECTS", .bpm = 176, .root = 30, .gallop = 10, .off = 5, .bk = {20, 25, 10, 20, 15, 10, 5, 10, 5, 10, 15, 15},
+     .turn = 60, .tk = {10, 15, 20, 25, 30},
      .ratio = 2.0f, .index = 2.4f, .index_ms = 9, .floor = 0.25f, .gate = 0.76f, .drive = 1.3f, .kick_len = 0.92f, .kick_bright = 1.2f,
      .hat_ms = 10, .open_ms = 40, .hat_hp = 0.88f, .clap_hz = 1500, .ride = 1,
      .ev_density = 9, .ev_low = 10, .ev_mid = 40, .ev_runs = 35, .atmos = 0.05f, .brk = 8,
@@ -134,6 +145,7 @@ static const world_t W[PS_NWORLD] = {
      .line_ratio = 2.0f, .line_index = 2.0f, .line_ms = 30, .line_gate = 0.6f},
     /* fast and fine: the detail in the line's fragments and the events, the densest; changing all the time */
     {.name = "CHROME SWARM", .bpm = 186, .root = 31, .gallop = 5, .off = 5, .bk = {20, 25, 5, 20, 15, 10, 5, 10, 5, 10, 15, 20},
+     .turn = 65, .tk = {15, 15, 20, 20, 30},
      .ratio = 2.0f, .index = 2.2f, .index_ms = 8, .floor = 0.25f, .gate = 0.7f, .drive = 1.3f, .kick_len = 0.9f, .kick_bright = 1.3f,
      .hat_ms = 8, .open_ms = 35, .hat_hp = 0.90f, .clap_hz = 1700, .ride = 1,
      .ev_density = 14, .ev_low = 10, .ev_mid = 35, .ev_runs = 50, .brk = 4,
@@ -237,6 +249,7 @@ static struct {
     uint8_t trip_at;                   /* the phrase's bar of triplets (3 or 7; 255: none) */
     uint8_t kit_pat, kit_bars;         /* the kit's shape over the groove's (s.pat's values), its bars to go (0: none) */
     uint8_t shape_was;                 /* GROOVE's ALGORITHM as the last bar began (turned: the kit's shape gone) */
+    uint8_t turn;                      /* the bass's turn at the phrase's end (1 + its row of TURN; 0: none) */
     uint8_t kf, kf_bars;               /* the phrase's kick twist at its end (KF_*), BARE's bars (1 or 2) */
     /* the echo: ping-pong */
     float e_lp[2];
@@ -1329,8 +1342,47 @@ static void section_bar(const world_t *w, uint32_t bar)   /* a bar begins: the c
     }
 }
 
-static void bass_note(const world_t *w, uint32_t span)   /* the bass strikes, its room span ticks */
+/* the bass's turns: at a phrase's end, two beats a few notes off the root (semitones, by the sixteenth; the offbeat's
+ * one note takes the last). Up only: below the root is too low to hear. The second beat is the last the bass sounds
+ * (before a fill or ROLL: a beat earlier) */
+static const int8_t TURN[NTURN][2][4] = {
+    {{0, 0, 0, 0}, {1, 1, 1, 1}},      /* STEP: a semitone up, leaning back on the root */
+    {{3, 3, 3, 3}, {1, 1, 1, 1}},      /* FALL: a minor third, a semitone, and home */
+    {{1, 1, 1, 1}, {3, 3, 3, 3}},      /* CLIMB: the other way */
+    {{0, 0, 0, 0}, {7, 7, 7, 12}},     /* FIFTH: a fifth, and the octave last */
+    {{0, 0, 0, 12}, {0, 0, 0, 12}},    /* JUMP: each beat's last an octave up */
+};
+
+static int bass_turn(uint32_t rb, uint32_t beat, uint32_t t, uint32_t pat)   /* the semitones a turn lifts this note */
 {
+    uint32_t last;
+    if (!s.turn || s.sec != SEC_MAIN || rb % 8u != 7u)
+        return 0;
+    last = fill_now(rb, 3u) || kick_fill(rb) == KF_ROLL ? 2u : 3u;
+    if (beat > last || beat + 1u < last)
+        return 0;
+    return TURN[(s.turn - 1u) % NTURN][beat + 1u - last][pat == 3u ? 3u : t / 6u];
+}
+
+static void turn_draw(const world_t *w, uint32_t rb)   /* a phrase begins: its end turned, and how (dice of their own:
+                                                        * the music's stay as they were) */
+{
+    uint32_t sum = 0, r, i;
+    s.turn = 0;
+    if (vary_u(rb / 8u, 0x7012Eu + (uint32_t)world) * 100.0f >= (float)w->turn)
+        return;
+    for (i = 0; i < NTURN; i++)
+        sum += w->tk[i];
+    r = (uint32_t)(vary_u(rb / 8u, 0x70C1Du + (uint32_t)world) * (float)sum);
+    for (i = 0; i < NTURN - 1u && r >= w->tk[i]; i++)
+        r -= w->tk[i];
+    s.turn = (uint8_t)(1u + i);
+}
+
+static void bass_note(const world_t *w, uint32_t span, int turn)   /* the bass strikes, its room span ticks; turn: semitones
+                                                                    * up (a jump then not) */
+{
+    int jump = w->jump && rnd() % 100u < w->jump ? ((rnd() & 1u) ? 12 : 7) : 0;
     s.b_t = 0.0f;
     s.b_cph = s.b_mph = 0.0f;          /* every note from the same place: the roll is tight */
     s.b_gate = w->gate * cf.b_len * s.tick_len * (float)span / PS_SR;   /* (LENGTH) */
@@ -1339,7 +1391,7 @@ static void bass_note(const world_t *w, uint32_t span)   /* the bass strikes, it
         if (s.b_gate > most)
             s.b_gate = most;
     }
-    s.b_inc = note_hz(m.root + s.lift + (w->jump && rnd() % 100u < w->jump ? ((rnd() & 1u) ? 12 : 7) : 0)) / PS_SR;
+    s.b_inc = note_hz(m.root + s.lift + (turn ? turn : jump)) / PS_SR;
     ps_ui.hits[HIT_BASS]++;
 }
 
@@ -1393,6 +1445,9 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         s.pat = (uint8_t)(rb == 0u || r >= (uint32_t)(w->gallop + w->off) ? 0 : r < w->gallop ? 1 : 3);
         r = rnd() % 100u;              /* a bar of triplets: the half's end, the 4th bar or the 8th */
         s.trip_at = (uint8_t)(rb != 0u && r < w->trip ? (r & 1u ? 3u : 7u) : 255u);
+        s.turn = 0;                    /* the bass's turn as it ends (not in the intro, nor a drop's first phrase) */
+        if (bar >= 16u && rb != 0u)
+            turn_draw(w, rb);
         s.kf = KF_NONE;                /* the kick's twist as it ends (not in the intro, nor where the 32nd bar's is) */
         if (bar >= 16u && rb != 0u && par[P_FILLS] && rb % 32u != 24u) {
             static const float F[5] = {0.0f, 0.4f, 0.7f, 1.0f, 1.4f};
@@ -1424,13 +1479,13 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
         s.k_t = 0.0f;
         s.k_ph = 0.0f;
         ps_ui.hits[HIT_KICK]++;
-        bass_note(w, 6u);
+        bass_note(w, 6u, 0);
         return;
     }
     if (acid_build()) {                /* ACID: the bass alone, every sixteenth, an octave up every third (its breath:
                                         * none) */
         if (t % 6u == 0u && !build_breath(beat)) {
-            bass_note(w, 6u);
+            bass_note(w, 6u, 0);
             if ((s.sec_bar * 16u + beat * 4u + t / 6u) % 3u == 2u)
                 s.b_inc *= 2.0f;
         }
@@ -1446,7 +1501,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
                 ps_ui.hits[HIT_KICK]++;
             }
         } else if (ht % 12u == 0u && !bass_rests && !(w->skip && rnd() % 100u < w->skip))
-            bass_note(w, 12u);
+            bass_note(w, 12u, 0);
         return;
     }
     if (t == 0u || (t % 6u == 0u && kf != KF_NONE && kick_at(rb, beat, t))) {   /* (a twist's: its tick the kick's) */
@@ -1466,7 +1521,7 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
             return;
         if (w->skip && rnd() % 100u < w->skip)   /* a stutter: this one rests */
             return;
-        bass_note(w, span);
+        bass_note(w, span, bass_turn(rb, beat, t, pat));
     }
 }
 
@@ -1917,6 +1972,7 @@ void ps_render(float *outl, float *outr, uint32_t n)
         s.out = s.pat = s.fill_beat = s.gap = 0;   /* (a GAP cued or sounding: forgotten) */
         fx.gap_req = 0;
         s.trip_at = 255;
+        s.turn = 0;
         s.kf = KF_NONE;
         ev.pending = 0;                /* (keys pressed while resting are not thrown in a heap) */
         take.n = take.arm = take.rec = 0;   /* (the keys' loop gone) */
