@@ -264,6 +264,53 @@ static int hd_move(uint32_t e, int size, int last)
     return 0;
 }
 
+/* a groove's own edge into a drop at tick e (au_bar's: whatever PERFORM, but never over the hand's): ROLL's, one of five
+ * (v: the kick out 4 bars; the kick and the bass out for the last; HIGH 8 bars, the kick out the last 2; half time 8;
+ * LOW 8 and the last beat silent); C's (v < 0): the old chapter thinned, HIGH 16 bars, the bass out 8, the kick the last */
+static void hd_edge(int v, uint32_t e)
+{
+    int fx = hd_fx_ok(), k = hd_part_ok(PART_KICK), b = hd_part_ok(PART_BASS);
+    switch (v) {
+    case 0: if (k) hd_do(PS_AG_OUT, 1 << PART_KICK, e - 4u * HD_BAR, e, 0); break;
+    case 1: if (k && b) hd_do(PS_AG_OUT, 1 << PART_KICK | 1 << PART_BASS, e - HD_BAR, e, 0); break;
+    case 2:
+        if (fx)
+            hd_do(PS_AG_FX, HF_HIGH, e - 8u * HD_BAR, e, 0);
+        if (k)
+            hd_do(PS_AG_OUT, 1 << PART_KICK, e - 2u * HD_BAR, e, 0);
+        break;
+    case 3: if (fx) hd_do(PS_AG_HALF, 0, e - 8u * HD_BAR, e, 0); break;
+    case 4:
+        if (fx) {
+            hd_do(PS_AG_FX, HF_LOW, e - 8u * HD_BAR, e, 0);
+            hd_do(PS_AG_GAP, 0, e - 24u, e, 0);
+        }
+        break;
+    default:
+        if (fx)
+            hd_do(PS_AG_FX, HF_HIGH, e - 16u * HD_BAR, e, 0);
+        if (b)
+            hd_do(PS_AG_OUT, 1 << PART_BASS, e - 8u * HD_BAR, e, 0);
+        if (k)
+            hd_do(PS_AG_OUT, 1 << PART_KICK, e - HD_BAR, e, 0);
+        break;
+    }
+    if (hd.out_to < (int)(e / HD_BAR))
+        hd.out_to = (int)(e / HD_BAR);
+    HD_LOG("HD edge %d bar %d\n", v, (int)(e / HD_BAR));
+}
+/* a track's beginning from t0 (the set's, C's drop): the events out for half of bars, the line for all of them, nothing
+ * else of the hands' so long */
+static void hd_intro(uint32_t t0, int bars, int flag)
+{
+    if (hd_part_ok(PART_EVENTS))
+        hd_do(PS_AG_OUT, 1 << PART_EVENTS, t0, t0 + HD_BAR * (uint32_t)(bars / 2), flag);
+    if (hd_part_ok(PART_LINE))
+        hd_do(PS_AG_OUT, 1 << PART_LINE, t0, t0 + HD_BAR * (uint32_t)bars, flag);
+    hd.out_to = hd.mot_to = (int)(t0 / HD_BAR) + bars;
+    HD_LOG("HD intro bar %d bars %d\n", (int)(t0 / HD_BAR), bars);
+}
+
 static void hd_strip(uint32_t t0, int left, int flag, int thrown)   /* a part left out from t0, left bars of the groove
                                                                      * from there (thrown: not the events, a throw on it) */
 {
@@ -287,9 +334,11 @@ static void hd_strip(uint32_t t0, int left, int flag, int thrown)   /* a part le
 
 static void hd_groove(int rb)            /* a groove's bar (rb from its drop): at a phrase's second bar, the phrase */
 {
-    int p = rb / 8, end = p * 8 + 8, last = end >= au.groove && !au_held(P_BREAKS), left = au.groove - end, size, i;
+    int p = rb / 8, end = p * 8 + 8, fin = end + (au.kind == K_C ? 8 : 0) >= au.groove && !au_held(P_BREAKS),
+        last = fin && au_breaky(), left = au.groove - end, size, i;
     uint32_t e = HD_BAR * (uint32_t)(au.drop_bar + end);
-    if (rb % 8 != 1)
+    if (rb % 8 != 1 || (fin && !last))   /* (a groove's last phrase into a build or a drop of its own, C's last two: its
+                                          * edge, au's) */
         return;
     size = end % 32 == 0 ? 2 : end % 16 == 0 ? 1 : 0;
     if (hd_fx_ok() && hd_ch(last ? 0.8f : size == 2 ? 0.75f : size == 1 ? 0.5f : 0.28f)) {
@@ -318,7 +367,7 @@ static void hd_groove(int rb)            /* a groove's bar (rb from its drop): a
 static void hd_break(int at)             /* a break's bar (at from its start) */
 {
     int len = au.ours ? au.brk : 16;
-    if (at == 1 && hd_fx_ok() && hd_ch(0.6f)) {   /* a long effect in its middle */
+    if (at == 1 && len >= 8 && hd_fx_ok() && hd_ch(0.6f)) {   /* a long effect in its middle */
         static const uint8_t F[6] = {HF_WASH, HF_DUB, HF_FREEZE, HF_GATE, HF_BAND, HF_LOW};
         int f = F[hd_rnd(6u)], b = f == HF_FREEZE || f == HF_DUB ? 2 : 4;
         uint32_t t0 = HD_BAR * (uint32_t)(au.bar - 1 + len / 2);

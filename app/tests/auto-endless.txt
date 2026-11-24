@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY without end (set 4): its first hour's last chapter goes on through its full break into the next hour's plan
+# (10 chapters, not the first hour's 8), and its chapters go on
+wait 3000   # the logo, then the play
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K2 2
+wait 30
+expect auto_len 3
+turn K3 4
+wait 30
+turn K1 1
+wait 30
+tap PLAY
+wait 30000
+expect chapters 8
+wait 3690000
+expect autoplay 1
+expect playing 1
+expect chapters 10
+expect chapter 0
+wait 360000
+expect chapter 1
+expect autoplay 1

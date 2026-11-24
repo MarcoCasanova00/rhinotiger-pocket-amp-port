@@ -64,6 +64,7 @@ int ps_root(void);                     /* the root now, MIDI note of the bass */
 void ps_auto_bpm(float bpm);
 void ps_auto_root(int note);
 void ps_stage(int world, int root);    /* (world < 0: none after all) */
+void ps_stage_bar(int world, int root);   /* the same as the next bar begins, a drop or not */
 /* and its hands (hands.c): things from a tick to a tick (since PLAY; t1 not in it) beside the player's own: an effect
  * (id: the grid's), parts out (id: 1 << PART_*), half time, a fill (t0 a beat), a gap (t0 a bar's last beat; both a beat long), a throw
  * (id: a white key's sound 0..15, semi over the root's nearest, bite x100), a motif (id: ps_auto_motif's) over and

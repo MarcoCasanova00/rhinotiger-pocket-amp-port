@@ -982,7 +982,8 @@ int ps_bpm(void)
 int ps_root(void) { return auto_root ? auto_root : W[want_world].root + par[P_ROOT]; }
 void ps_auto_bpm(float bpm) { auto_bpm = bpm; }
 void ps_auto_root(int note) { auto_root = note; }
-void ps_stage(int w, int root) { stage = w < 0 ? 0u : 1u + (unsigned)w % PS_NWORLD + ((uint32_t)root << 8); }
+void ps_stage(int w, int root) { stage = w < 0 ? 0u : 1u + (unsigned)w % PS_NWORLD + ((uint32_t)(root & 255) << 8); }
+void ps_stage_bar(int w, int root) { stage = 1u + (unsigned)w % PS_NWORLD + ((uint32_t)(root & 255) << 8) + (1u << 31); }
 int ps_world_now(void) { return want_world; }
 int ps_world_bpm(int w) { return (int)W[(unsigned)w % PS_NWORLD].bpm; }
 int ps_world_root(int w) { return W[(unsigned)w % PS_NWORLD].root; }
@@ -2019,11 +2020,12 @@ void ps_render(float *outl, float *outr, uint32_t n)
         }
         if (playing) {
             if (s.next <= 0.0f) {                  /* a tick begins on this sample */
-                if (s.tick % TPBAR == 0u && stage && drop_next()) {   /* AUTO PLAY's next world and root, together,
-                                                                       * and two turns of the kit */
+                if (s.tick % TPBAR == 0u && stage && (drop_next() || stage >> 31)) {   /* AUTO PLAY's next world and
+                                                                                        * root, together, and two turns
+                                                                                        * of the kit */
                     uint32_t st = stage;
                     want_world = (int)((st & 255u) - 1u);
-                    auto_root = (int)(st >> 8);
+                    auto_root = (int)(st >> 8 & 255u);
                     stage = 0;
                     kit.fwd_seen -= 2u;
                     tempo(w);

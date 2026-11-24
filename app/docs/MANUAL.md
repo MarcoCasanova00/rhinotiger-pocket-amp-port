@@ -258,13 +258,23 @@ them back, and throws sounds as the keys do.
 - SEED: which set. Each number from 1 to 99 is a plan of its own: the worlds, the tempos, the keys, where it rises and
   falls. Started from rest, the same number, the same MINUTES and the same tempo plan the same set again; the sounds in it
   still come out different each time. RANDOM picks a number for you, and shows it while the set plays. RANDOM.
-- PERFORM: how much it plays the effects, the parts and the sounds of the keys. At 0 it leaves them all to you. 50.
+- PERFORM: how much it plays the effects, the parts and the sounds of the keys. At 0 it leaves them all to you (what it
+  takes out at a chapter's change, a groove's end and a beginning stays: that is the set's own shape). 50.
 
 Turn it on while the music rests and the set waits at its beginning for PLAY. Turn it on while the music plays and the
 set goes on from there. MINUTES and SEED can be turned only while it is off; PERFORM at any time. On MAIN, BREAK and AUTO the rule shows how
 many minutes have gone, as `AUTO 12/60`.
 
-A set is made of chapters of some minutes each. A new chapter comes in on a drop, with its world and its key. The tempo
+A set is made of chapters of some minutes each, and each plays like a track: a few grooves, each ending its own way. One
+of them is the chapter's full break, a long break and a build into the drop; the others end in a short break and a drop
+at once, in a build straight from the groove, or in a part taken out or a filter into a drop of their own. The highest chapter
+is the set's peak: its break is the longest, and the chapter before it is held back. The set's own beginning comes in
+part by part, the line and the events a little after the rest.
+
+A chapter changes to the next in one of three ways, as a DJ goes from one track to the next. Through the full break: the
+world and the key come on its drop. Into the next one's break: they come as that break begins. In the groove: the old
+chapter thins out (the low end, the bass and the kick going), a drop brings the new world and key, and the new chapter
+comes in part by part. The world and the key change at these and nowhere else. The tempo
 glides all the way through. The set begins at the tempo it is turned on with: GROOVE's TEMPO while the music rests, the
 tempo it plays at while it plays (a MIDI clock's, if one comes). Every later tempo moves as far with it, between 125 and
 206 BPM. A set of 30, 60 or 90 minutes ends in a break that fades out, and then the music rests.
@@ -283,7 +293,7 @@ builds) stays yours for 32 bars, then goes back to the set: the four knobs and T
 once, ROOT at the next chapter (turned
 just before one, it stays through that one too). A world you
 choose with PRESETS stays until the next chapter. Breaks, builds and drops you call are followed (a break you call goes
-on to its build after 32 bars at most): a drop you call in a chapter's last break or build brings the next chapter. Play
+on to its build after 32 bars at most): a drop you call in the last break or build of a chapter that changes through its break brings the next chapter. Play
 an effect yourself
 and the set leaves the effects and the parts to you for 32 bars; mute a part, or bring it back, and it leaves that part
 alone as long, and takes no part out while any is muted. Turn the atmos's LEVEL and it comes back up, and is left alone

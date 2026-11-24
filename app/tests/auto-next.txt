@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# AUTO PLAY's next chapter comes with its last break's drop, whoever calls it (set 3, 30 minutes: the first chapter's
-# last break at bar 172, its build at 188): called in the break; a build called by hand, and its drop at once
+# AUTO PLAY's next chapter comes with its last break's drop, whoever calls it (set 31, 30 minutes: the first chapter
+# goes on to the next through its full break (A), at bar 292, its build at 308): called in the break; a build called by
+# hand, and its drop at once
 wait 3000   # the logo, then the play
 tap PLAY
 wait 200
@@ -15,12 +16,12 @@ expect page 4
 turn K2 -1
 wait 30
 expect auto_len 0
-turn K3 3
+turn K3 31
 wait 30
 turn K1 1
 wait 30
 tap PLAY
-wait 283500
+wait 470000
 expect section 1
 expect chapter 0
 expect world 2
@@ -36,7 +37,7 @@ expect root 32
 tap PLAY
 wait 600
 tap PLAY
-wait 283500
+wait 470000
 expect section 1
 expect chapter 0
 tap ARP

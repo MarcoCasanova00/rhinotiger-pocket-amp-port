@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY's chapters as tracks (set 7, 60 minutes): the set's beginning by degrees; a short break and the drop at
+# once; C, the old chapter thinned into a drop that brings the next world, which comes in by degrees; a drop of its own
+# after the kick out (ROLL); B, the next world as its break begins; a build straight from the groove
+wait 3000   # the logo, then the play
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 7
+wait 30
+turn K1 1
+wait 30
+tap PLAY
+# its beginning: the line and the events out (by the set), the events back halfway
+wait 10000
+expect hd_out 24
+expect muted 0
+wait 30000
+expect hd_out 8
+# a short break (4 bars), then the drop with no build
+wait 116000
+expect section 1
+wait 5000
+expect section 0
+# C: the bass out, then the next world on the drop, its line and its events out
+wait 305000
+expect hd_out 2
+expect world 2
+expect chapter 0
+wait 14000
+expect section 0
+expect world 3
+expect chapter 1
+expect hd_out 24
+# ROLL: the kick out 4 bars, then a drop of its own
+wait 115000
+expect hd_out 1
+expect section 0
+wait 10000
+expect hd_out 0
+expect chapter 1
+# B: the world as it was till its break, the next one as the break begins
+wait 685000
+expect section 0
+expect world 6
+expect chapter 2
+wait 5000
+expect section 1
+expect world 5
+expect chapter 3
+# a build straight from the groove
+wait 215000
+expect section 0
+wait 4000
+expect section 2
+wait 6000
+expect section 0
+expect chapter 3
