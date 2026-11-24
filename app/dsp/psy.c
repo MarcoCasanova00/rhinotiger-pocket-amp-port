@@ -1412,7 +1412,8 @@ static void step(const world_t *w)     /* a tick begins: what strikes on it */
     {   /* STAIRS: a minor third higher each quarter of it; GATE: all of it cut, quarters to 32nds (not under TAPE's
          * or REVERSE's ending) */
         static const uint8_t SL[4] = {24, 12, 6, 3};
-        uint32_t q = (uint32_t)clampi((int)((s.sec_bar * 4u + beat) / build_len()), 0, 3);
+        uint32_t q = s.sec == SEC_BUILD && build_len() ? (uint32_t)clampi((int)((s.sec_bar * 4u + beat) / build_len()), 0, 3)
+                                                       : 0u;   /* (no build, no length: nothing divided by it) */
         s.lift = (int8_t)(s.sec == SEC_BUILD && s.bk == PS_BUILD_STAIRS ? 3u * q : 0u);
         fx.auto_gate = (uint8_t)(s.sec == SEC_BUILD && s.bk == PS_BUILD_GATE && !build_breath(beat) &&
                                  !(build_end(beat) && (s.be == PS_END_TAPE || s.be == PS_END_REVERSE)) ? SL[q] : 0u);
