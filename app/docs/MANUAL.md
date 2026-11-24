@@ -263,7 +263,8 @@ them back, and throws sounds as the keys do.
 
 Turn it on while the music rests and the set waits at its beginning for PLAY. Turn it on while the music plays and the
 set goes on from there. MINUTES and SEED can be turned only while it is off; PERFORM at any time. On MAIN, BREAK and AUTO the rule shows how
-many minutes have gone, as `AUTO 12/60`.
+long the set has played, as `12:34` (past an hour, `1:02:34`). The rule's line beside it becomes a bar, lit as
+far as the set has come, with a mark at each chapter's end. On ENDLESS the bar fills once an hour.
 
 A set is made of chapters of some minutes each, and each plays like a track: a few grooves, each ending its own way. One
 of them is the chapter's full break, a long break and a build into the drop; the others end in a short break and a drop

@@ -440,23 +440,62 @@ static int au_turn(int p, int step)
     return 1;
 }
 
-static const char *au_text(void)         /* for the rule: its chapter, its minutes */
+static uint32_t au_put2(char *t, uint32_t v)   /* two digits */
+{
+    t[0] = (char)('0' + v / 10u % 10u);
+    t[1] = (char)('0' + v % 10u);
+    t[2] = 0;
+    return 2;
+}
+/* the set's time so far, minutes (an endless one's since its start, au.total its hours before): smooth through a bar
+ * (au.min moves a bar at a time; the tempo as au_tick counts the bars, so no second back at one) */
+static float au_elapsed(int all)
+{
+    uint32_t tk = ps_ui.tick;
+    float m = au.min, bpm = (float)ps_bpm();
+    if (bpm <= au.bpm + 1.0f && bpm >= au.bpm - 1.0f)
+        bpm = au.bpm;
+    if (au.begun && ps_playing() && tk >= 4u && (int)((tk - 4u) / (4u * PS_TPB)) == au.bar && bpm > 1.0f)
+        m += (float)((tk - 4u) % (4u * PS_TPB)) / (float)PS_TPB / bpm;
+    return all ? au.total + m : m;
+}
+/* for the rule: the set's time so far (12:34, past an hour 1:02:34), the same for every length; waiting or ending,
+ * a word with AUTO */
+static const char *au_text(void)
 {
     static char t[32];
-    uint32_t n;
+    uint32_t n, sec;
     char v[12];
     if (!ps_playing())
         return "AUTO: PLAY";
     if (au.closing)
         return "AUTO: THE END";
-    n = str_put(t, sizeof t, "AUTO ");
-    int_text((int)(au.total + au.min), v);
-    n += str_put(t + n, sizeof t - n, v);
-    if (au.len == AU_LEN_ENDLESS)
-        str_put(t + n, sizeof t - n, " MIN");
-    else
-        str_put(t + n, sizeof t - n, au.len == AU_LEN_30 ? "/30" : au.len == AU_LEN_60 ? "/60" : "/90");
+    sec = (uint32_t)(au_elapsed(1) * 60.0f);
+    n = 0;
+    if (sec >= 3600u) {
+        int_text((int)(sec / 3600u), v);
+        n += str_put(t + n, sizeof t - n, v);
+        t[n++] = ':';
+        n += au_put2(t + n, sec / 60u % 60u);
+    } else {
+        int_text((int)(sec / 60u), v);
+        n += str_put(t + n, sizeof t - n, v);
+    }
+    t[n++] = ':';
+    au_put2(t + n, sec % 60u);
     return t;
+}
+/* for the rule's bar: how far into the set (an endless one: into its hour), 0..1; the chapters' ends in *ends (n of
+ * them, the last not: the set's own end) */
+static float au_progress(float *ends, int *n)
+{
+    static const uint8_t MIN[AU_NLEN] = {30, 60, 90, 60};
+    float len = (float)MIN[au.len];
+    uint32_t i;
+    *n = 0;
+    for (i = 0; i + 1u < au.nch && i < AU_NCH; i++)
+        ends[(*n)++] = fm_clampf(au.ch[i].end / len, 0.0f, 1.0f);
+    return au.closing ? 1.0f : fm_clampf(au_elapsed(0) / len, 0.0f, 1.0f);
 }
 
 /* the next chapter's world and key handed to the engine, which takes them on the drop, whenever it comes (the set's or

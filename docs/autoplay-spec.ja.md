@@ -1006,12 +1006,11 @@ size  = end % 32 == 0 ? 2 : end % 16 == 0 ? 1 : 0
 | --- | --- |
 | 休み中（`!ps_playing()`） | 「AUTO: PLAY」 |
 | `au.closing` | 「AUTO: THE END」 |
-| 30 分 | 「AUTO n/30」 |
-| 60 分 | 「AUTO n/60」 |
-| 90 分 | 「AUTO n/90」 |
-| ENDLESS | 「AUTO n MIN」 |
+| 鳴っている（どの長さも） | 「m:ss」（たった時間。「AUTO」は付けない）、1 時間以上は「h:mm:ss」 |
 
-`n` は `(int)(au.total + au.min)`（切り捨てた分）。
+たった時間（`au_elapsed`）は `au.total + au.min`（分）に、いまの小節に入ってからの拍を足したもの（`(ps_ui.tick - 4) % (4 * PS_TPB) / PS_TPB / bpm`。`au.min` は小節ごとにしか進まないので、秒がなめらかに進むように）。`bpm` は `au_tick` と同じく、`ps_bpm()` が `au.bpm` から 1 以内なら `au.bpm`（小節の切れ目で秒が戻らない）。秒は切り捨て。
+
+ルールの線（`draw_rule`）は、`au_text()` を出すときバーになる。文字の欄は、鳴っている間は「00:00」（ENDLESS は「0:00:00」）の幅に固定（時間が伸びてもバーが動かない）。バーは線の幅 × `au_progress()`（たった時間 ÷ セットの長さ。ENDLESS は `au.min` ÷ 60 で、1 時間ごとに始めから。`closing` 中は 1）だけ 3 ドットの太さで `C_AMB`。章の終わり（`au.ch[i].end` ÷ 長さ、最後の章を除く）に 5 ドットの目盛り（光った中は黒、まだのところは `C_GRAY`）。
 
 ### 8.2 グリッドの自動表示（`au_see`）
 

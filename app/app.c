@@ -1527,6 +1527,7 @@ static void draw_rule(void)
     const char *ctx = 0, *name = PAGE_NAME[ui.page];
     static char rec_t[16];
     int32_t xd = 231 - NPAGE * 5, xt = xd - 6 - text_w(&FONT_XS, name), xs = 0, i;
+    int au_rule = 0;
     if (ps_rec_state() == 1)
         ctx = "REC: NEXT BAR";
     else if (ps_rec_state() == 2) {          /* taking: its bar, of its bars */
@@ -1539,9 +1540,11 @@ static void draw_rule(void)
     else if (ui.page == PG_GLOBAL && set_dirty)
         ctx = "SAVE: KEEP IT";
     else if (au.on && (ui.page == PG_MAIN || ui.page == PG_BREAK || ui.page == PG_AUTO))
-        ctx = au_text();
+        ctx = au_text(), au_rule = 1;
     if (ctx)
         xs = cv_text(6, 0, &FONT_XS, ctx, C_AMB) + 6;
+    if (au_rule && ps_playing() && !au.closing)   /* (the time's room as wide as it grows: the bar stays put) */
+        xs = 6 + text_w(&FONT_XS, au.len == AU_LEN_ENDLESS ? "0:00:00" : "00:00") + 6;
     else if (ui.page == PG_BUILD && ps_ui.section == SEC_BUILD && ps_ui.build_kind > 0) {   /* in a build: this
                                                                                               * one's type and ending */
         xs = cv_text(6, 0, &FONT_XS, "NOW", C_GRAY) + 6;
@@ -1557,7 +1560,19 @@ static void draw_rule(void)
         xs = 6;
         xs = cv_text(xs, 0, &FONT_XS, ps_type_name(part, ps_type_now(part)), part_txt(PART_HUE[part], 255)) + 6;
     }
-    if (xt - 6 > xs)
+    if (au_rule && xt - 6 > xs) {         /* AUTO PLAY's: the line a bar, lit as far as the set has come, a mark at each
+                                          * chapter's end */
+        float ends[AU_NCH];
+        int ne, w = xt - 6 - xs, lit = (int)(au_progress(ends, &ne) * (float)w + 0.5f);
+        cv_rect(xs, 5, w, 1, C_LINE);
+        if (lit > 0)
+            cv_rect(xs, 4, lit, 3, C_AMB);
+        for (i = 0; i < ne; i++) {
+            int x = xs + (int)(ends[i] * (float)w + 0.5f);
+            if (x > xs && x < xs + w - 1)
+                cv_rect(x, 3, 1, 5, x < xs + lit ? C_BLACK : C_GRAY);
+        }
+    } else if (xt - 6 > xs)
         cv_rect(xs, 5, xt - 6 - xs, 1, C_LINE);
     cv_text(xt, 0, &FONT_XS, name, C_HI);
     for (i = 0; i < NPAGE; i++) {
