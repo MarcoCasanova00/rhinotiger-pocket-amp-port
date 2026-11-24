@@ -25,7 +25,7 @@ it: back it up first.
 | LFO | LINE (Bite, Decay, Length, Drive); again: LINE SEQ (Density, Mutate, Range, Slide); again: ATMOS (Colour, Air, Motion, Depth). Held on LINE or LINE SEQ: the phrase is drawn anew |
 | EDIT | MIX: a part's Level, Send and Mute |
 | FX | ECHO (Feedback, Tone, Time, Level); the keys play the effects |
-| GLO | GLOBAL (Lights, Theme, CPU, MIDI in); SAVE here keeps everything, held: the defaults |
+| GLO | GLOBAL (Lights, Theme, CPU); SAVE here keeps everything, held: the defaults |
 | PRESETS | the world, from the next bar |
 | ALGORITHM | the type of the page's part (on MAIN: the kit; on ECHO: the kind of echo) |
 | K1..K4 | the four knobs of the page shown |

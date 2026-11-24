@@ -38,10 +38,10 @@
  *                            track, its meter, its level and its send
  *  14 ECHO (FX)              K1..K4 Feedback, Tone, Time, Level (the return)
  *  15 GLOBAL (GLO)           K1..K2 Lights (the buttons' glow), Theme (the screen's colours and how they move: NEON,
- *                            ACID, INFRA, ICE, MONO); K3 shows the audio's load (CPU); K4 MIDI in
- *                            (off by default); SAVE here keeps it all (tapped: as it is let go); held 1.5 s, every
- *                            knob of every page back where it began (the world's own sound: the knobs move from it),
- *                            not kept until SAVE (SAVE lit); the world, the lights, the theme and MIDI stay
+ *                            ACID, INFRA, ICE, MONO); K3 shows the audio's load (CPU); K4 none; SAVE here keeps
+ *                            it all (tapped: as it is let go); held 1.5 s, every knob of every page back where it
+ *                            began (the world's own sound: the knobs move from it), not kept until SAVE (SAVE lit);
+ *                            the world, the lights and the theme stay
  * PRESETS: the world, from the next bar (the header's name changes, white a moment; no message over the BPM). PLAY:
  * play or rest. ALGORITHM: the type of the page's part (the bass's: a drop chooses another on its own); on GROOVE the bass's shape, on ECHO the echo's kind; on MAIN the kit (forward: one part or a few of
  * those heard another type as the next bar begins, more turns more parts, and the groove another shape for four
@@ -79,14 +79,14 @@ typedef struct {
     uint8_t world;
     uint8_t lights;                      /* the buttons' glow: 0 off, 1 low, 2 high */
     uint8_t theme;                       /* THEME (the screen's colours and their movement) */
-    uint8_t flags;                       /* SET_MIDI */
+    uint8_t flags;                       /* SET_MIDI (no longer read) */
     int16_t par[P_NPARAMS];
     uint8_t auto_len, auto_set;          /* AUTO PLAY's: 30, 60, 90 minutes, without end; its seed (0: a random one) */
     uint8_t auto_perf;                   /* its hands, how much (0..100) */
 } settings_t;
 static settings_t set;
-#define SET_MIDI 2u                      /* MIDI in: notes throw events, start / stop / clock followed */
-static void midi_off(void);
+#define SET_MIDI 2u                      /* v1.0's MIDI IN (GLOBAL's K4): MIDI in always on now; a save with it
+                                          * still read */
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 #define NTHEME 5                         /* THEME's (the screen's): NEON, ACID, INFRA, ICE, MONO */
 static void theme_apply(void);
@@ -407,7 +407,7 @@ static uint32_t app_ms(void)
 static const char *knob_name(int page, int k)
 {
     if (page == PG_GLOBAL)
-        return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "MIDI IN";
+        return k == 0 ? "LIGHTS" : k == 1 ? "THEME" : k == 2 ? "CPU" : "";
     if (page == PG_BUILD)
         return k == 0 ? "TYPE" : k == 1 ? "ENDING" : k == 2 ? "LENGTH" : "";
     if (page == PG_AUTO)
@@ -462,10 +462,6 @@ static void knob_value(int page, int k, char *t, int32_t *pos, int32_t *span)   
             str_put(t + k, 4, ps_shedding() ? "%!" : "%");   /* (!: lighter, the render was near its time) */
             *pos = (int32_t)(c > 100u ? 100u : c);
             *span = 100;
-        } else {
-            str_put(t, 12, set.flags & SET_MIDI ? "ON" : "OFF");
-            *pos = (set.flags & SET_MIDI) != 0;
-            *span = 1;
         }
         return;
     }
@@ -587,10 +583,6 @@ static void knob_turn(int k, int32_t d)
         else if (k == 1) {
             set.theme = (uint8_t)clamp(set.theme + d, 0, NTHEME - 1);
             theme_apply();
-        } else if (k == 3) {
-            set.flags = (uint8_t)(d > 0 ? set.flags | SET_MIDI : set.flags & ~SET_MIDI);
-            if (!(set.flags & SET_MIDI))
-                midi_off();
         } else
             return;
     } else if (page == PG_BUILD && k < 2) {   /* the builds' type (K1), their ending (K2): AUTO at the left */
@@ -831,7 +823,7 @@ static void key_up(int k)
 }
 
 /* ------------------------------------------------------------------- midi --- */
-/* MIDI in (optional: GLOBAL's MIDI IN, off by default), from USB and the TRS jack: a note throws an event as its key
+/* MIDI in (always), from USB and the TRS jack: a note throws an event as its key
  * would (folded by octaves into the keys' F3..G5); start, continue and stop play and rest (start from the top); a
  * clock's tempo is followed (its beats' length, smoothed) until the clock stops for half a second */
 static struct {
@@ -841,18 +833,6 @@ static struct {
     uint8_t clocks;
 } md;
 
-static void midi_off(void)
-{
-    uint32_t k;
-    for (k = 0; k < NKEYS; k++)
-        if (md.down >> k & 1u && !(ui.keys >> k & 1u))
-            ps_key((int)k, 0, 0);
-    md.down = 0;
-    md.clocks = 0;
-    md.beat_t24 = 0;
-    ps_ext_bpm(0.0f);
-}
-
 static void midi_poll(void)
 {
     uint32_t pkt;
@@ -860,8 +840,6 @@ static void midi_poll(void)
     int took = 0;
     while (took++ < 48 && plat_midi_in(&pkt, &port)) {   /* (at most 48 a pass: the rest wait, the queue keeps room) */
         uint32_t st = pkt >> 8 & 0xFFu, d1 = pkt >> 16 & 0x7Fu, d2 = pkt >> 24 & 0x7Fu;
-        if (!(set.flags & SET_MIDI))
-            continue;
         if (st == 0xF8u) {               /* a clock: 24 a beat */
 #ifdef PLAT_HOST
             uint32_t t = plat_ms() * 1000u * PLAT_TICKS_PER_US;   /* (the host's t24 is its real clock, not the script's) */

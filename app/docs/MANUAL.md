@@ -450,7 +450,7 @@ repeats in the middle; TAPE wavers, darker and slightly driven; SMEAR blurs each
 
 ### 5.15 GLOBAL
 
-![The GLOBAL page: SAVE: KEEP IT and GLOBAL in the rule, Lights HIGH, Theme NEON, CPU 0%, MIDI IN ON](img/screen-global.png "GLOBAL, with changes not saved")
+![The GLOBAL page: SAVE: KEEP IT and GLOBAL in the rule, Lights HIGH, Theme NEON, CPU 0%](img/screen-global.png "GLOBAL, with changes not saved")
 
 GLO.
 
@@ -459,7 +459,6 @@ GLO.
 - CPU: how much of its time the audio is using, in percent. It is only a reading; the knob does nothing. If it says,
   for example, `83%!`, the music came close to what the FM-1 can compute, and it has made the sound a little simpler
   for a few seconds.
-- MIDI IN: ON or OFF. OFF. Turn right for ON (see 11. MIDI).
 
 The themes:
 
@@ -663,7 +662,7 @@ Every knob works inside the world, and none of them is moved by the choice. Eigh
 
 ## 10. Saving
 
-On GLOBAL, tap SAVE to keep everything: the world, every knob of every page, Lights, Theme and MIDI IN. They come back
+On GLOBAL, tap SAVE to keep everything: the world, every knob of every page, Lights and Theme. They come back
 the next time the FM-1 starts. While something is not saved, the rule there says `SAVE: KEEP IT` and SAVE stays lit, and the header says
 `SAVED` when it is done, or `SAVE FAILED` if it could not be. Elsewhere SAVE calls a break (see 8. Sections), so go to GLOBAL to save.
 
@@ -672,15 +671,15 @@ starts each time with the world's own sounds. If a newer version changes what is
 may come back with the defaults.
 
 **Back to the defaults.** On GLOBAL, hold SAVE for 1.5 seconds. Every knob of every page goes back to where it began
-(tempo and root to the world's own). The world, Lights, Theme and MIDI IN stay. The header says `DEFAULTS`. This is not kept until
+(tempo and root to the world's own). The world, Lights and Theme stay. The header says `DEFAULTS`. This is not kept until
 you tap SAVE.
 
 ---
 
 ## 11. MIDI
 
-MIDI in is optional: turn MIDI IN on GLOBAL on. It is OFF until you do. It listens on USB and the TRS jack, on any
-channel.
+MIDI in is always on. It listens on USB and the TRS jack, on any channel. With a DAW or another device connected, it
+follows the clock, start and stop that come from it too: turn off their sending if you don't want that.
 
 - Notes: a note throws the sound of the key it matches, as the key would (see 6. The keys), on every page: on ECHO
   too, where the notes throw sounds while the keys play the effects. The keys are F3 to G5 (MIDI

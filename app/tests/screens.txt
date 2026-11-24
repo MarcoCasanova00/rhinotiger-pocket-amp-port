@@ -97,7 +97,6 @@ shot screen-echo.png
 tap GLO
 wait 40
 expect page 14
-turn K4 1
 turn K1 1
 wait 600
 shot screen-global.png

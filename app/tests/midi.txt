@@ -1,17 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# MIDI in, optional (GLOBAL's MIDI IN, off by default): notes throw events, start / stop, a clock's tempo followed.
+# MIDI in, always on: notes throw events, start / stop, a clock's tempo followed.
 wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
 wait 1500
-# off: a note does nothing
-midi 90 3C 64
-wait 300
-expect thrown 0
-# on
-tap GLO
-turn K4 1
-wait 30
-expect dirty 1
+# a note: the key's throw
 midi 90 3C 64
 wait 300
 midi 80 3C 00

@@ -112,7 +112,7 @@ SEQ ボタンを 3 回押すと開く（BREAK → BUILD → AUTO の順。ペー
 | 4 | 1 | `world` |
 | 5 | 1 | `lights` |
 | 6 | 1 | `theme` |
-| 7 | 1 | `flags`（`SET_MIDI` = 2 のみ） |
+| 7 | 1 | `flags`（`SET_MIDI` = 2 のみ。v1.0 の MIDI IN の名残で、今は読まない。MIDI 入力はいつも受ける） |
 | 8 | 110 | `par[55]`（`int16_t`） |
 | 118 | 1 | `auto_len` |
 | 119 | 1 | `auto_set` |
