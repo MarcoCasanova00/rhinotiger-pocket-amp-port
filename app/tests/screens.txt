@@ -126,12 +126,12 @@ tapkey w7
 wait 120
 shot screen-thrown.png
 wait 1500
-key b3 down 90
+key b10 down 90
 key w5 down 90
 wait 700
 shot screen-rhythm.png
 key w5 up
-key b3 up
+key b10 up
 wait 400
 # REC: the keys' two bars (tapped: from the next bar)
 tap REC

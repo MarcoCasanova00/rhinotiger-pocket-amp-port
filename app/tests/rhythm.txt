@@ -30,13 +30,13 @@ key w9 down 90
 wait 1000
 expect throws >31
 expect throws <41
-# SCATTER (D#4) with them: on the sixteenths, the pitches drawn
-key b4 down 90
+# SCATTER (G#4) with them: on the sixteenths, the pitches drawn
+key b6 down 90
 wait 30
-expect rhythm 10
+expect rhythm 15
 wait 1000
 expect throws >40
 expect throws <52
-key b4 up
+key b6 up
 key w9 up
 key w5 up

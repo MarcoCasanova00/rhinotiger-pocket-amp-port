@@ -1024,8 +1024,8 @@ const char *ps_event_name(int type)
 int ps_rhythm(void) { return ev.rk; }
 const char *ps_rhythm_name(int k)
 {
-    static const char *const N[11] = {"3/16", "1/8", "1/8T", "GALLOP", "SCATTER", "WANDER", "LEAP", "FASTER", "SLOWER",
-                                      "CLIMB", "FALL"};
+    static const char *const N[11] = {"3/16", "1/8", "1/8T", "CLIMB", "FALL", "WANDER", "SCATTER", "LEAP", "SLOWER",
+                                      "FASTER", "GALLOP"};
     return k >= 0 && k < 27 && key_black(k) ? N[key_blacki(k)] : "";
 }
 

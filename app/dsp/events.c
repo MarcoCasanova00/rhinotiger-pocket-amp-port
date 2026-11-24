@@ -183,22 +183,24 @@ static const key_sound_t KEY_SOUND[16] = {
     {"SPARK", EV_CHIRP, 2.0f, 0.0f, 0.0f, 0.04f, 0.02f, 7.13f, 8.0f, 2.0f, 0.0f, 0.0f, 0.0f, 0, 1.53f},  /* G5 */
 };
 
-/* the black keys' rhythms, F#3 to F#5: the ticks between throws (24 a beat), going round, the first where the tick in
- * the beat modulo grid is phase; a pitch step a throw. Or a pattern of the bar's sixteenths (mask, bit i the i-th):
- * where the bar is, from the next sixteenth (never out of step with the groove, nothing waited for) */
+/* the black keys' rhythms, F#3 to F#5, by kind and by the keys' groups: the beat's (dotted eighths, eighths, triplets);
+ * the pitch moving (climbing and falling, then wandering, scattered, leaping); slower and faster; a gallop. The ticks
+ * between throws (24 a beat), going round, the first where the tick in the beat modulo grid is phase; a pitch step a
+ * throw. Or a pattern of the bar's sixteenths (mask, bit i the i-th): where the bar is, from the next sixteenth (never
+ * out of step with the groove, nothing waited for) */
 enum { PK_STEP, PK_SCATTER, PK_WANDER, PK_LEAP };   /* a rhythm's pitches: a step a throw, or drawn at its press */
 static const struct { uint8_t n; uint8_t iv[13]; uint8_t grid, phase; int8_t step; uint16_t mask; uint8_t pk; } KEY_RHYTHM[11] = {
     {1, {18}, 6, 0, 0, 0},                                   /* F#3 dotted eighths */
     {1, {12}, 12, 0, 0, 0},                                  /* G#3 eighths (on the eighths) */
     {1, {8}, 8, 0, 0, 0},                                    /* A#3 eighth triplets (on theirs) */
-    {0, {0}, 6, 0, 0, 0xDDDDu},                              /* C#4 a gallop, x.xx a beat */
-    {1, {6}, 6, 0, 0, 0, PK_SCATTER},                        /* D#4 SCATTER: sixteenths, anywhere in an octave */
+    {1, {6}, 6, 0, 3, 0},                                    /* C#4 CLIMB: sixteenths climbing (a minor third each, eight) */
+    {1, {6}, 6, 0, -3, 0},                                   /* D#4 FALL: sixteenths falling */
     {1, {6}, 6, 0, 0, 0, PK_WANDER},                         /* F#4 WANDER: sixteenths, a step or two along the scale */
-    {1, {12}, 12, 0, 0, 0, PK_LEAP},                         /* G#4 LEAP: eighths, the root, the fifth, octaves */
-    {1, {3}, 3, 0, 0, 0},                                    /* A#4 FASTER: thirty-seconds (twice the sixteenths) */
+    {1, {6}, 6, 0, 0, 0, PK_SCATTER},                        /* G#4 SCATTER: sixteenths, anywhere in an octave */
+    {1, {12}, 12, 0, 0, 0, PK_LEAP},                         /* A#4 LEAP: eighths, the root, the fifth, octaves */
     {0, {0}, 6, 0, 0, 0x1111u},                              /* C#5 SLOWER: quarters, x... a beat */
-    {1, {6}, 6, 0, 3, 0},                                    /* D#5 sixteenths climbing (a minor third each, eight) */
-    {1, {6}, 6, 0, -3, 0},                                   /* F#5 sixteenths falling */
+    {1, {3}, 3, 0, 0, 0},                                    /* D#5 FASTER: thirty-seconds (twice the sixteenths) */
+    {0, {0}, 6, 0, 0, 0xDDDDu},                              /* F#5 GALLOP: x.xx a beat */
 };
 
 static int key_white(int k)            /* the white keys' index (k white) */

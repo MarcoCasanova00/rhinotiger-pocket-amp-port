@@ -555,7 +555,7 @@ With ALGORITHM on the EVENTS page you change the type of all of them (see 5.9).
 **The black keys.** There are 11. Hold one and it becomes a rhythm: the white key held with it throws on its
 beats instead of on every sixteenth. The eighths, the triplets and the thirty-seconds fall on their own places in the beat, and GALLOP
 and SLOWER on their own places in the bar.
-SCATTER, WANDER and LEAP move the pitch: each time you press one, it makes up a new run of notes, and plays it again
+WANDER, SCATTER and LEAP move the pitch: each time you press one, it makes up a new run of notes, and plays it again
 every bar for as long as you hold it. Held alone, it makes no sound. Let go and the sixteenths come back. The name of the rhythm shows to the left
 of the event's name.
 
@@ -566,14 +566,14 @@ of the event's name.
 | 1 | 3/16: dotted eighths |
 | 2 | 1/8: eighths |
 | 3 | 1/8T: eighth triplets |
-| 4 | GALLOP: x.xx on each beat |
-| 5 | SCATTER: sixteenths, jumping anywhere within an octave |
+| 4 | CLIMB: sixteenths climbing a minor third each time, eight steps |
+| 5 | FALL: the same, falling |
 | 6 | WANDER: sixteenths, stepping up and down the scale |
-| 7 | LEAP: eighths, leaping between the root, the fifth and the octaves |
-| 8 | FASTER: thirty-seconds, twice as fast as the sixteenths |
+| 7 | SCATTER: sixteenths, jumping anywhere within an octave |
+| 8 | LEAP: eighths, leaping between the root, the fifth and the octaves |
 | 9 | SLOWER: quarters, once a beat |
-| 10 | CLIMB: sixteenths climbing a minor third each time, eight steps |
-| 11 | FALL: the same, falling |
+| 10 | FASTER: thirty-seconds, twice as fast as the sixteenths |
+| 11 | GALLOP: x.xx on each beat |
 
 **OCT− and OCT+** move the octave of all of it, from one octave down to two up. The header says OCTAVE and the
 number.
