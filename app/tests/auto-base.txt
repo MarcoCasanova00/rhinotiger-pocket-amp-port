@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY's tempo: the set begins at the tempo it is turned on with (resting or playing), never one of its own, and
+# moves from there
+wait 3000   # the logo, then the play
+listen
+tap PLAY
+wait 200
+expect playing 0
+expect setworld 2
+# resting: COLD SIGNAL's 152, TEMPO +10
+tap HOME
+wait 30
+expect page 1
+turn K1 10
+wait 30
+expect bpm 162
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 7
+wait 30
+turn K1 1
+wait 30
+said AUTO PLAY PLAY: BEGIN
+tap PLAY
+wait 8000
+expect playing 1
+expect bpm 162
+wait 30000
+expect bpm >161
+# off: the music goes on in the set's first world (RUBBER CIRCUS, 156, the nearest 162); TEMPO -20 by hand, then on
+# while it plays: from there
+turn K1 -1
+wait 100
+expect autoplay 0
+tap HOME
+wait 30
+tap HOME
+wait 30
+expect page 1
+expect world 3
+turn K1 -40
+wait 500
+expect bpm 136
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+turn K1 1
+wait 30
+said AUTO PLAY ON
+wait 8000
+expect bpm 136

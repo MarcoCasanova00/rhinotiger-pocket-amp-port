@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 hacha
-# AUTO PLAY's last break (set 3, 30 minutes): the DUB its groove ends with goes on two bars into it, then nothing
+# AUTO PLAY's last break (set 10, 30 minutes): the DUB its groove ends with goes on two bars into it, then nothing
 wait 3000   # the logo, then the play
 tap PLAY
 wait 200
@@ -14,12 +14,12 @@ expect page 4
 turn K2 -1
 wait 30
 expect auto_len 0
-turn K3 3
+turn K3 10
 wait 30
 turn K1 1
 wait 30
 tap PLAY
-wait 1759500
+wait 1766000
 expect section 1
 expect hd_fx 512
 wait 5000

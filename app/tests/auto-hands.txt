@@ -61,6 +61,6 @@ key w0 down 90
 wait 100
 key w0 up
 wait 300
-expect hd_throws 42
+expect hd_throws 43
 wait 15000
-expect hd_throws 42
+expect hd_throws 43

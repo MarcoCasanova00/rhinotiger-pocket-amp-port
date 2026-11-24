@@ -256,7 +256,7 @@ them back, and throws sounds as the keys do.
 - AUTO PLAY: right for ON, left for OFF. OFF.
 - MINUTES: how long the set is: 30, 60, 90, or ENDLESS. 60.
 - SEED: which set. Each number from 1 to 99 is a plan of its own: the worlds, the tempos, the keys, where it rises and
-  falls. Started from rest, the same number and the same MINUTES plan the same set again; the sounds in it
+  falls. Started from rest, the same number, the same MINUTES and the same tempo plan the same set again; the sounds in it
   still come out different each time. RANDOM picks a number for you, and shows it while the set plays. RANDOM.
 - PERFORM: how much it plays the effects, the parts and the sounds of the keys. At 0 it leaves them all to you. 50.
 
@@ -265,7 +265,9 @@ set goes on from there. MINUTES and SEED can be turned only while it is off; PER
 many minutes have gone, as `AUTO 12/60`.
 
 A set is made of chapters of some minutes each. A new chapter comes in on a drop, with its world and its key. The tempo
-glides all the way through. A set of 30, 60 or 90 minutes ends in a break that fades out, and then the music rests.
+glides all the way through. The set begins at the tempo it is turned on with: GROOVE's TEMPO while the music rests, the
+tempo it plays at while it plays (a MIDI clock's, if one comes). Every later tempo moves as far with it, between 125 and
+206 BPM. A set of 30, 60 or 90 minutes ends in a break that fades out, and then the music rests.
 ARP in that last break calls the music back: AUTO PLAY turns off and it goes on.
 
 Each chapter has a few sounds of its own and a short motif that comes back through it. The effects and the parts move

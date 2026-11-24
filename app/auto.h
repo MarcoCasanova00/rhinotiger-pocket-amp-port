@@ -7,7 +7,8 @@
  * of some 4 to 10 minutes along it: a world, a tempo reached by its end, a key, the macros, how dark. Within a chapter
  * the groove runs 48 to 96 bars (the last one of it what is left, 32 to 128), then a break, a build, the drop; the last drop of a chapter is the next one's first
  * bar: its world and its key come there, never elsewhere. The tempo glides, a tenth of a BPM a bar at most, and goes
- * on through the change of world; the macros move one step a bar.
+ * on through the change of world; the macros move one step a bar. The tempo when it is turned on is where the set
+ * begins, and all its tempos move with it (125 to 206).
  *
  * What a hand turns is the hand's for AU_HOLD bars, then glides back (the key: at the next chapter; a world: for its
  * chapter). A break or a build called by hand is followed. The settings kept (set) are the hand's alone: SAVE during a
@@ -38,6 +39,7 @@ static struct {
     au_ch_t ch[AU_NCH];
     float from;                          /* the tempo as the chapter began */
     float bpm, start, min;               /* now; the chapter's start; since the set's (its cycle's) start */
+    float base;                          /* the tempo when it was turned on: where the set begins, all its tempos moved with it */
     float total;                         /* minutes before this cycle */
     int bar, drop_bar, sec, sec_at, groove, brk;
     uint8_t drops;
@@ -93,11 +95,12 @@ static int au_key(int root, int up)      /* the next key from root: near ones, n
 }
 
 /* the chapters of a set (or of an endless one's next hour): go_on 1, the first is the world, the key and the tempo given;
- * 2, it goes on from them into another */
+ * 2, it goes on from them into another. The first chapter's tempo is the base (au.base), and every other moves as far as
+ * the first did to get there (an endless set's next hour too) */
 static void au_plan(int go_on, int world, int root, float bpm)
 {
     static const uint8_t MIN[AU_NLEN] = {30, 60, 90, 60};
-    float len = (float)MIN[au.len], sum = 0.0f, w[AU_NCH], bot, top, d0, d1, d2, drift, t = 0.0f;
+    float len = (float)MIN[au.len], sum = 0.0f, w[AU_NCH], bot, top, d0, d1, d2, drift, t = 0.0f, s = 0.0f;
     uint32_t curve, i, k, used[PS_NWORLD] = {0};
     int prev = go_on ? world : -1, prev2 = -1;
     au.rng = (0x9E3779B9u * (au.nset + 1u)) ^ (0x85EBCA6Bu * (au.len + 1u)) ^ (0xC2B2AE35u * (au.cycle + 1u));
@@ -121,9 +124,14 @@ static void au_plan(int go_on, int world, int root, float bpm)
         t += len * w[i] / sum;
         c->end = t;
         want = bot + (top - bot) * h * (0.75f + 0.25f * h);
+        if (!i)                          /* (how far the base moves them all) */
+            s = au.base - fm_clampf(want, 140.0f, 190.0f);
+        want += s;
         if (i || go_on)                  /* a chapter never moves it far, and down less than up */
             want = fm_clampf(want, bpm - 8.0f, bpm + 14.0f);
-        want = fm_clampf(want, 140.0f, 190.0f);
+        want = fm_clampf(want, fm_maxf(125.0f, 140.0f + s), fm_minf(206.0f, 190.0f + s));   /* (all the worlds' reach) */
+        if (!i && go_on < 2)
+            want = au.base;              /* (the set begins where it was turned on) */
         c->bpm = want;
         if (!i && go_on == 1) {          /* (from where the music is) */
             c->world = (uint8_t)world;
@@ -214,7 +222,7 @@ static void au_top(void)                 /* from the set's own beginning (nothin
         au_rested = plat_ms() | 1u;
     ps_stage(-1, 0);
     au_plan(0, 0, 0, 0.0f);
-    au.bpm = au.ch[0].bpm - (float)au_rnd(3u);
+    au.bpm = au.ch[0].bpm;
     au_chapter(0);
     for (k = 0; k < 4; k++)
         au.val[k] = (float)au.ch[0].mac[k] - (k < 2 ? 6.0f : 0.0f);
@@ -239,6 +247,7 @@ static void au_start(void)
     au.nset = set.auto_set ? set.auto_set : (uint8_t)(1u + (plat_ms() * 2654435761u >> 16) % 99u);
     au_fade = 1.0f;
     au_rested = 0;
+    au.base = (float)clamp(ps_bpm(), 125, 206);   /* (a clock's tempo too, within the worlds' reach) */
     if (!ps_playing() || boot_hold) {
         au_top();
         return;
@@ -246,7 +255,7 @@ static void au_start(void)
     au.cycle = 0;                        /* playing: from where the music is, its first chapter */
     au.total = au.min = 0.0f;
     au.closing = au.staged = au.ours = 0;
-    au.bpm = (float)ps_bpm();
+    au.bpm = au.base;
     au_plan(1, ps_world_now(), ps_root(), au.bpm);
     au_chapter(0);
     for (k = 0; k < 4u; k++)

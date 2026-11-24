@@ -23,15 +23,15 @@ tap PLAY
 wait 283500
 expect section 1
 expect chapter 0
-expect world 1
+expect world 2
 press ARP
 wait 600
 release ARP
 wait 2500
 expect section 0
 expect chapter 1
-expect world 2
-expect root 30
+expect world 3
+expect root 32
 # from the top: a build by hand in that break, the drop before its last bar
 tap PLAY
 wait 600
@@ -43,12 +43,12 @@ tap ARP
 wait 3000
 expect section 2
 expect chapter 0
-expect world 1
+expect world 2
 tap ARP
 wait 2500
 expect section 0
 expect chapter 1
-expect world 2
+expect world 3
 # a drop called in a groove: no chapter
 wait 20000
 press ARP
