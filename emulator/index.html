@@ -176,6 +176,7 @@ function startScriptAudio(){
   * out_r, scheduled ahead on the audio clock. createScriptProcessor with a
   * write-back is not needed: browsers have been dropping samples from it. */
  const N=1024;
+ let oscBuf=null, oscSrc=null;
  const push=()=>{
   if(!actx||!ex)return;
   ex.web_render(N);                       // advance the device (out_l/out_r)
@@ -183,14 +184,16 @@ function startScriptAudio(){
    * upstream worklet), so build the views from memory, not from the numbers. */
   const L=new Float32Array(mem.buffer, ex.web_out_l(), N);
   const R=new Float32Array(mem.buffer, ex.web_out_r(), N);
-  const ab=actx.createBuffer(2,N,44100);
-  ab.getChannelData(0).set(L);
-  ab.getChannelData(1).set(R);
-  const src=actx.createBufferSource();
-  src.buffer=ab; src.connect(actx.destination);
+  if(!oscBuf){
+   oscBuf=actx.createBuffer(2,N,44100);
+   oscSrc=actx.createBufferSource(); oscSrc.buffer=oscBuf; oscSrc.connect(actx.destination);
+  }
+  oscBuf.getChannelData(0).set(L);
+  oscBuf.getChannelData(1).set(R);
   const now=actx.currentTime;
-  if(nextT<now+0.02)nextT=now+0.02;
-  src.start(nextT);
+  if(nextT<now+0.01)nextT=now+0.01;
+  oscSrc.start(nextT);
+  oscSrc=actx.createBufferSource(); oscSrc.buffer=oscBuf; oscSrc.connect(actx.destination);
   nextT+=N/44100;
   audioPushed+=N;
  };
@@ -223,19 +226,15 @@ function setTone(){
 }
 /* prove the audio stack alone (no WASM involved): play a tone via a buffer
    source and show whether the browser delivers it */
-let toneProbe=0;
 function audioProbe(){
  if(!actx)audioInit();
  if(!actx||actx.state!=='running')return 'context not running';
- if(!toneProbe){
-  toneProbe=actx.createBufferSource();
-  toneProbe.buffer=actx.createBuffer(1,44100*2,44100);
-  const d=toneProbe.buffer.getChannelData(0);
-  for(let i=0;i<d.length;i++) d[i]=Math.sin(2*Math.PI*440*i/44100)*0.1;
-  toneProbe.connect(actx.destination); toneProbe.start();
-  return 'probe playing 2 s';
- }
- return 'probe done';
+ const src=actx.createBufferSource();
+ src.buffer=actx.createBuffer(1,44100*2,44100);
+ const d=src.buffer.getChannelData(0);
+ for(let i=0;i<d.length;i++) d[i]=Math.sin(2*Math.PI*440*i/44100)*0.1;
+ src.connect(actx.destination); src.start();
+ return 'probe playing 2 s';
 }
 document.getElementById("tone").onclick=setTone; document.getElementById("probe").onclick=()=>{ document.getElementById("alert").textContent=audioProbe(); };
 window.addEventListener('error',e=>{ const a=document.getElementById('alert'); a.textContent='JS: '+(e.message||e); });
