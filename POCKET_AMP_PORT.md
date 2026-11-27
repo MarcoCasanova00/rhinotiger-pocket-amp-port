@@ -32,6 +32,25 @@ the check, the app's host regression passes, the control translation is
 regression-tested, and the package is accepted by Pendel's installer. The
 remaining step is flashing a unit and the bench soak (see `docs/FLASHING.md`).
 
+## Credits
+
+- **RhinoTiger** — app and DSP by hacha (GPL-3.0-only), upstream commit
+  `7647586` (see `docs/SOURCE_PROVENANCE.md`)
+- **fm1-base** — host/device platform pieces by Charles Vestal (MPL-2.0),
+  upstream commit `968d570`
+- **BSP / Pocket AMP board headers** — Hügelton Instruments BSP family by Leo
+  Kuroshita (MPL-2.0), BSP commit `18eadab`; the `pa_*` headers are the ones
+  used by Pendel
+- **Pendel** — open-source Pocket AMP firmware by Leo Kuroshita (GPL-3.0);
+  its packaging/installing tools produce and install our `rhinotiger-pa.fwsc`
+  (run externally; none of its code is copied into this fork)
+- **Pocket AMP hardware** — M-VAVE / Donner
+- **JieLi AC79 SDK** — three files are embedded in the `.fwsc` package
+  (Apache-2.0, listed in `LICENSING.md`)
+- Generated fonts keep their own licences (OFL)
+
+No Andromeda (the Pocket AMP's stock firmware) source is included.
+
 ## Licensing
 
 GPL-3.0-only for the app/DSP and this port's new code as a whole; the base

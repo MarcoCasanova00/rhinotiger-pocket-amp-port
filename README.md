@@ -2,11 +2,20 @@
 
 ![RhinoTiger](app/docs/img/screen-logo.png)
 
+[![License](https://img.shields.io/github/license/MarcoCasanova00/rhinotiger)](LICENSE)
+[![Web emulator](https://img.shields.io/badge/-Web%20emulator-important?style=for-the-badge&logo=googlechrome&logoColor=white)](https://github.com/MarcoCasanova00/rhinotiger/blob/pocket-amp-port/docs/POCKET_AMP_CONTROLS.md)
+[![Web installer](https://img.shields.io/badge/-Web%20installer-success?style=for-the-badge)](https://github.com/MarcoCasanova00/rhinotiger/blob/pocket-amp-port/docs/FLASHING.md)
+
 > **POCKET AMP PORT** — this fork adds a port of RhinoTiger to the
 > M-VAVE / Donner Pocket AMP. The app and DSP stay literal upstream;
 > the port lives under `plat/pocketamp/`, `ld/`, `tools/` and `docs/`
 > (see `POCKET_AMP_PORT.md`). The upstream README below describes the
 > original FM-1 firmware.
+>
+> **Web emulator** (browser demo of the port): `python3 tools/emu_pa_server.py`
+> then open http://localhost:8321/ — the page also contains the browser
+> flasher for the real Pocket AMP (`rhinotiger-pa.fwsc`, see
+> `docs/FLASHING.md`).
 
 A generative psytrance firmware for the M-VAVE FM-1, from dark psy to hi-tech. It plays by itself; you steer it.
 
@@ -18,6 +27,22 @@ the browser and install it: https://hacha.github.io/rhinotiger/
 
 It reads nothing another firmware saved (projects, presets, samples), and that may not be there when you go back to
 it: back it up first.
+
+## Credits
+
+This port is a fork of **RhinoTiger** by [hacha](https://github.com/hacha)
+(app and DSP, GPL-3.0-only) and of its base, **fm1-base**, by
+[Charles Vestal](https://github.com/charlesvestal) (host/device platform
+pieces, MPL-2.0). The chip and Pocket AMP board headers come from the
+Hügelton Instruments BSP family by [Leo Kuroshita](https://github.com/kurogedelic)
+(MPL-2.0), reused in the Pocket AMP firmware Pendel, whose tooling we also use
+for packaging and installing (GPL-3.0-only, run externally; nothing of it is
+copied here). The installer's loader is Pendel's (GPL-3.0). The Pocket AMP
+hardware is M-VAVE / Donner; the package embeds three JieLi AC79 SDK files
+(Apache-2.0, see `LICENSING.md`). Generated fonts keep their own licences
+(OFL). **No Andromeda (the Pocket AMP's stock firmware) source is included.**
+See `docs/SOURCE_PROVENANCE.md` for the exact upstream commits.
+
 
 ## Controls
 
