@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RhinoTiger · Pocket AMP — web emulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Semi+Condensed:wght@600;700&display=swap">
+<style>
+:root{--ground:#1c1814;--ink:#f2e8d8;--muted:#b3a28e;--rule:#3a322a;--card:#26201b;--accent:#f28a5a;--teal:#4cc3b6;--bad:#ff8a73;--focus:#79adff}
+*{box-sizing:border-box}
+body{background:radial-gradient(1200px 600px at 50% -10%,#2a241d,var(--ground));color:var(--ink);margin:0;padding:28px 18px 60px;font:400 15px/1.5 "Barlow","Segoe UI",system-ui,sans-serif}
+main{max-width:980px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;align-items:center;margin:0 0 1rem}
+h1{font:700 1.8rem/1.1 "Barlow Semi Condensed","Barlow",sans-serif;margin:0}
+h1 em{font-style:normal;color:var(--accent)}
+header p{margin:0;color:var(--muted)}
+.chip{font:600 .8rem ui-monospace,monospace;padding:.25em .8em;border:1px solid var(--rule);border-radius:999px;color:var(--muted)}
+.chip b{color:var(--ink)}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+.pa{position:relative;border-radius:20px;padding:22px 26px 24px;background:linear-gradient(180deg,#2a2a2d,#161618 30%,#101012);border:1px solid #000;box-shadow:0 18px 50px #0009, inset 0 1px 0 #ffffff14}
+.pa .model{position:absolute;top:10px;right:16px;color:#55524c;font:600 .68rem ui-monospace,monospace;letter-spacing:.14em}
+.scr{background:#050505;border-radius:12px;padding:12px;border:1px solid #2a2a2e;box-shadow:inset 0 0 30px #000, 0 2px 0 #ffffff08}
+.scr .glass{border-radius:6px;overflow:hidden;background:#000;position:relative}
+canvas{display:block;width:280px;height:280px;margin:0 auto;image-rendering:pixelated}
+.scr .glass::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,#ffffff08 0 40%,transparent 40% 60%,#ff9a3c07 60% 100%);pointer-events:none}
+.rowctl{display:flex;align-items:center;gap:14px;margin-top:20px;flex-wrap:wrap;justify-content:center}
+.knobmod{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:110px}
+.knobmod .lbl{font:600 .72rem "Barlow Semi Condensed","Barlow",sans-serif;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+.knob{width:76px;height:76px;border-radius:50%;position:relative;cursor:ns-resize;touch-action:none;background:conic-gradient(#3a3a3e,#17171a,#3a3a3e,#17171a,#3a3a3e);border:1px solid #000;box-shadow:0 6px 14px #000a, inset 0 1px 0 #ffffff22}
+.knob::after{content:"";position:absolute;inset:14px;border-radius:50%;background:linear-gradient(180deg,#2b2b2f,#19191c);box-shadow:inset 0 1px 0 #ffffff18}
+.knob::before{content:"";position:absolute;top:5px;left:50%;width:4px;height:15px;background:var(--accent);transform:translateX(-50%) rotate(var(--rot,0deg));transform-origin:50% 33px;border-radius:2px;transition:transform .06s}
+.knob.held{box-shadow:0 6px 14px #000a, inset 0 0 0 2px #f28a5a44}
+.pads{display:flex;gap:10px}
+.pad{position:relative;width:64px;padding:18px 4px 12px;text-align:center;cursor:pointer;user-select:none;touch-action:manipulation;background:linear-gradient(180deg,var(--alum2,#2c2c2f),var(--alum,#232324));border:1px solid #000;border-radius:9px;box-shadow:0 4px 0 #000, inset 0 1px 0 #ffffff14;font:600 .82rem "Barlow Semi Condensed","Barlow",sans-serif}
+.pad .n{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;background:#1f1c18;box-shadow:inset 0 0 2px #000}
+.pad.on{background:linear-gradient(180deg,#8a4a22,#6e3a1a);box-shadow:0 4px 0 #000, inset 0 0 14px #ff9a3c33}
+.pad.on .n{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.pad.home{width:74px}
+.leds{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.vled{flex:1 1 56px;min-width:56px;padding:4px 2px;text-align:center;font:600 .6rem ui-monospace,monospace;color:var(--muted);border:1px solid var(--rule);border-radius:6px;background:#1a1713}
+.vled.on{color:#ffd9b3;border-color:var(--accent);background:#3a2412}
+.help{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem 2rem;margin-top:1.4rem}
+.help h2{font:600 1rem "Barlow Semi Condensed","Barlow",sans-serif;margin:0 0 .3rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+table{border-collapse:collapse;width:100%}
+td,th{padding:.25rem .5rem;border-bottom:1px solid var(--rule);text-align:left;font-size:.92rem}
+th{color:var(--muted);font-weight:600}
+kbd{font:600 .82em ui-monospace,monospace;background:var(--card);border:1px solid var(--rule);border-radius:4px;padding:0 .3em}
+#alert{color:var(--bad);font-weight:600;min-height:1.2em}
+.start{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,11,13,.65);border-radius:20px;z-index:5}
+.start[hidden]{display:none}
+.start .boot{font:600 1.1rem "Barlow Semi Condensed","Barlow",sans-serif;letter-spacing:.1em;color:var(--accent)}
+@media (max-width:700px){ canvas{width:100%;height:auto} .rowctl{gap:10px} .pad{width:56px} .knob{width:64px;height:64px} }
+</style></head><body>
+<main>
+<header>
+ <h1>RhinoTiger <em>· Pocket AMP</em></h1>
+ <p>the port, in your browser</p>
+ <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap">
+  <span class="chip" id="chip-ms">0 ms</span>
+  <span class="chip on" id="chip-state">starting…</span>
+ </div>
+</header>
+
+<div class="pa">
+ <div class="model">M-VAVE / Donner Pocket AMP</div>
+ <div class="scr">
+  <div class="glass"><canvas id="cv" width="240" height="240"></canvas></div>
+ </div>
+ <div class="rowctl">
+  <div class="knobmod"><div class="knob" id="knob-para"></div><div class="lbl">PARA · push</div></div>
+  <div class="pads">
+   <span class="pad home" data-b="1">HOME<span class="n"></span></span>
+   <span class="pad" data-b="2">VOL−<span class="n"></span></span>
+   <span class="pad" data-b="3">VOL+<span class="n"></span></span>
+   <span class="pad" data-b="4">&lt;<span class="n"></span></span>
+   <span class="pad" data-b="5">&gt;<span class="n"></span></span>
+  </div>
+  <div class="knobmod"><div class="knob" id="knob-master"></div><div class="lbl">MASTER</div></div>
+ </div>
+ <div class="leds" id="leds"></div>
+ <div class="start" id="start"><span class="boot">starting…</span></div>
+</div>
+
+<div class="row" style="display:flex;flex-wrap:wrap;gap:.5rem 1.4rem;margin-top:.9rem;align-items:center">
+ <span id="alert"></span>
+ <span style="color:var(--muted);font-size:.9rem">drag knobs up/down · <kbd>P</kbd> push · <kbd>Q/E</kbd> turn ·
+  <kbd>H</kbd> HOME · <kbd>V/B</kbd> VOL−/+ · <kbd>,</kbd>/<kbd>.</kbd> &lt;/&gt; · <kbd>M/N</kbd> MASTER ·
+  <b style="color:var(--teal)">click anywhere to start the sound</b></span>
+</div>
+
+<div class="help">
+ <div><h2>chords</h2><table>
+  <tr><td>VOL−</td><td>PLAY</td></tr>
+  <tr><td>VOL+</td><td>ARP</td></tr>
+  <tr><td>&lt;</td><td>SAVE</td></tr>
+  <tr><td>&gt;</td><td>REC</td></tr>
+  <tr><td>VOL−+VOL+</td><td>HOME</td></tr>
+  <tr><td>&lt;+&gt;</td><td>SEQ</td></tr>
+  <tr><td>VOL−+&lt;</td><td>SEL</td></tr>
+  <tr><td>VOL++&gt;</td><td>ENV</td></tr>
+  <tr><td>VOL−+&gt;</td><td>LFO</td></tr>
+  <tr><td>VOL++&lt;</td><td>EDIT</td></tr>
+  <tr><td>HOME+VOL−</td><td>GLO</td></tr>
+  <tr><td>HOME+VOL+</td><td>FX</td></tr>
+  <tr><td>HOME+&lt; / &gt;</td><td>OCT− / OCT+</td></tr>
+ </table></div>
+ <div><h2>PARA</h2><table>
+  <tr><th>click</th><td>cycles PAGE · WORLD · K1..K4 · ALGO · KEY</td></tr>
+  <tr><th>turn</th><td>the focus's knob</td></tr>
+  <tr><th>hold 1 s</th><td>GLOBAL, then SAVE on release</td></tr>
+  <tr><th>hold 3 s</th><td>GLOBAL + SAVE held → factory defaults</td></tr>
+  <tr><th>KEY focus</th><td>VOL−/VOL+ play the cursor, &lt;/&gt; move it</td></tr>
+ </table></div>
+</div>
+</main>
+
+<script>
+"use strict";
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const BTN=["FX","SEL","ENV","LFO","EDIT","GLO","HOME","SAVE","ARP","SEQ","PLAY","REC","OCT-","OCT+"];
+let ex=null, mem=null, mask=0, master=4096, rot=0, firstFrame=false;
+
+async function loadWasm(){
+ const bytes=await (await fetch('app.wasm')).arrayBuffer();
+ const imports={
+  env:new Proxy({}, {get:()=>()=>0}),
+  wasi_snapshot_preview1:new Proxy({}, {get:()=>()=>0})
+ };
+ const {instance}=await WebAssembly.instantiate(bytes,imports);
+ ex=instance.exports; mem=ex.memory;
+ ex.web_boot();
+ document.getElementById('start').hidden=true;
+}
+function sendMask(){ if(ex) ex.web_pa(mask, Date.now(), 0, master); }
+function enc(d){ if(ex){ rot+=d*18; document.getElementById('knob-para').style.setProperty('--rot',(rot%360)+'deg'); ex.web_pa(mask, Date.now(), d, master); } }
+function setMaster(v){ master=Math.max(0,Math.min(4096,v)); if(ex) ex.web_pa(mask, Date.now(), 0, master); }
+function bit(b,on){ if(on)mask|=1<<b; else mask&=~(1<<b); const el=document.querySelector('[data-b="'+b+'"]'); if(el)el.classList.toggle('on',on); sendMask(); }
+
+document.querySelectorAll('.pad[data-b]').forEach(el=>{
+ const b=+el.dataset.b;
+ el.addEventListener('pointerdown',e=>{e.preventDefault();bit(b,true);});
+ ['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,()=>bit(b,false)));
+});
+function attachKnob(id,kind){ const el=document.getElementById(id); let down=false,y0=0,acc=0;
+ el.addEventListener('pointerdown',e=>{e.preventDefault();down=true;y0=e.clientY;acc=0;el.classList.add('held');});
+ window.addEventListener('pointermove',e=>{ if(!down)return; const dy=y0-e.clientY; y0=e.clientY;
+  if(kind==='para'){ acc+=dy; while(acc>=12){enc(1);acc-=12;} while(acc<=-12){enc(-1);acc+=12;} }
+  else setMaster(master+dy*24); });
+ window.addEventListener('pointerup',()=>{ if(down){down=false;el.classList.remove('held');} });
+ el.addEventListener('wheel',e=>{e.preventDefault(); if(kind==='para')enc(e.deltaY<0?1:-1); else setMaster(master+(e.deltaY<0?128:-128)); },{passive:false});
+}
+attachKnob('knob-para','para');
+attachKnob('knob-master','master');
+document.getElementById('knob-para').addEventListener('pointerdown',()=>bit(0,true));
+document.getElementById('knob-para').addEventListener('pointerup',()=>bit(0,false));
+window.addEventListener('keydown',e=>{
+ const k=e.key.toLowerCase(), map={'p':0,'h':1,'v':2,'b':3,'q':4,',':4,'.':5};
+ if(k==='q'||k==='e')enc(k==='q'?-1:1);
+ else if(k==='m'||k==='n')setMaster(master+(k==='m'?-128:128));
+ else if(k in map&&!e.repeat)bit(map[k],true);
+});
+window.addEventListener('keyup',e=>{const k=e.key.toLowerCase(),map={'p':0,'h':1,'v':2,'b':3,'q':4,',':4,'.':5};if(k in map)bit(map[k],false);});
+
+let actx=null,nextT=0;
+function audioInit(){
+ if(!actx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return; actx=new AC(); nextT=actx.currentTime+0.1; }
+ if(actx.state==='suspended')actx.resume();
+}
+async function pullAudio(){
+ if(!actx||!ex)return;
+ try{
+  const n=256; ex.web_render(n);
+  const L=new Float32Array(ex.web_out_l(),0,n), R=new Float32Array(ex.web_out_r(),0,n);
+  const ab=actx.createBuffer(2,n,44100);
+  ab.getChannelData(0).set(L); ab.getChannelData(1).set(R);
+  const src=actx.createBufferSource(); src.buffer=ab; src.connect(actx.destination);
+  if(nextT<actx.currentTime+0.05)nextT=actx.currentTime+0.05;
+  src.start(nextT); nextT+=n/44100;
+ }catch(e){}
+}
+['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,audioInit));
+setInterval(pullAudio,120);
+
+function drawLeds(){ if(!ex)return; const lit=ex.web_lit_buttons(), l=document.getElementById('leds'); l.innerHTML='';
+ BTN.forEach((n,i)=>{ const d=document.createElement('div'); d.className='vled'; d.textContent=n; if(lit>>i&1)d.classList.add('on'); l.appendChild(d); }); }
+function frame(){ if(!ex)return;
+ try{
+  const fb=ex.web_fb(); const u8=new Uint8Array(mem.buffer, fb, 240*240*2);
+  const im=ctx.createImageData(240,240);
+  for(let i=0;i<240*240;i++){ const raw=u8[2*i]|(u8[2*i+1]<<8), c=((raw&0xff)<<8)|(raw>>8);
+   im.data[4*i]=((c>>11)&31)<<3; im.data[4*i+1]=((c>>5)&63)<<2; im.data[4*i+2]=(c&31)<<3; im.data[4*i+3]=255; }
+  ctx.putImageData(im,0,0);
+  if(!firstFrame){firstFrame=true;document.getElementById('start').hidden=true;}
+ }catch(e){}
+}
+function status(){
+ if(!ex)return; document.getElementById('chip-ms').textContent=ex.web_now()+' ms';
+ document.getElementById('chip-state').textContent='ON';
+}
+loadWasm().then(()=>{ setInterval(frame,400); setInterval(status,700); setInterval(drawLeds,700); frame(); status(); drawLeds(); })
+ .catch(e=>{ document.getElementById('alert').textContent='failed to start the emulator: '+e.message; });
+</script>
+</body></html>

@@ -3,7 +3,7 @@
 ![RhinoTiger](app/docs/img/screen-logo.png)
 
 [![License](https://img.shields.io/github/license/MarcoCasanova00/rhinotiger)](LICENSE)
-[![Web emulator](https://img.shields.io/badge/-Web%20emulator-important?style=for-the-badge&logo=googlechrome&logoColor=white)](https://marcocasanova00.github.io/rhinotiger/)
+[![Web emulator](https://img.shields.io/badge/-Web%20emulator-important?style=for-the-badge&logo=googlechrome&logoColor=white)](https://marcocasanova00.github.io/rhinotiger/emulator/)
 [![Web installer](https://img.shields.io/badge/-Web%20installer-success?style=for-the-badge)](https://marcocasanova00.github.io/rhinotiger/installer/)
 
 > **POCKET AMP PORT** — this fork adds a port of RhinoTiger to the
@@ -12,10 +12,11 @@
 > (see `POCKET_AMP_PORT.md`). The upstream README below describes the
 > original FM-1 firmware.
 >
-> **Web emulator** (browser demo of the port): `python3 tools/emu_pa_server.py`
-> then open http://localhost:8321/ — the page also contains the browser
-> flasher for the real Pocket AMP (`rhinotiger-pa.fwsc`, see
-> `docs/FLASHING.md`).
+> **Web emulator** — runs in the browser (WASM of the literal app + the
+> Pocket AMP translator): https://marcocasanova00.github.io/rhinotiger/emulator/
+> Build it with `tools/build_web_pa.sh` (needs Emscripten). The browser
+> flasher for the real Pocket AMP (`rhinotiger-pa.fwsc`) is on the same site
+> and in `docs/FLASHING.md`.
 
 A generative psytrance firmware for the M-VAVE FM-1, from dark psy to hi-tech. It plays by itself; you steer it.
 
