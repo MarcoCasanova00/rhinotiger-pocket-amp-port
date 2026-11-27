@@ -3,8 +3,8 @@
 ![RhinoTiger](app/docs/img/screen-logo.png)
 
 [![License](https://img.shields.io/github/license/MarcoCasanova00/rhinotiger)](LICENSE)
-[![Web emulator](https://img.shields.io/badge/-Web%20emulator-important?style=for-the-badge&logo=googlechrome&logoColor=white)](https://github.com/MarcoCasanova00/rhinotiger/blob/pocket-amp-port/docs/POCKET_AMP_CONTROLS.md)
-[![Web installer](https://img.shields.io/badge/-Web%20installer-success?style=for-the-badge)](https://github.com/MarcoCasanova00/rhinotiger/blob/pocket-amp-port/docs/FLASHING.md)
+[![Web emulator](https://img.shields.io/badge/-Web%20emulator-important?style=for-the-badge&logo=googlechrome&logoColor=white)](https://marco-casanova00.github.io/rhinotiger/)
+[![Web installer](https://img.shields.io/badge/-Web%20installer-success?style=for-the-badge)](https://marco-casanova00.github.io/rhinotiger/installer/)
 
 > **POCKET AMP PORT** — this fork adds a port of RhinoTiger to the
 > M-VAVE / Donner Pocket AMP. The app and DSP stay literal upstream;
