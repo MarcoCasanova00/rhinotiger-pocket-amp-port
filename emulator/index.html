@@ -166,20 +166,37 @@ function audioInit(){
  if(!actx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return; actx=new AC(); nextT=actx.currentTime+0.1; }
  if(actx.state==='suspended')actx.resume();
 }
-async function pullAudio(){
- if(!actx||!ex)return;
- try{
-  const n=256; ex.web_render(n);
-  const L=new Float32Array(ex.web_out_l(),0,n), R=new Float32Array(ex.web_out_r(),0,n);
-  const ab=actx.createBuffer(2,n,44100);
-  ab.getChannelData(0).set(L); ab.getChannelData(1).set(R);
-  const src=actx.createBufferSource(); src.buffer=ab; src.connect(actx.destination);
-  if(nextT<actx.currentTime+0.05)nextT=actx.currentTime+0.05;
-  src.start(nextT); nextT+=n/44100;
- }catch(e){}
-}
 ['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,audioInit));
-setInterval(pullAudio,120);
+/* real-time scheduler: render as many frames as wall-clock time has passed,
+   so the simulated device runs ~1:1. The audio queue follows the same
+   cadence; if the tab throttles, we skip stale audio rather than spin. */
+const MAX_PENDING=0.35;
+let rendered=0, t0=0;
+function startPump(){ t0=performance.now(); rendered=0; requestAnimationFrame(pump); }
+function pump(){
+ const target=(performance.now()-t0)/1000*44100;
+ let delta=target-rendered;
+ if(delta>44100*2){ rendered=target-44100; delta=44100; }   // catch up after a long stall
+ while(delta>0){
+  const n=Math.min(1024, Math.ceil(delta));
+  ex.web_render(n);
+  if(actx){
+   const pend=nextT-actx.currentTime;
+   if(pend<MAX_PENDING){
+    try{
+     const L=new Float32Array(ex.web_out_l(),0,n), R=new Float32Array(ex.web_out_r(),0,n);
+     const ab=actx.createBuffer(2,n,44100);
+     ab.getChannelData(0).set(L); ab.getChannelData(1).set(R);
+     const src=actx.createBufferSource(); src.buffer=ab; src.connect(actx.destination);
+     if(nextT<actx.currentTime+0.05)nextT=actx.currentTime+0.05;
+     src.start(nextT); nextT+=n/44100;
+    }catch(e){}
+   }
+  }
+  rendered+=n; delta-=n;
+ }
+ requestAnimationFrame(pump);
+}
 
 function drawLeds(){ if(!ex)return; const lit=ex.web_lit_buttons(), l=document.getElementById('leds'); l.innerHTML='';
  BTN.forEach((n,i)=>{ const d=document.createElement('div'); d.className='vled'; d.textContent=n; if(lit>>i&1)d.classList.add('on'); l.appendChild(d); }); }
@@ -197,7 +214,11 @@ function status(){
  if(!ex)return; document.getElementById('chip-ms').textContent=ex.web_now()+' ms';
  document.getElementById('chip-state').textContent='ON';
 }
-loadWasm().then(()=>{ setInterval(frame,400); setInterval(status,700); setInterval(drawLeds,700); frame(); status(); drawLeds(); })
+loadWasm().then(()=>{
+ startPump();
+ setInterval(frame,200); setInterval(status,700); setInterval(drawLeds,700);
+ frame(); status(); drawLeds();
+ })
  .catch(e=>{ document.getElementById('alert').textContent='failed to start the emulator: '+e.message; });
 </script>
 </body></html>
