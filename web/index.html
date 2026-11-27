@@ -83,10 +83,12 @@ kbd{font:600 .82em ui-monospace,monospace;background:var(--card);border:1px soli
 
 <div class="row" style="display:flex;flex-wrap:wrap;gap:.5rem 1.4rem;margin-top:.9rem;align-items:center">
  <span id="alert"></span>
+ <button id="tone" type="button" style="border-radius:999px;padding:.4em 1em;background:var(--teal);color:#062a26;font-weight:600;border:0">test tone</button>
  <span style="color:var(--muted);font-size:.9rem">drag knobs up/down · <kbd>P</kbd> push · <kbd>Q/E</kbd> turn ·
   <kbd>H</kbd> HOME · <kbd>V/B</kbd> VOL−/+ · <kbd>,</kbd>/<kbd>.</kbd> &lt;/&gt; · <kbd>M/N</kbd> MASTER ·
   <b style="color:var(--teal)">click anywhere to start the sound</b></span>
 </div>
+<div id="aidiag" style="margin-top:.4rem;color:var(--muted);font:600 .8rem ui-monospace,monospace"></div>
 
 <div class="help">
  <div><h2>chords</h2><table>
@@ -211,6 +213,19 @@ function frame(){ if(!ex)return;
   if(!firstFrame){firstFrame=true;document.getElementById('start').hidden=true;}
  }catch(e){}
 }
+let toneOn=false;
+function setTone(){
+ toneOn=!toneOn;
+ if(!actx)audioInit();
+ if(toneOn&&actx){
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.frequency.value=440; g.gain.value=0.08; o.connect(g); g.connect(actx.destination);
+  o.start(); o.stop(actx.currentTime+0.6);
+ }
+ document.getElementById('tone').textContent=toneOn?'tone…':'test tone';
+}
+document.getElementById('tone').onclick=setTone;
+window.addEventListener('error',e=>{ const a=document.getElementById('alert'); a.textContent='JS: '+(e.message||e); });
 function status(){
  if(!ex)return; document.getElementById('chip-ms').textContent=ex.web_now()+' ms';
  let st='ON';
@@ -218,6 +233,9 @@ function status(){
   if(actx.state==='running'&&ex.web_debug_ring_peak){ st+=' ('+ex.web_debug_ring_peak().toFixed(2)+' peak, '+audioPushed+' sched)'; }
  }
  document.getElementById('chip-state').textContent=st;
+ const diag=document.getElementById('aidiag');
+ if(!actx) diag.textContent='audio: not started yet — click anywhere';
+ else diag.textContent='audio: '+actx.state+' | pending '+(nextT-actx.currentTime).toFixed(2)+'s | pushed '+audioPushed+' frames'+(ex.web_debug_ring_peak?' | ring peak '+ex.web_debug_ring_peak().toFixed(3):'');
 }
 loadWasm().then(()=>{
  startPump();
