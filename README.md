@@ -2,9 +2,9 @@
 
 ![RhinoTiger](app/docs/img/screen-logo.png)
 
-[![License](https://img.shields.io/github/license/MarcoCasanova00/rhinotiger)](LICENSE)
-[![Web emulator](https://img.shields.io/badge/-Web%20emulator-important?style=for-the-badge&logo=googlechrome&logoColor=white)](https://marcocasanova00.github.io/rhinotiger/emulator/)
-[![Web installer](https://img.shields.io/badge/-Web%20installer-success?style=for-the-badge)](https://marcocasanova00.github.io/rhinotiger/installer/)
+[![License](https://img.shields.io/github/license/MarcoCasanova00/rhinotiger-pocket-amp-port)](LICENSE)
+[![Web emulator](https://img.shields.io/badge/-Web%20emulator-important?style=for-the-badge&logo=googlechrome&logoColor=white)](https://marcocasanova00.github.io/rhinotiger-pocket-amp-port/emulator/)
+[![Web installer](https://img.shields.io/badge/-Web%20installer-success?style=for-the-badge)](https://marcocasanova00.github.io/rhinotiger-pocket-amp-port/installer/)
 
 > **POCKET AMP PORT** — this fork adds a port of RhinoTiger to the
 > M-VAVE / Donner Pocket AMP. The app and DSP stay literal upstream;
@@ -13,7 +13,7 @@
 > original FM-1 firmware.
 >
 > **Web emulator** — runs in the browser (WASM of the literal app + the
-> Pocket AMP translator): https://marcocasanova00.github.io/rhinotiger/emulator/
+> Pocket AMP translator): https://marcocasanova00.github.io/rhinotiger-pocket-amp-port/emulator/
 > Build it with `tools/build_web_pa.sh` (needs Emscripten). The browser
 > flasher for the real Pocket AMP (`rhinotiger-pa.fwsc`) is on the same site
 > and in `docs/FLASHING.md`.
