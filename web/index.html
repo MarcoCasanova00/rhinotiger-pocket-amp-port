@@ -164,7 +164,7 @@ window.addEventListener('keydown',e=>{
 });
 window.addEventListener('keyup',e=>{const k=e.key.toLowerCase(),map={'p':0,'h':1,'v':2,'b':3,'q':4,',':4,'.':5};if(k in map)bit(map[k],false);});
 
-let actx=null, sp=null, audioPushed=0, lastAErr='';
+let actx=null, sp=null, audioPushed=0, lastAErr='', nextT=0;
 function audioInit(){
  if(!actx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return; actx=new AC(); }
  if(actx.state!=='running'){ try{ actx.resume(); }catch(e){} }
