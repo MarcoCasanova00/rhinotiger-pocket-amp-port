@@ -171,16 +171,16 @@ function audioInit(){
 }
 function startScriptAudio(){
  try{
-  sp=actx.createScriptProcessor(4096,0,2);
+  sp=actx.createScriptProcessor(1024,0,2);
   sp.onaudioprocess=e=>{
    if(!ex)return;
    try{
-    ex.web_render(4096);
-    const L=new Float32Array(ex.web_out_l(),0,4096);
-    const R=new Float32Array(ex.web_out_r(),0,4096);
+    ex.web_render(1024);
+    const L=new Float32Array(ex.web_out_l(),0,1024);
+    const R=new Float32Array(ex.web_out_r(),0,1024);
     e.outputBuffer.getChannelData(0).set(L);
     e.outputBuffer.getChannelData(1).set(R);
-    audioPushed+=4096;
+    audioPushed+=1024;
     lastAErr='';
    }catch(err){ lastAErr=String(err); }
   };
