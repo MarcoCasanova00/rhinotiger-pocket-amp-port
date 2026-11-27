@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RhinoTiger · Pocket AMP — browser installer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Semi+Condensed:wght@600;700&display=swap">
+<style>
+:root{--ground:#1c1814;--ink:#f2e8d8;--muted:#b3a28e;--rule:#3a322a;--accent:#f28a5a;--teal:#4cc3b6;--card:#26201b;--bad:#ff8a73;--focus:#79adff}
+*{box-sizing:border-box}
+body{background:radial-gradient(1200px 600px at 50% -10%,#2a241d,var(--ground));color:var(--ink);margin:0;padding:36px 20px 70px;
+    font:400 16px/1.55 "Barlow","Segoe UI",system-ui,sans-serif}
+main{max-width:760px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem 1.2rem;margin:0 0 1.4rem}
+h1{font:700 1.9rem/1.1 "Barlow Semi Condensed","Barlow",sans-serif;margin:0}
+h1 em{font-style:normal;color:var(--accent)}
+header p{margin:0;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:1rem 1.2rem;margin:1rem 0}
+.card h2{font:600 .82rem "Barlow Semi Condensed","Barlow",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 .6rem}
+button{font:600 1rem "Barlow Semi Condensed","Barlow",sans-serif;color:var(--ink);background:#2e2c28;border:1px solid #000;
+       border-radius:999px;padding:.6em 1.5em;cursor:pointer;margin:4px 10px 4px 0;box-shadow:0 2px 0 #000}
+button:hover{background:#3d3a35}
+button.primary{background:var(--accent);color:#2a140a}
+button.primary:hover{background:#ffa062}
+button:disabled{opacity:.45;cursor:default}
+#status{font:600 .95rem ui-monospace,monospace;color:var(--muted);min-height:1.5em;margin-top:.7rem}
+#bar{height:8px;border-radius:4px;background:#141210;overflow:hidden;margin-top:.5rem}
+#bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.small{color:var(--muted);font-size:.92rem}
+code{font-family:ui-monospace,monospace}
+a{color:var(--teal)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+</style></head><body>
+<main>
+<header>
+ <h1>RhinoTiger <em>· Pocket AMP</em></h1>
+ <p>browser installer</p>
+</header>
+
+<div class="card">
+ <h2>1 · prepare</h2>
+ <p class="small">Connect the Pocket AMP with a USB data cable. Back up your presets first
+  (<a href="https://github.com/vitoramaral10/pocket-amp-tools">pocket-amp-tools</a>). Close other apps that use MIDI
+  (DAW, the local emulator page).</p>
+</div>
+
+<div class="card">
+ <h2>2 · install</h2>
+ <button id="detect" type="button">Detect Pocket AMP</button>
+ <button id="go" class="primary" type="button" disabled>Install rhinotiger-pa.fwsc</button>
+ <div id="status">package: loading…</div>
+ <div id="bar"><i id="fill"></i></div>
+</div>
+
+<div class="card">
+ <h2>3 · afterwards</h2>
+ <p class="small">The unit restarts twice (once into the update loader, once into RhinoTiger). To go back to stock,
+  install M-VAVE's official <code>Pocket AMP.fwsc</code> the same way. Do not unplug while writing. If a write is cut
+  off, the unit stays in update mode: run Install again to finish.</p>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const HS_QUERY=[0xF0,0x00,0x32,0x45,0x00,0x00,0x00,0x40,0x7F,0xF7];
+const UPGRADE=[0xF0,0x22,0x24,0x35,0x7F,0xF7];
+const FINISH_CHECK=0xE0000000, FINISH_WRITE=0xF0000000;
+let midi=null,outPort=null,inPort=null,frameQ=[],waiters=[];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+function pack7(data){const out=[];let acc=0,nb=0;for(const b of data){acc|=b<<nb;nb+=8;while(nb>=7){out.push(acc&0x7F);acc>>=7;nb-=7;}}if(nb)out.push(acc&0x7F);return out;}
+function unpack7(s){const out=[];let acc=0,nb=0;for(const b of s){acc|=(b&0x7F)<<nb;nb+=7;while(nb>=8){out.push(acc&0xFF);acc>>=8;nb-=8;}}return out;}
+function buildResponse(addr,data,fl=0){const n=data.length,body=[0x00,0x59,0x30,(n+8)&0xFF,((n+8)>>8)&0xFF,0,fl];
+ body.push(addr&0xFF,(addr>>8)&0xFF,(addr>>16)&0xFF,(addr>>24)&0xFF,n&0xFF,(n>>8)&0xFF,0,...data);
+ let s=0;for(let i=6;i<body.length;i++)s+=body[i];body.push((~s)&0xFF);return[0xF0,...pack7(body),0xF7];}
+function parseRequest(pkt){if(pkt.length<2||pkt[0]!==0xF0||pkt[pkt.length-1]!==0xF7)return null;
+ const u=unpack7(pkt.slice(1,-1));
+ if(u.length!==15||u[0]!==0||u[1]!==0x59||u[2]!==0x30)return null;
+ let s=0;for(let i=6;i<14;i++)s+=u[i];if(((~s)&0xFF)!==u[14])return null;
+ return[u[6],u[6]|(u[7]<<8)|(u[8]<<16)|(u[9]<<24),u[10]|(u[11]<<8)|(u[12]<<16)];}
+function parseIdentity(pkt){if(pkt.length<2||pkt[0]!==0xF0||pkt[pkt.length-1]!==0xF7)return null;
+ const d=unpack7(pkt.slice(1,-1));
+ if(d.length!==34||d[0]!==0||d[1]!==0x59||d[2]!==0x11)return null;
+ let t="";for(let i=6;i<33;i++){const c=d[i];t+=(c>=32&&c<127)?String.fromCharCode(c):"?";}
+ t=t.replace(/\0+$/,"");const m=t.match(/^([^_]+)_(\d+)/);
+ return m?{text:t,model:m[1],version:+m[2],loader:m[1].toLowerCase().startsWith("ota-")}:null;}
+function send(pkt){if(outPort)outPort.send(Array.from(pkt.slice(1,-1)));}
+function onFrame(f){const w=waiters.shift();if(w){clearTimeout(w.t);w.res(f);}else frameQ.push(f);}
+function awaitFrame(ms){return new Promise(res=>{const t=setTimeout(()=>{waiters.splice(waiters.indexOf(w),1);res(null);},ms);const w={res,t};waiters.push(w);});}
+async function midiInit(){if(midi)return true;
+ try{midi=await navigator.requestMIDIAccess({sysex:true});}catch(e){return false;}
+ for(const p of midi.outputs.values()){if(/pocket|pendel|ota|composite|usb-midi/i.test(p.name)){outPort=p;break;}}
+ for(const p of midi.inputs.values()){if(/pocket|pendel|ota|composite|usb-midi/i.test(p.name)){inPort=p;break;}}
+ if(inPort)inPort.onmidimessage=ev=>{const d=ev.data;if(d&&d[0]===0xF0&&d[d.length-1]===0xF7)onFrame(new Uint8Array(d));};
+ return !!(outPort&&inPort);}
+async function find(want,secs){const end=Date.now()+secs*1000;
+ while(Date.now()<end){if(!(await midiInit()))return null;
+  const q=[...frameQ];frameQ.length=0;send(HS_QUERY);const t=Date.now()+1200;
+  while(Date.now()<t){const f=q.length?q.shift():await awaitFrame(500);if(!f)continue;
+   const id=parseIdentity(f);if(id&&(!want||want(id)))return id;}
+  await sleep(500);}return null;}
+async function serve(image,finish,idleMs,onProgress){let served=0,last=Date.now();
+ for(;;){const pkt=await awaitFrame(1000);
+  if(!pkt){if(Date.now()-last>idleMs)return{ok:false,why:"idle"};continue;}
+  const r=parseRequest(pkt);if(!r)continue;last=Date.now();
+  const addr=r[1],n=r[2];
+  if(addr===FINISH_CHECK||addr===FINISH_WRITE){send(buildResponse(addr,[0x73,0x75,0x63,0x63,0x65,0x73,0x73,0x00]));
+   if(addr===finish)return{ok:true};continue;}
+  if(n>512||addr+n>image.length)return{ok:false,why:"bad request"};
+  await sleep(10);send(buildResponse(addr,image.subarray(addr,addr+n),r[0]));
+  served++;if(onProgress)onProgress(served,addr+n);}}
+function unpackPackage(raw){if(raw.length<20*0x30)throw new Error("not a package");
+ const out=new Uint8Array(raw.length-20);let o=0;
+ for(let i=0;i<20;i++){out.set(raw.subarray(i*0x30,i*0x30+0x2F),o);o+=0x2F;}
+ out.set(raw.subarray(20*0x30),o);return out;}
+function enc(buf,off,size,key){key=key||0xFFFF;for(let i=0;i<size;i++){buf[off+i]^=key&0xFF;key=((key<<1)^(key&0x8000?0x1021:0))&0xFFFF;}}
+function parseUfw(logical){const hdr=new Uint8Array(logical.subarray(0,0x40));enc(hdr,0,0x40);
+ const count=hdr[8]|(hdr[9]<<8);const files={};
+ for(let i=0;i<count;i++){const e=new Uint8Array(logical.subarray(0x40+i*0x50,0x40+(i+1)*0x50));enc(e,0,0x50);
+  const dv=new DataView(e.buffer);const typ=dv.getUint16(0,true);
+  const off=dv.getUint32(12,true),len=dv.getUint32(16,true);
+  let name="";for(let j=0x40;j<0x50&&e[j];j++)name+=String.fromCharCode(e[j]);
+  files[name]={typ,off,len};}
+ return files;}
+function status(s){$("status").textContent=s;}
+function fail(s){status("error: "+s);$("go").disabled=false;}
+async function install(){ $("go").disabled=true;
+ status("loading the package…");let image=null;
+ try{const resp=await fetch("rhinotiger-pa.fwsc");
+  if(resp.status!==200)throw new Error("package not found");
+  const buf=new Uint8Array(await resp.arrayBuffer());
+  const logical=unpackPackage(buf);
+  const f=parseUfw(logical);
+  if(!f["flash.bin"])throw new Error("package missing flash.bin");
+  image=logical.subarray(f["flash.bin"].off,f["flash.bin"].off+f["flash.bin"].len);
+ }catch(e){fail(e.message);return;}
+ status("detecting the Pocket AMP (Web MIDI)…");
+ let dev=await find(null,3);
+ if(!dev){fail("Pocket AMP not found (USB data cable? Chrome/Edge? another app using it?)");return;}
+ status("device: "+dev.text+" ("+dev.model+")");
+ if(!dev.loader){
+  if(!dev.model.startsWith("Pocket AMP")){fail("wrong model "+dev.model);return;}
+  status("starting the update on "+dev.text+"…");
+  send(UPGRADE);await sleep(2000);
+  const ck=await serve(image,FINISH_CHECK,8000,null);
+  if(!ck.ok){fail("package check did not finish ("+ck.why+")");return;}
+  status("switching to the update loader…");await sleep(3000);
+ } else status("device is in update mode — finishing the write");
+ dev=await find(id=>id.loader,30);
+ if(!dev){fail("the update loader did not appear (replug USB and run again)");return;}
+ status("writing the app area…");send(UPGRADE);await sleep(2000);
+ const wr=await serve(image,FINISH_WRITE,180000,(k,end)=>{const pct=Math.min(99,Math.floor(end*100/image.length));$("fill").style.width=pct+"%";status("writing "+pct+"%");});
+ if(!wr.ok){fail("write did not finish ("+wr.why+") — replug and run again");return;}
+ status("restarting…");await sleep(4000);
+ const back=await find(id=>!id.loader,40);
+ if(!back){fail("the Pocket AMP did not come back — power-cycle it");return;}
+ $("fill").style.width="100%";
+ status("done: the Pocket AMP now runs "+back.text);
+ $("go").disabled=false;}
+$("detect").onclick=async()=>{status("detecting…");const dev=await find(null,3);
+ status(dev?"device: "+dev.text+" ("+dev.model+")":"not found (USB data cable? Chrome/Edge? another app using it?)");};
+$("go").onclick=install;
+(async()=>{try{const r=await fetch("rhinotiger-pa.fwsc");
+ $("go").disabled=r.status!==200;
+ status(r.status===200?"package ready: rhinotiger-pa.fwsc":"package: not found on this site");}catch(e){status("package: not reachable");}})();
+})();
+</script></body></html>
