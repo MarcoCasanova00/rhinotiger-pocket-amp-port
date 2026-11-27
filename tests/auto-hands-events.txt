@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY's hands: the events out by the set (its beginning: bar 0..16 of set 2 at 100, the line 0..32): a key thrown
+# brings them back, heard
+wait 3000   # the logo, then the play
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 2
+wait 30
+turn K4 -60
+wait 30
+expect perform 0
+turn K4 50
+wait 30
+expect perform 100
+turn K1 1
+wait 30
+tap PLAY
+wait 10000
+expect hd_out 24
+tap HOME
+wait 30
+key w0 down 90
+wait 60
+key w0 up
+wait 100
+expect hd_out 8
+wait 10000
+expect hd_out 8
+expect muted 0

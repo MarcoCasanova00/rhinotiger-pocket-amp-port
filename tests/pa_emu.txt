@@ -1,0 +1,114 @@
+# Pocket AMP control-translation regression, driven through the same
+# pa_virt.c the firmware runs, against the literal app on the host simulator
+# (tools/emu_pa.py --serial). Read by tools/test_pa_emu.sh.
+H wait 300
+H expect page 0
+RD
+# single keys: VOL- = PLAY (play/rest), VOL+ = ARP (build/drop)
+H tap PLAY
+H wait 600
+H expect playing 1
+RD
+H tap PLAY
+H wait 600
+H expect playing 0
+RD
+# chords -> page buttons (from the debounced stable mask)
+X 0x14            # VOL- + <  -> SEL -> KICK
+H wait 300
+H expect page 5
+RD
+X 0x0
+H wait 200
+H expect page 5
+RD
+ENC 1             # PAGE focus: PARA turn -> SELECT -> BASS
+H wait 300
+H expect page 6
+RD
+X 0x30            # < + > -> SEQ -> BREAK
+H wait 300
+H expect page 2
+RD
+X 0x0
+H wait 200
+X 0x0c           # VOL- + VOL+ -> HOME -> MAIN
+H wait 300
+H expect page 0
+RD
+X 0x0
+H wait 200
+X 0x18           # VOL+ + < -> EDIT -> MIX
+H wait 300
+H expect page 12
+RD
+X 0x0
+H wait 200
+X 0x24           # VOL- + > -> LFO -> LINE
+H wait 300
+H expect page 9
+RD
+X 0x0
+H wait 200
+X 0x06           # HOME + VOL- -> GLO -> GLOBAL
+H wait 300
+H expect page 14
+RD
+X 0x00
+H wait 200
+X 0x0a           # HOME + VOL+ -> FX -> ECHO
+H wait 300
+H expect page 13
+RD
+X 0x00
+H wait 200
+# PARA click cycles the focus (PAGE, WORLD, K1..K4, ALGO, KEY):
+# the 7th click lands on KEY, where VOL- holds the cursor key (F3)
+X 0x01
+N 200
+X 0x00
+N 200
+X 0x01
+N 200
+X 0x00
+N 200
+X 0x01
+N 200
+X 0x00
+N 200
+X 0x01
+N 200
+X 0x00
+N 200
+X 0x01
+N 200
+X 0x00
+N 200
+X 0x01
+N 200
+X 0x00
+N 200
+X 0x01
+N 200
+X 0x00
+N 200
+X 0x01
+N 200
+X 0x00
+N 200
+X 0x04           # in KEY focus VOL- holds the cursor key (F3)
+H wait 300
+H expect page 13
+RD
+X 0x00
+H wait 200
+# PARA hold 1 s: GLOBAL, then a SAVE tap saves on release
+X 0x01
+N 1200
+H wait 300
+H expect page 14
+RD
+X 0x00
+N 100
+H wait 300
+Q

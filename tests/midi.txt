@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# MIDI in, always on: notes throw events, start / stop, a clock's tempo followed.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+wait 1500
+# a note: the key's throw
+midi 90 3C 64
+wait 300
+midi 80 3C 00
+expect thrown 1
+# a note out of the keys' range, folded in
+midi 90 18 64
+wait 300
+midi 80 18 00
+expect thrown 2
+# a clock at 18 ms: 139 bpm (followed between 125 and 220)
+clock 96 18
+wait 30
+expect bpm >137
+expect bpm <141
+# stop, start
+midi FC
+wait 50
+expect playing 0
+midi FA
+wait 50
+expect playing 1
+# the clock gone: the world's tempo again
+wait 1000
+expect bpm 152

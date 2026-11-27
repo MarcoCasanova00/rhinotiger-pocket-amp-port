@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The sounds' pages' new knobs, where their levels were: KICK Decay (K4, param46), BASS Decay (K2, 47: how fast its bite
+# closes), PERC Open (K2, 48), EVENTS Pitch (50, semitones -12..12, one a detent) and Spread (51), LINE Drive (49, 0: clean), ATMOS
+# Motion (52) and Depth (53); each reaching the engine. At their defaults the sound is as it was. Recorded
+# (build/host/sound-params.wav): two bars of each pushed to an end, after two as they are. COLD SIGNAL, 152.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+listen
+jack in
+wait 600
+expect param46 50
+expect param47 50
+expect param48 50
+expect param49 0
+expect param50 0
+expect param51 50
+expect param52 50
+expect param53 50
+# into the line's sure phrase: everything sounding
+wait 25000
+wav sound-params.wav
+wait 3200
+# KICK: Decay up (a longer body)
+tap SEL
+wait 30
+expect page 5
+turn K4 25
+wait 30
+expect param46 100
+expect engine46 100
+said DECAY
+wait 3200
+turn K4 -25
+# BASS: Decay down (the bite closing at once, a rounder body)
+tap SEL
+wait 30
+expect page 6
+turn K2 -25
+wait 30
+expect param47 0
+expect engine47 0
+said DECAY
+wait 3200
+turn K2 25
+# PERC: Open up (the open hat long)
+tap ENV
+wait 30
+expect page 7
+turn K2 25
+wait 30
+expect param48 100
+expect engine48 100
+said OPEN
+wait 3200
+turn K2 -25
+# EVENTS: Pitch +7, Spread wide
+tap ENV
+wait 30
+expect page 8
+turn K3 7
+wait 30
+expect param50 7
+expect engine50 7
+said +7
+turn K4 25
+wait 30
+expect param51 100
+said SPREAD
+wait 3200
+turn K3 -7
+turn K4 -25
+# LINE: Drive up
+tap LFO
+wait 30
+expect page 9
+turn K4 40
+wait 30
+expect param49 80
+expect engine49 80
+said DRIVE
+wait 3200
+turn K4 -40
+# ATMOS: Motion fast, Depth deep
+tap LFO
+wait 30
+tap LFO
+wait 30
+expect page 11
+turn K3 25
+turn K4 25
+wait 30
+expect param52 100
+expect param53 100
+expect engine52 100
+expect engine53 100
+said DEPTH
+wait 3200
+wavstop

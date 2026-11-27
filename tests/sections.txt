@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The sections, cued with SAVE and ARP (side by side): SAVE, a break from the next bar (in a break or a build: nothing);
+# ARP tapped, a build from the next bar (from the groove or a break), then the drop (4 bars); ARP tapped in a build, the
+# drop at the next bar; ARP held, the drop at the next bar. Recorded (build/host/sections.wav) to listen to.
+# COLD SIGNAL, 152: a bar is about 1.58 s.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+jack in
+listen
+wait 600
+expect section 0
+wav sections.wav
+# 12 bars of the groove
+wait 19000
+tap SAVE
+said BREAK NEXT BAR
+wait 1700
+expect section 1
+shot break.png
+# SAVE in a break does nothing, and says so
+tap SAVE
+said IN A BREAK
+wait 1700
+expect section 1
+# 6 bars of the break (a few spent), ARP: its build
+wait 6000
+tap ARP
+said BUILD NEXT BAR
+wait 1700
+expect section 2
+shot build.png
+# SAVE in a build does nothing, and says so
+tap SAVE
+said BUILDING
+wait 500
+expect section 2
+# the build's 4 bars, then the drop
+wait 5700
+expect section 0
+expect drops 1
+# a build straight from the groove (8 bars after the drop): ARP tapped, the build from the next bar, then the drop
+wait 12600
+tap ARP
+said BUILD NEXT BAR
+expect section 0
+wait 1700
+expect section 2
+wait 6400
+expect section 0
+expect drops 2
+# ARP tapped in a build: the drop at the next bar
+wait 12600
+tap ARP
+wait 1700
+expect section 2
+wait 1600
+tap ARP
+said DROP NEXT BAR
+wait 1700
+expect section 0
+expect drops 3
+# ARP held in the groove: the drop at the next bar
+wait 12600
+press ARP
+wait 700
+said DROP NEXT BAR
+release ARP
+wait 1700
+expect drops 4
+expect section 0
+wait 6000
+wavstop

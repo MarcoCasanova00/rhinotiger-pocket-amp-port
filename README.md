@@ -1,6 +1,12 @@
-# RhinoTiger（犀虎）
+# RhinoTiger（犀虎） — POCKET AMP PORT
 
 ![RhinoTiger](app/docs/img/screen-logo.png)
+
+> **POCKET AMP PORT** — this fork adds a port of RhinoTiger to the
+> M-VAVE / Donner Pocket AMP. The app and DSP stay literal upstream;
+> the port lives under `plat/pocketamp/`, `ld/`, `tools/` and `docs/`
+> (see `POCKET_AMP_PORT.md`). The upstream README below describes the
+> original FM-1 firmware.
 
 A generative psytrance firmware for the M-VAVE FM-1, from dark psy to hi-tech. It plays by itself; you steer it.
 

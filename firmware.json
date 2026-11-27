@@ -10,11 +10,10 @@
   "install": "https://hacha.github.io/rhinotiger/install/",
   "site": "https://hacha.github.io/rhinotiger/",
   "source": "https://github.com/hacha/rhinotiger",
-  "screenshot": "app/docs/img/screen-logo.png",
   "hardware": {
     "models": ["FM-1"],
     "flash": ["856014", "B36014"],
-    "features": ["usb-audio-in", "velocity", "pressure", "screen-reader"]
+    "features": ["usb-audio-in", "velocity", "pressure", "screen-reader", "screen-mirror"]
   },
   "credits": "Built on fm1-base and felucca-bsp, from Felucca by Leo Kuroshita (Hügelton Instruments). Started from fm1-base's template by Charles Vestal."
 }

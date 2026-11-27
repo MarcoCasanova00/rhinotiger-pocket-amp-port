@@ -1,0 +1,121 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The builds' endings: K2 on the BUILD page (SEQ, twice) chooses BREATH, RUSH, VOID, TAPE, REVERSE, ECHO,
+# PICKUP (or AUTO); a ROLL build each (4 bars) from ARP, then the drop. Recorded (build/host/build-ends.wav) to listen
+# to. COLD SIGNAL, 152: a bar is about 1.58 s.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+jack in
+wait 1500
+tap SEQ
+wait 60
+tap SEQ
+wait 60
+expect page 3
+expect endset 0
+expect end 0
+turn K1 1
+wait 30
+expect buildset 1
+listen
+wav build-ends.wav
+turn K2 1
+wait 30
+expect endset 1
+said ENDING BREATH
+expect buildset 1
+tap ARP
+wait 1700
+expect section 2
+expect end 1
+wait 3200
+wait 3400
+expect section 0
+wait 3200
+turn K2 1
+wait 30
+expect endset 2
+said ENDING RUSH
+expect buildset 1
+tap ARP
+wait 1700
+expect section 2
+expect end 2
+wait 3200
+wait 3400
+expect section 0
+wait 3200
+turn K2 1
+wait 30
+expect endset 3
+said ENDING VOID
+expect buildset 1
+tap ARP
+wait 1700
+expect section 2
+expect end 3
+wait 3200
+wait 3400
+expect section 0
+wait 3200
+turn K2 1
+wait 30
+expect endset 4
+said ENDING TAPE
+expect buildset 1
+tap ARP
+wait 1700
+expect section 2
+expect end 4
+wait 3200
+shot build-end.png
+wait 3400
+expect section 0
+wait 3200
+turn K2 1
+wait 30
+expect endset 5
+said ENDING REVERSE
+expect buildset 1
+tap ARP
+wait 1700
+expect section 2
+expect end 5
+wait 3200
+wait 3400
+expect section 0
+wait 3200
+turn K2 1
+wait 30
+expect endset 6
+said ENDING ECHO
+expect buildset 1
+tap ARP
+wait 1700
+expect section 2
+expect end 6
+wait 3200
+wait 3400
+expect section 0
+wait 3200
+turn K2 1
+wait 30
+expect endset 7
+said ENDING PICKUP
+expect buildset 1
+tap ARP
+wait 1700
+expect section 2
+expect end 7
+wait 3200
+wait 3400
+expect section 0
+wait 3200
+wavstop
+# back to AUTO, at the left: an ending its own (not PICKUP, the last, again)
+turn K2 -10
+wait 30
+expect endset 0
+tap ARP
+wait 1700
+expect section 2
+expect end <7

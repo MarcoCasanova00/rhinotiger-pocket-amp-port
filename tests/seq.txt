@@ -1,0 +1,169 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# LFO and SEQ. LFO cycles LINE (page 7), LINE SEQ (8) and ATMOS (9); SEQ goes to BREAK (2), and tapped again BUILD (3): SEQ is
+# not held-sensitive and draws no phrase (LFO held on a LINE page does: line-new). LINE SEQ's knobs: K1..K4 Density
+# (param33), Mutate (param35), Range (param40), Slide (param41), each changing its own parameter only; ALGO there is
+# the line's type.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+listen
+wait 600
+expect page 0
+# LFO: LINE, LINE SEQ, ATMOS, again LINE, LINE SEQ
+tap LFO
+wait 50
+expect page 9
+tap LFO
+wait 50
+expect page 10
+tap LFO
+wait 50
+expect page 11
+tap LFO
+wait 50
+expect page 9
+tap LFO
+wait 50
+expect page 10
+# LINE SEQ's knobs: K3 is Range (param40) and nothing else
+expect param33 50
+expect param35 50
+expect param40 50
+expect param41 50
+turn K3 -10
+wait 30
+expect param40 30
+expect param33 50
+expect param35 50
+expect param41 50
+expect param32 70
+expect param34 50
+expect param42 50
+expect param43 50
+turn K1 4
+turn K2 -4
+turn K4 6
+wait 30
+expect param33 58
+expect param35 42
+expect param41 62
+expect param40 30
+# ALGO on LINE SEQ is the line's type
+expect line_type 0
+turn ALGO 2
+wait 100
+expect line_type 2
+expect colour 0
+said LINE
+# SEQ from LINE SEQ: BREAK, and again BUILD
+said_none
+tap SEQ
+wait 50
+expect page 2
+said BREAK
+said_none
+tap SEQ
+wait 50
+expect page 3
+said BUILD
+# LFO from BUILD: the first of its own, LINE
+tap LFO
+wait 50
+expect page 9
+# SEQ from LINE: BREAK
+tap SEQ
+wait 50
+expect page 2
+# SEQ from every other page
+tap HOME
+wait 30
+expect page 0
+tap SEQ
+wait 50
+expect page 2
+tap HOME
+wait 30
+tap HOME
+wait 30
+expect page 1
+tap SEQ
+wait 50
+expect page 2
+tap SEL
+wait 30
+expect page 5
+tap SEQ
+wait 50
+expect page 2
+tap SEL
+wait 30
+tap SEL
+wait 30
+expect page 6
+tap SEQ
+wait 50
+expect page 2
+tap ENV
+wait 30
+expect page 7
+tap SEQ
+wait 50
+expect page 2
+tap ENV
+wait 30
+tap ENV
+wait 30
+expect page 8
+tap SEQ
+wait 50
+expect page 2
+tap EDIT
+wait 30
+expect page 12
+tap SEQ
+wait 50
+expect page 2
+tap FX
+wait 30
+expect page 13
+tap SEQ
+wait 50
+expect page 2
+tap GLO
+wait 30
+expect page 14
+tap SEQ
+wait 50
+expect page 2
+# held for 700 ms: only the page, nothing said but BREAK, nothing else changed
+tap LFO
+wait 50
+expect page 9
+tap LFO
+wait 50
+expect page 10
+said LINE SEQ
+said_none
+press SEQ
+wait 700
+release SEQ
+wait 50
+expect page 2
+said BREAK
+unsaid NEW PATTERN
+wait 600
+expect page 2
+# held from BREAK: BUILD (a page's button, as tapped), still no new pattern
+said_none
+press SEQ
+wait 700
+release SEQ
+wait 50
+expect page 3
+unsaid NEW PATTERN
+unsaid NO PATTERN YET
+# the knobs and type are as they were
+expect param33 58
+expect param35 42
+expect param40 30
+expect param41 62
+expect line_type 2

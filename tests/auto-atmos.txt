@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY's atmos out: its fader's ride, no mute (set 7 at 100: bars 32..64, after the set's beginning, down over 32..40, up over 56..64); its black
+# key while it is down: back, not muted; its level turned: the hand's
+wait 3000   # the logo, then the play
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 7
+wait 30
+turn K4 -60
+wait 30
+expect perform 0
+turn K4 50
+wait 30
+expect perform 100
+turn K1 1
+wait 30
+tap PLAY
+wait 50300
+expect atm_ride >95
+wait 6300
+expect atm_ride >10
+expect atm_ride <70
+expect muted 0
+wait 8000
+expect atm_ride 0
+expect hd_out 32
+expect muted 0
+# its level by hand
+tap FX
+wait 30
+tapkey b5
+wait 100
+expect atm_ride 100
+expect hd_out 0
+expect muted 0
+# again: muted, the hand's
+tapkey b5
+wait 100
+expect muted 32
+tapkey b5
+wait 100
+expect muted 0
+# from the top, left alone: up again by itself
+tap PLAY
+wait 600
+tap PLAY
+wait 64700
+expect atm_ride 0
+wait 38000
+expect atm_ride 100
+expect hd_out 0
+# from the top: its level turned on MIX, the hand's: up again, and not below the hand's level by the ride
+tap PLAY
+wait 600
+tap PLAY
+wait 64700
+expect atm_ride 0
+tap EDIT
+wait 30
+expect page 12
+shot auto-atmos.png
+turn K1 5
+wait 30
+turn K2 -3
+wait 100
+expect atm_ride 100
+expect muted 0

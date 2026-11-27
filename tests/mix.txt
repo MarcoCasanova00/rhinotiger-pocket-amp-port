@@ -1,0 +1,103 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# MIX (EDIT, page 10): K1 the track (0..5: KICK BASS PERC EVENTS LINE ATMOS, the sounds' pages' order), K2 its level,
+# K3 its send into the echo (the kick and the bass: none, not shown), K4 its mute (right on, left off; ECHO's black keys the same). The levels and the sends are MIX's
+# only: param8 KICK, 12 BASS, 16 PERC, 32 LINE, 20 EVENTS, 28 ATMOS; sends 44 PERC, 45 LINE, 23 EVENTS, 31 ATMOS. The
+# echo's level (param24) is ECHO's K4. A strip a track, its meter (meterN). The keys throw events as on the other
+# pages. COLD SIGNAL, 152.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+listen
+wait 600
+tap EDIT
+wait 30
+expect page 12
+said MIX
+expect track 0
+# into the line's sure phrase (bars 16..23): every part sounding, the echo too
+wait 26000
+expect meter0 >0
+expect meter1 >0
+expect meter2 >0
+expect meter3 >0
+expect meter5 >0
+shot mix.png
+# K2 on KICK: the kick's level
+expect param8 80
+turn K2 -10
+wait 30
+expect param8 60
+said KICK
+turn K2 -30
+wait 1000
+expect param8 0
+expect meter0 0
+expect meter1 >0
+# K3 on KICK: no send, nothing said
+said KICK
+turn K3 10
+wait 30
+said_none
+# K1 to LINE (4: after EVENTS, as the sounds' pages): K2 its level, K3 its send
+turn K1 3
+wait 30
+expect track 3
+said EVENTS
+turn K1 1
+wait 30
+expect track 4
+said LINE
+expect param32 70
+turn K2 -35
+wait 1000
+expect param32 0
+expect meter3 0
+expect param45 50
+turn K3 10
+wait 30
+expect param45 70
+said LINE
+shot mix-line.png
+# K1 past the end: ATMOS (5), no further
+turn K1 10
+wait 30
+expect track 5
+said ATMOS
+# K4: ATMOS muted (right), again right: still; left: back
+turn K4 1
+wait 1000
+expect muted 32
+expect meter5 0
+said MUTED
+turn K4 1
+wait 30
+expect muted 32
+turn K4 -1
+wait 30
+expect muted 0
+said BACK
+shot mix-mute.png
+# back, and the kick and the line again
+turn K1 -1
+wait 30
+expect track 4
+turn K2 35
+turn K1 -10
+wait 30
+expect track 0
+turn K2 40
+wait 2000
+expect param8 80
+expect meter0 >0
+# a black key here throws (not a mute)
+tapkey b1
+wait 300
+expect muted 0
+# the echo's level: ECHO's K4
+tap FX
+wait 30
+expect page 13
+expect param24 50
+turn K4 -5
+wait 30
+expect param24 40
+said LEVEL

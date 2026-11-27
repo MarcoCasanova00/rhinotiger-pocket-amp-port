@@ -1,0 +1,184 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# The screens, for a look (build/host/*.png): ./test.sh screens
+# The manual's pictures (app/docs/img): ./build.sh --host, then
+#   app/build/host/rhinotiger_host app/tests/screens.txt app/docs/img
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+jack in
+# the boot, again: the logo whole, then gone
+reboot
+wait 1900
+shot screen-logo.png
+expect held 1
+wait 800
+expect held 0
+# the groove, a while in (the parts come in over the first bars)
+wait 38000
+shot screen-playing.png
+expect page 0
+# the pages, in the panel's order
+tap HOME
+wait 40
+expect page 1
+wait 600
+shot screen-groove.png
+tap HOME
+wait 40
+expect page 0
+wait 300
+shot screen-main.png
+# ALGORITHM on MAIN: the kit, from the next bar (what it changed, named over the header)
+turn ALGO 1
+wait 1100
+shot screen-kit.png
+wait 800
+tap SEQ
+wait 40
+expect page 2
+wait 600
+shot screen-phase.png
+tap SEQ
+wait 40
+expect page 3
+wait 600
+shot screen-buildpage.png
+tap SEQ
+wait 40
+expect page 4
+wait 600
+shot screen-auto.png
+tap SEL
+wait 40
+expect page 5
+wait 600
+shot screen-kick.png
+tap SEL
+wait 40
+expect page 6
+wait 600
+shot screen-bass.png
+tap ENV
+wait 40
+expect page 7
+wait 600
+shot screen-perc.png
+tap ENV
+wait 40
+expect page 8
+wait 600
+shot screen-events.png
+tap LFO
+wait 40
+expect page 9
+wait 600
+shot screen-line.png
+tap LFO
+wait 40
+expect page 10
+wait 600
+shot screen-line-seq.png
+tap LFO
+wait 40
+expect page 11
+wait 600
+shot screen-atmos.png
+tap EDIT
+wait 40
+expect page 12
+turn K1 2
+wait 600
+shot screen-mix.png
+expect track 2
+tap FX
+wait 40
+expect page 13
+wait 600
+shot screen-echo.png
+tap GLO
+wait 40
+expect page 14
+turn K1 1
+wait 600
+shot screen-global.png
+expect dirty 1
+# THEME, one by one, and back to NEON
+turn K2 1
+wait 400
+shot screen-theme-acid.png
+turn K2 1
+wait 400
+shot screen-theme-infra.png
+turn K2 1
+wait 400
+shot screen-theme-ice.png
+turn K2 1
+wait 400
+shot screen-theme-mono.png
+turn K2 -4
+wait 400
+shot screen-theme-neon.png
+turn K1 -1
+# a key throws an event; a black key held, a rhythm for the white keys
+wait 1500
+tap HOME
+wait 40
+tapkey w7
+wait 120
+shot screen-thrown.png
+wait 1500
+key b10 down 90
+key w5 down 90
+wait 700
+shot screen-rhythm.png
+key w5 up
+key b10 up
+wait 400
+# REC: the keys' two bars (tapped: from the next bar)
+tap REC
+wait 1650
+expect rec 2
+tapkey w3
+wait 300
+shot screen-rec.png
+wait 3300
+# a world, and back
+turn PRESET 1
+wait 150
+turn PRESET -1
+wait 3000
+# the sections: a break (SAVE), a build (ARP), the drop
+tap SEQ
+wait 40
+tap SAVE
+wait 150
+shot screen-break-cued.png
+wait 3300
+expect section 1
+shot screen-break.png
+tap SEQ
+wait 40
+tap ARP
+wait 3600
+expect section 2
+expect page 3
+shot screen-build.png
+wait 7000
+expect section 0
+# the performance on ECHO: sixteen effects, six parts
+tap FX
+wait 40
+key w2 down 90
+key w8 down 90
+key w9 down 90
+wait 300
+shot screen-fx-held.png
+key w2 up
+key w8 up
+key w9 up
+tapkey b0
+tapkey b4
+wait 400
+shot screen-fx-muted.png
+tapkey b10
+wait 100
+expect muted 0

@@ -1,0 +1,53 @@
+# The keys throw events: each white key its own sound (thrown_type 6 + the white key's index); a black key held is a
+# rhythm the white keys held with it throw on. Recorded (build/host/throw-*.wav) to listen to.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+jack in
+listen
+wav throw-cold-signal.wav
+# the generator's own events from bar 4, a 4-bar loop (COLD SIGNAL, 152: a bar is 1.58 s): by bar 8 all of it
+wait 13000
+expect events >0
+# a low white key (F3): its sound (DIVE), on the next sixteenth
+tapkey w0
+wait 400
+expect thrown 1
+expect thrown_type 6
+shot throw-dive.png
+# a middle white key (F4): SQUELCH
+tapkey w7
+wait 400
+expect thrown_type 13
+# a high white key (F5): TWEET
+tapkey w14
+wait 400
+expect thrown_type 20
+# a black key (G#3) held: eighths; a white key held with it throws on them; let go, none
+expect rhythm -1
+key b1 down 90
+wait 100
+expect rhythm 3
+key w5 down 90
+wait 300
+shot throw-rhythm.png
+wait 1280
+key w5 up
+key b1 up
+wait 100
+expect rhythm -1
+wait 600
+# a middle key held two seconds, pressed harder as it goes: thrown again every sixteenth
+expect events <30
+key w8 down 90
+wait 700
+key w8 down 90 60
+wait 700
+key w8 down 90 100
+wait 600
+key w8 up
+wait 2000
+expect thrown 5
+# held two seconds: thrown again each sixteenth (152: about 10 a second): some 20 more, the generator's on top
+expect events >35
+# the generator takes up what was thrown: let it run some phrases
+wait 30000
+wavstop

@@ -1,0 +1,102 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY (SEQ's third page): a set of 30 minutes, seed 7. What it turns is the hand's a while once touched, and the
+# settings (what SAVE keeps) stay the hand's. Off: the music goes on from where it is. Run out: it fades and rests.
+wait 3000   # the logo, then the play
+jack in
+listen
+tap PLAY
+wait 200
+expect playing 0
+expect setworld 2
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K2 -5
+wait 30
+turn K3 7
+wait 30
+# on, resting: the set waits at its beginning for PLAY
+turn K1 1
+wait 30
+said AUTO PLAY PLAY: BEGIN
+expect autoplay 1
+expect chapters >3
+expect chapters <7
+# its minutes and its seed: only while off
+turn K2 1
+wait 30
+said AUTO PLAY IS ON
+tap PLAY
+wait 8000
+expect playing 1
+expect setworld 2
+expect section 0
+# its breaks: the set's (BREAKS 0 in the engine, the hand's 50 kept)
+expect engine36 0
+expect param36 50
+# Dark by hand: kept as it was turned for 32 bars (about 50 s), then back
+tap HOME
+wait 30
+expect page 0
+turn K3 -50
+wait 30
+expect engine2 0
+expect param2 50
+wait 30000
+expect engine2 0
+wait 60000
+expect engine2 >10
+expect param2 50
+# a break by hand, and a build: followed, the drop, the set goes on
+tap SAVE
+wait 2500
+expect section 1
+tap ARP
+wait 2500
+expect section 2
+wait 20000
+expect section 0
+expect autoplay 1
+# SAVE on GLOBAL keeps the hand's
+tap GLO
+wait 30
+tap SAVE
+wait 100
+expect dirty 0
+expect param2 50
+expect setworld 2
+# off: the music goes on, the knobs where the set left them
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K1 -1
+wait 100
+said AUTO PLAY OFF
+expect autoplay 0
+expect playing 1
+expect dirty 1
+expect engine36 50
+# on again while it plays: from here, the world as it is; run out (30 minutes): it fades in its last break and rests,
+# and everything is the hand's again
+turn K1 1
+wait 30
+said AUTO PLAY ON
+expect chapter 0
+wait 1500000
+expect autoplay 1
+expect playing 1
+wait 420000
+expect autoplay 0
+expect playing 0
+tap PLAY
+wait 4000
+expect playing 1

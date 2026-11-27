@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY's effects on the screen (the grid's picture, the page as it is) and the keys it plays lit: set 7 at 100: BAND
+# (w7, F4) into bar 8
+wait 3000   # the logo, then the play
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 7
+wait 30
+turn K4 -60
+wait 30
+expect perform 0
+turn K4 50
+wait 30
+expect perform 100
+turn K1 1
+wait 30
+tap PLAY
+wait 11900
+expect page 4
+expect au_show 1
+expect keys_lit 4096
+# a knob: the page's own picture, for three seconds
+turn K2 1
+wait 50
+expect au_show 0
+expect keys_lit 4096
+# the effect over: the lanes again
+wait 6000
+expect au_show 0
+expect hd_fx 0

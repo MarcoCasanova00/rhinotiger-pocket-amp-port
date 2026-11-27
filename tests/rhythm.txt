@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# A white key held, then a black key with it (its rhythm), then the black key let go: the white key goes on, on the
+# sixteenths again. COLD SIGNAL, 152: a sixteenth is about 99 ms, an eighth (G#3) 197 ms.
+wait 2400   # the logo (face, characters, all): silent, the play begins as it goes
+jack in
+wait 3000
+key w5 down 90
+wait 1000
+expect throws >8
+expect throws <12
+key b1 down 90
+wait 1000
+expect rhythm 3
+expect throws >13
+expect throws <17
+key b1 up
+wait 1000
+expect rhythm -1
+expect throws >22
+expect throws <28
+key w5 up
+wait 500
+expect throws >22
+expect throws <29
+# mono: two white keys held, one plays (the last pressed): still one a sixteenth
+wait 500
+key w5 down 90
+key w9 down 90
+wait 1000
+expect throws >31
+expect throws <41
+# SCATTER (G#4) with them: on the sixteenths, the pitches drawn
+key b6 down 90
+wait 30
+expect rhythm 15
+wait 1000
+expect throws >40
+expect throws <52
+key b6 up
+key w9 up
+key w5 up

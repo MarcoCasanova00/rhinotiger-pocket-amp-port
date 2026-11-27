@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 hacha
+# AUTO PLAY's half time on the screen and its key lit (set 11 at 100: HALF, b7, A#4, over bars 28..32)
+wait 3000   # the logo, then the play
+tap PLAY
+wait 200
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect page 4
+turn K3 11
+wait 30
+turn K4 -60
+wait 30
+expect perform 0
+turn K4 50
+wait 30
+expect perform 100
+turn K1 1
+wait 30
+tap PLAY
+wait 47500
+expect hd_do 1
+expect au_show 1
+expect keys_lit >131071
+# a hand's own key is lit as ever, and the half time gives way to the hand's effect
+tap FX
+wait 100
+expect au_show 0
+key w9 down 90
+wait 100
+expect hd_do 0
+key w9 up
