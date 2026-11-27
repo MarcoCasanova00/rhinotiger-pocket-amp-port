@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RhinoTiger · Pocket AMP port</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Semi+Condensed:wght@600;700&display=swap">
+<style>
+:root{--ground:#1c1814;--ink:#f2e8d8;--muted:#b3a28e;--rule:#3a322a;--accent:#f28a5a;--teal:#4cc3b6;--card:#26201b;--bad:#ff8a73;--focus:#79adff}
+*{box-sizing:border-box}
+body{background:radial-gradient(1200px 600px at 50% -10%,#2a241d,var(--ground));color:var(--ink);margin:0;padding:36px 20px 70px;
+    font:400 16px/1.55 "Barlow","Segoe UI",system-ui,sans-serif}
+main{max-width:840px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem 1.2rem;margin:0 0 1.4rem}
+h1{font:700 2.2rem/1.1 "Barlow Semi Condensed","Barlow",sans-serif;margin:0;letter-spacing:.01em}
+h1 em{font-style:normal;color:var(--accent)}
+header p{margin:0;color:var(--muted)}
+.badges{display:flex;gap:.5rem;flex-wrap:wrap}
+.badge{font:600 .8rem/1 "Barlow Semi Condensed","Barlow",sans-serif;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;
+       padding:.5em .9em;border-radius:999px;border:1px solid var(--muted);color:var(--ink)}
+.badge.accent{border-color:var(--accent);color:var(--accent)}
+.badge.teal{border-color:var(--teal);color:var(--teal)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:1.1rem 1.2rem;text-decoration:none;color:var(--ink);display:block;transition:border-color .15s}
+.card:hover{border-color:var(--accent)}
+.card h2{font:600 1.05rem "Barlow Semi Condensed","Barlow",sans-serif;margin:0 0 .4rem;color:var(--accent)}
+.card p{margin:0;color:var(--muted);font-size:.95rem}
+.note{margin-top:1.6rem;border:1px solid var(--rule);border-radius:14px;padding:1rem 1.2rem;background:var(--card);font-size:.95rem;color:var(--muted)}
+.note b{color:var(--ink);font-weight:600}
+pre{background:#141210;border:1px solid var(--rule);border-radius:8px;padding:.7em .9em;margin:.6em 0;color:var(--ink);overflow-x:auto;font:400 .9rem ui-monospace,monospace}
+code{font-family:ui-monospace,monospace}
+a{color:var(--teal)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+</style></head><body>
+<main>
+<header>
+ <h1>RhinoTiger <em>· Pocket AMP</em></h1>
+ <p>the port — in the browser and on the pedal</p>
+ <div class="badges" style="margin-left:auto">
+  <a class="badge accent" href="installer/">Browser installer</a>
+  <a class="badge teal" href="https://github.com/MarcoCasanova00/rhinotiger">Source</a>
+ </div>
+</header>
+
+<div class="grid">
+ <a class="card" href="installer/">
+  <h2>Browser installer</h2>
+  <p>Install <code>rhinotiger-pa.fwsc</code> on a real Pocket AMP over Web MIDI (Chrome/Edge).</p>
+ </a>
+ <a class="card" href="https://github.com/MarcoCasanova00/rhinotiger/blob/pocket-amp-port/docs/FLASHING.md">
+  <h2>Flashing &amp; bench</h2>
+  <p>The full procedure, the first-boot checklist, and how to return to the stock firmware.</p>
+ </a>
+ <a class="card" href="https://github.com/MarcoCasanova00/rhinotiger/blob/pocket-amp-port/docs/POCKET_AMP_CONTROLS.md">
+  <h2>Control card</h2>
+  <p>Two knobs and four keys mapped to the RhinoTiger panel: chords, PARA click/hold sequences.</p>
+ </a>
+ <a class="card" href="https://github.com/MarcoCasanova00/rhinotiger/blob/pocket-amp-port/POCKET_AMP_PORT.md">
+  <h2>About the port</h2>
+  <p>Credits, layout and status — literal app/DSP plus the new platform layer.</p>
+ </a>
+</div>
+
+<div class="note">
+ <b>Interactive web emulator</b> — it runs the actual host build, so it needs the local Python server (GitHub Pages is static):
+ <pre>cd /home/maltomare/pocketamp-rhinotiger
+python3 tools/emu_pa_server.py --port 8321</pre>
+ then open <code>http://localhost:8321/</code>. A WASM build (<code>emcc</code>) would make it run statically; it is not included here.
+</div>
+</main>
+</body></html>
