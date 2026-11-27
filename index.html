@@ -43,6 +43,10 @@ a{color:var(--teal)}
 </header>
 
 <div class="grid">
+ <a class="card" href="emulator/">
+  <h2>Web emulator</h2>
+  <p>Run the port in the browser: WASM of the literal app with the Pocket AMP translator.</p>
+ </a>
  <a class="card" href="installer/">
   <h2>Browser installer</h2>
   <p>Install <code>rhinotiger-pa.fwsc</code> on a real Pocket AMP over Web MIDI (Chrome/Edge).</p>
@@ -62,10 +66,8 @@ a{color:var(--teal)}
 </div>
 
 <div class="note">
- <b>Interactive web emulator</b> — it runs the actual host build, so it needs the local Python server (GitHub Pages is static):
- <pre>cd /home/maltomare/pocketamp-rhinotiger
-python3 tools/emu_pa_server.py --port 8321</pre>
- then open <code>http://localhost:8321/</code>. A WASM build (<code>emcc</code>) would make it run statically; it is not included here.
+ <b>Web emulator</b> — a pure-browser WASM build of the literal app with the Pocket AMP translator; no server needed.
+ Rebuild it with <code>tools/build_web_pa.sh</code> (Emscripten). The device-side flasher is the installer page.
 </div>
 </main>
 </body></html>
