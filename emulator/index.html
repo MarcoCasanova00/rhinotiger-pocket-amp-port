@@ -168,45 +168,35 @@ let actx=null, sp=null, audioPushed=0, lastAErr='';
 function audioInit(){
  if(!actx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return; actx=new AC(); }
  if(actx.state!=='running'){ try{ actx.resume(); }catch(e){} }
- if(!sp){ startScriptAudio(); }
+ startScriptAudio();
 }
 function startScriptAudio(){
- try{
-  const N=1024;
-  sp=actx.createScriptProcessor(N,0,2);
-  sp.onaudioprocess=e=>{
-   if(!ex)return;
-   try{
-    ex.web_render(N);
-    const L=new Float32Array(ex.web_out_l(),0,N);
-    const R=new Float32Array(ex.web_out_r(),0,N);
-    e.outputBuffer.getChannelData(0).set(L);
-    e.outputBuffer.getChannelData(1).set(R);
-    audioPushed+=N;
-    lastAErr='';
-   }catch(err){ lastAErr=String(err); }
-  };
-  sp.connect(actx.destination);
- }catch(err){ lastAErr=String(err); }
+ /* The local build played the simulator this way (and you heard it there):
+  * one 1024-frame AudioBufferSource per ~23 ms, drawn from the WASM's out_l /
+  * out_r, scheduled ahead on the audio clock. createScriptProcessor with a
+  * write-back is not needed: browsers have been dropping samples from it. */
+ const N=1024;
+ const push=()=>{
+  if(!actx||!ex)return;
+  ex.web_render(N);                       // advance the device (out_l/out_r)
+  /* web_out_l()/_r() return byte offsets into the module memory (as in the
+   * upstream worklet), so build the views from memory, not from the numbers. */
+  const L=new Float32Array(mem.buffer, ex.web_out_l(), N);
+  const R=new Float32Array(mem.buffer, ex.web_out_r(), N);
+  const ab=actx.createBuffer(2,N,44100);
+  ab.getChannelData(0).set(L);
+  ab.getChannelData(1).set(R);
+  const src=actx.createBufferSource();
+  src.buffer=ab; src.connect(actx.destination);
+  const now=actx.currentTime;
+  if(nextT<now+0.02)nextT=now+0.02;
+  src.start(nextT);
+  nextT+=N/44100;
+  audioPushed+=N;
+ };
+ setInterval(push, 1000/1920|0);
 }
 ['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,audioInit));
-/* real-time scheduler: render as many frames as wall-clock time has passed,
-   so the simulated device runs ~1:1. The audio queue follows the same
-   cadence; if the tab throttles, we skip stale audio rather than spin. */
-const MAX_PENDING=0.35;
-let rendered=0, t0=0;
-function startPump(){ t0=performance.now(); rendered=0; requestAnimationFrame(pump); }
-function pump(){
- const target=(performance.now()-t0)/1000*44100;
- let delta=target-rendered;
- if(delta>44100*2){ rendered=target-44100; delta=44100; }   // catch up after a long stall
- while(delta>0){
-  const n=Math.min(1024, Math.ceil(delta));
-  ex.web_render(n);                 // the ScriptProcessor pulls the sound; here we only keep time moving
-  rendered+=n; delta-=n;
- }
- requestAnimationFrame(pump);
-}
 
 function drawLeds(){ if(!ex)return; const lit=ex.web_lit_buttons(), l=document.getElementById('leds'); l.innerHTML='';
  BTN.forEach((n,i)=>{ const d=document.createElement('div'); d.className='vled'; d.textContent=n; if(lit>>i&1)d.classList.add('on'); l.appendChild(d); }); }
@@ -261,10 +251,9 @@ function status(){
  else diag.textContent='audio: '+actx.state+' | pulled '+audioPushed+' frames | ring peak '+(ex.web_debug_ring_peak?ex.web_debug_ring_peak().toFixed(3):'?')+(lastAErr?' | last error: '+lastAErr:'');
 }
 loadWasm().then(()=>{
- startPump();
  setInterval(frame,200); setInterval(status,700); setInterval(drawLeds,700);
  frame(); status(); drawLeds();
- })
+})
  .catch(e=>{ document.getElementById('alert').textContent='failed to start the emulator: '+e.message; });
 </script>
 </body></html>
