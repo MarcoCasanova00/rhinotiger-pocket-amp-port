@@ -163,10 +163,29 @@ window.addEventListener('keydown',e=>{
 });
 window.addEventListener('keyup',e=>{const k=e.key.toLowerCase(),map={'p':0,'h':1,'v':2,'b':3,'q':4,',':4,'.':5};if(k in map)bit(map[k],false);});
 
-let actx=null,nextT=0,audioPushed=0;
+let actx=null, sp=null, audioPushed=0, lastAErr='';
 function audioInit(){
- if(!actx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return; actx=new AC(); nextT=actx.currentTime+0.1; }
+ if(!actx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return; actx=new AC(); }
  if(actx.state!=='running'){ try{ actx.resume(); }catch(e){} }
+ if(!sp){ startScriptAudio(); }
+}
+function startScriptAudio(){
+ try{
+  sp=actx.createScriptProcessor(4096,0,2);
+  sp.onaudioprocess=e=>{
+   if(!ex)return;
+   try{
+    ex.web_render(4096);
+    const L=new Float32Array(ex.web_out_l(),0,4096);
+    const R=new Float32Array(ex.web_out_r(),0,4096);
+    e.outputBuffer.getChannelData(0).set(L);
+    e.outputBuffer.getChannelData(1).set(R);
+    audioPushed+=4096;
+    lastAErr='';
+   }catch(err){ lastAErr=String(err); }
+  };
+  sp.connect(actx.destination);
+ }catch(err){ lastAErr=String(err); }
 }
 ['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,audioInit));
 /* real-time scheduler: render as many frames as wall-clock time has passed,
@@ -181,21 +200,7 @@ function pump(){
  if(delta>44100*2){ rendered=target-44100; delta=44100; }   // catch up after a long stall
  while(delta>0){
   const n=Math.min(1024, Math.ceil(delta));
-  ex.web_render(n);
-  if(actx){
-   if(actx.state!=='running'){ try{ actx.resume(); }catch(e){} }
-   const pend=nextT-actx.currentTime;
-   if(pend<MAX_PENDING){
-    try{
-     const L=new Float32Array(ex.web_out_l(),0,n), R=new Float32Array(ex.web_out_r(),0,n);
-     const ab=actx.createBuffer(2,n,44100);
-     ab.getChannelData(0).set(L); ab.getChannelData(1).set(R);
-     const src=actx.createBufferSource(); src.buffer=ab; src.connect(actx.destination);
-     if(nextT<actx.currentTime+0.05)nextT=actx.currentTime+0.05;
-     src.start(nextT); nextT+=n/44100; audioPushed+=n;
-    }catch(e){}
-   }
-  }
+  ex.web_render(n);                 // the ScriptProcessor pulls the sound; here we only keep time moving
   rendered+=n; delta-=n;
  }
  requestAnimationFrame(pump);
@@ -235,7 +240,7 @@ function status(){
  document.getElementById('chip-state').textContent=st;
  const diag=document.getElementById('aidiag');
  if(!actx) diag.textContent='audio: not started yet — click anywhere';
- else diag.textContent='audio: '+actx.state+' | pending '+(nextT-actx.currentTime).toFixed(2)+'s | pushed '+audioPushed+' frames'+(ex.web_debug_ring_peak?' | ring peak '+ex.web_debug_ring_peak().toFixed(3):'');
+ else diag.textContent='audio: '+actx.state+' | pulled '+audioPushed+' frames | ring peak '+(ex.web_debug_ring_peak?ex.web_debug_ring_peak().toFixed(3):'?')+(lastAErr?' | last error: '+lastAErr:'');
 }
 loadWasm().then(()=>{
  startPump();
