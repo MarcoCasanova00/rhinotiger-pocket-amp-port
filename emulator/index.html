@@ -1,122 +1,123 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RhinoTiger · Pocket AMP — web emulator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Semi+Condensed:wght@600;700&display=swap">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RhinoTiger — Pocket AMP port</title>
 <style>
-:root{--ground:#1c1814;--ink:#f2e8d8;--muted:#b3a28e;--rule:#3a322a;--card:#26201b;--accent:#f28a5a;--teal:#4cc3b6;--bad:#ff8a73;--focus:#79adff}
+:root{
+ --bg:#0a0c0d; --card:#14171a; --rule:#262b2f; --muted:#8a9499; --muted2:#b0b9bd;
+ --teal:#18b69a; --green:#3cb371; --amber:#e0a300; --rose:#d33f4a; --blue:#3d6fcf;
+ --on:#ffdb7a;
+}
 *{box-sizing:border-box}
-body{background:radial-gradient(1200px 600px at 50% -10%,#2a241d,var(--ground));color:var(--ink);margin:0;padding:28px 18px 60px;font:400 15px/1.5 "Barlow","Segoe UI",system-ui,sans-serif}
-main{max-width:980px;margin:0 auto}
-header{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;align-items:center;margin:0 0 1rem}
-h1{font:700 1.8rem/1.1 "Barlow Semi Condensed","Barlow",sans-serif;margin:0}
-h1 em{font-style:normal;color:var(--accent)}
-header p{margin:0;color:var(--muted)}
-.chip{font:600 .8rem ui-monospace,monospace;padding:.25em .8em;border:1px solid var(--rule);border-radius:999px;color:var(--muted)}
-.chip b{color:var(--ink)}
-.chip.on{border-color:var(--accent);color:var(--accent)}
-.pa{position:relative;border-radius:20px;padding:22px 26px 24px;background:linear-gradient(180deg,#2a2a2d,#161618 30%,#101012);border:1px solid #000;box-shadow:0 18px 50px #0009, inset 0 1px 0 #ffffff14}
-.pa .model{position:absolute;top:10px;right:16px;color:#55524c;font:600 .68rem ui-monospace,monospace;letter-spacing:.14em}
-.scr{background:#050505;border-radius:12px;padding:12px;border:1px solid #2a2a2e;box-shadow:inset 0 0 30px #000, 0 2px 0 #ffffff08}
-.scr .glass{border-radius:6px;overflow:hidden;background:#000;position:relative}
-canvas{display:block;width:280px;height:280px;margin:0 auto;image-rendering:pixelated}
-.scr .glass::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,#ffffff08 0 40%,transparent 40% 60%,#ff9a3c07 60% 100%);pointer-events:none}
-.rowctl{display:flex;align-items:center;gap:14px;margin-top:20px;flex-wrap:wrap;justify-content:center}
-.knobmod{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:110px}
-.knobmod .lbl{font:600 .72rem "Barlow Semi Condensed","Barlow",sans-serif;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
-.knob{width:76px;height:76px;border-radius:50%;position:relative;cursor:ns-resize;touch-action:none;background:conic-gradient(#3a3a3e,#17171a,#3a3a3e,#17171a,#3a3a3e);border:1px solid #000;box-shadow:0 6px 14px #000a, inset 0 1px 0 #ffffff22}
-.knob::after{content:"";position:absolute;inset:14px;border-radius:50%;background:linear-gradient(180deg,#2b2b2f,#19191c);box-shadow:inset 0 1px 0 #ffffff18}
-.knob::before{content:"";position:absolute;top:5px;left:50%;width:4px;height:15px;background:var(--accent);transform:translateX(-50%) rotate(var(--rot,0deg));transform-origin:50% 33px;border-radius:2px;transition:transform .06s}
-.knob.held{box-shadow:0 6px 14px #000a, inset 0 0 0 2px #f28a5a44}
-.pads{display:flex;gap:10px}
-.pad{position:relative;width:64px;padding:18px 4px 12px;text-align:center;cursor:pointer;user-select:none;touch-action:manipulation;background:linear-gradient(180deg,var(--alum2,#2c2c2f),var(--alum,#232324));border:1px solid #000;border-radius:9px;box-shadow:0 4px 0 #000, inset 0 1px 0 #ffffff14;font:600 .82rem "Barlow Semi Condensed","Barlow",sans-serif}
-.pad .n{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;background:#1f1c18;box-shadow:inset 0 0 2px #000}
-.pad.on{background:linear-gradient(180deg,#8a4a22,#6e3a1a);box-shadow:0 4px 0 #000, inset 0 0 14px #ff9a3c33}
-.pad.on .n{background:var(--accent);box-shadow:0 0 10px var(--accent)}
-.pad.home{width:74px}
-.leds{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
-.vled{flex:1 1 56px;min-width:56px;padding:4px 2px;text-align:center;font:600 .6rem ui-monospace,monospace;color:var(--muted);border:1px solid var(--rule);border-radius:6px;background:#1a1713}
-.vled.on{color:#ffd9b3;border-color:var(--accent);background:#3a2412}
-.help{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem 2rem;margin-top:1.4rem}
-.help h2{font:600 1rem "Barlow Semi Condensed","Barlow",sans-serif;margin:0 0 .3rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
-table{border-collapse:collapse;width:100%}
-td,th{padding:.25rem .5rem;border-bottom:1px solid var(--rule);text-align:left;font-size:.92rem}
-th{color:var(--muted);font-weight:600}
-kbd{font:600 .82em ui-monospace,monospace;background:var(--card);border:1px solid var(--rule);border-radius:4px;padding:0 .3em}
-#alert{color:var(--bad);font-weight:600;min-height:1.2em}
-.start{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,11,13,.65);border-radius:20px;z-index:5}
-.start[hidden]{display:none}
-.start .boot{font:600 1.1rem "Barlow Semi Condensed","Barlow",sans-serif;letter-spacing:.1em;color:var(--accent)}
-@media (max-width:700px){ canvas{width:100%;height:auto} .rowctl{gap:10px} .pad{width:56px} .knob{width:64px;height:64px} }
-</style></head><body>
-<main>
+body{margin:0;background:var(--bg);color:var(--muted2);font:14px/1.35 ui-sans-serif,system-ui,sans-serif}
+a{color:var(--teal)}
+header{max-width:640px;margin:0 auto 1.2rem;padding:.9rem 1rem 0}
+header h1{margin:0;font-size:1.25rem;letter-spacing:.2px;color:#e8edf0}
+header .sub{color:var(--muted);margin-top:.25rem;font-size:.85rem}
+header .meta{display:flex;gap:.5rem;margin-top:.5rem}
+.chip{font:600 .75rem/1 ui-monospace,monospace;padding:.3rem .55rem;border-radius:6px;background:var(--card);color:var(--muted);border:1px solid var(--rule)}
+.chip.on{background:#1c2b26;color:var(--teal)}
+.chip.ver{background:#1c1508;color:var(--amber)}
+main{max-width:640px;margin:0 auto}
+.pa{display:flex;flex-direction:column;gap:.7rem;background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:1rem}
+.scr{margin:0 auto;max-width:160px}
+.glass{background:#0c0e0f;border:1px solid #1c1f21;border-radius:10px;padding:4px}
+canvas{display:block;width:240px;height:240px;image-rendering:pixelated;border-radius:7px;background:#060809}
+.rowctl{display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap}
+.knobmod{display:flex;flex-direction:column;align-items:center;gap:.2rem;min-width:96px}
+.knob{width:40px;height:40px;border-radius:50%;background:var(--card);border:2px solid var(--rule);position:relative;cursor:grab}
+.knob::after{content:"";position:absolute;top:4px;left:50%;width:3px;height:12px;background:var(--amber);transform:translate(-50%,-50%) rotate(var(--rot,0deg));transform-origin:center 14px;border-radius:1px}
+.knob.held{background:#1c2224;cursor:grabbing}
+.lbl{font-size:.65rem;letter-spacing:.3px;color:var(--muted);text-transform:uppercase}
+.pads{display:flex;flex-wrap:wrap;gap:.35rem;justify-content:center}
+.pad,.vled{font:600 .7rem/1 ui-sans-serif,system-ui,sans-serif;color:var(--muted);background:#0c0e0f;border:1px solid var(--rule);border-radius:6px;padding:.3rem .55rem;min-width:44px;text-align:center;cursor:default;user-select:none}
+.pad.on{background:#16241a;color:var(--teal)}
+.pad.home.on{background:#303a35;color:#e6eef0}
+rowctl{display:flex;align-items:center}
+.leds{display:flex;flex-wrap:wrap;gap:.35rem;justify-content:center;margin-top:.5rem}
+.vled.padding:0 4px}
+.start{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:var(--muted);font:600 .85rem/1 ui-monospace,monospace}
+.start .boot{background:#000;padding:.6rem 1.2rem;border-radius:8px;border:1px solid var(--rule)}
+.row{display:flex;flex-wrap:wrap;gap:.5rem 1.4rem;margin-top:.9rem;align-items:center}
+kbd{background:#0c0e0f;border:1px solid var(--rule);border-bottom-width:2px;border-radius:5px;padding:.1rem .35rem;font:600 .7rem ui-monospace,monospace;color:var(--muted2)}
+button{border-radius:999px;padding:.4em 1em;font-weight:600;border:0;cursor:pointer}
+button.test{background:var(--teal);color:#062a26}
+button.test:hover{filter:brightness(1.08)}
+button.probe{background:var(--card);color:var(--muted);border:1px solid var(--rule)}
+button.probe:hover{background:#1a1e21}
+#alert{margin:0 1rem 0 0;color:var(--muted)}
+#alert.error{color:var(--rose)}
+#alert.ok{color:var(--teal)}
+#aidiag{margin-top:.4rem;color:var(--muted);font:600 .75rem/1.4 ui-monospace,monospace}
+.help{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:.7rem}
+.help>div{flex:1 1 240px;background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:.6rem .7rem;font-size:.75rem}
+.help h2{font-size:.7rem;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin:0 0 .35rem}
+.help table{width:100%;border-collapse:collapse}
+.help td{padding:.12rem 0;color:var(--muted2);white-space:nowrap}
+.help td:first-child{color:var(--muted)}
+.help b.color:var(--teal)}</style>
+</head><body>
 <header>
- <h1>RhinoTiger <em>· Pocket AMP</em></h1>
- <p>the port, in your browser</p>
- <div style="margin-left:auto;display:flex;gap:.5rem;flex-wrap:wrap">
-  <span class="chip" id="chip-ms">0 ms</span>
-  <span class="chip on" id="chip-state">starting…</span>
-  <span class="chip" id="chip-ver">v5</span>
+ <h1>RhinoTiger — Pocket AMP</h1>
+ <div class="sub">literal app + DSP (unchanged) running on the M-VAVE / Donner Pocket AMP — WASM emulator</div>
+ <div class="meta">
+  <span class="chip on" id="chip-state">off</span>
+  <span class="chip" id="chip-ms">— ms</span>
+  <span class="chip ver" id="chip-ver">web v9</span>
  </div>
 </header>
-
-<div class="pa">
- <div class="model">M-VAVE / Donner Pocket AMP</div>
- <div class="scr">
-  <div class="glass"><canvas id="cv" width="240" height="240"></canvas></div>
- </div>
- <div class="rowctl">
-  <div class="knobmod"><div class="knob" id="knob-para"></div><div class="lbl">PARA · push</div></div>
-  <div class="pads">
-   <span class="pad home" data-b="1">HOME<span class="n"></span></span>
-   <span class="pad" data-b="2">VOL−<span class="n"></span></span>
-   <span class="pad" data-b="3">VOL+<span class="n"></span></span>
-   <span class="pad" data-b="4">&lt;<span class="n"></span></span>
-   <span class="pad" data-b="5">&gt;<span class="n"></span></span>
+<main>
+ <div class="pa">
+  <div class="scr">
+   <div class="glass"><canvas id="cv" width="240" height="240"></canvas></div>
   </div>
-  <div class="knobmod"><div class="knob" id="knob-master"></div><div class="lbl">MASTER</div></div>
+  <div class="rowctl rowctl">
+   <div class="knobmod"><div class="knob" id="knob-para"></div><div class="lbl">PARA · push</div></div>
+   <div class="pads">
+    <span class="pad" data-b="1">HOME<span class="n"></span></span>
+    <span class="pad" data-b="2">VOL−<span class="n"></span></span>
+    <span class="pad" data-b="3">VOL+<span class="n"></span></span>
+    <span class="pad" data-b="4">&lt;<span class="n"></span></span>
+    <span class="pad" data-b="5">&gt;<span class="n"></span></span>
+   </div>
+   <div class="knobmod"><div class="knob" id="knob-master"></div><div class="lbl">MASTER</div></div>
+  </div>
+  <div class="leds" id="leds"></div>
+  <div class="start" id="start"><span class="boot">starting…</span></div>
  </div>
- <div class="leds" id="leds"></div>
- <div class="start" id="start"><span class="boot">starting…</span></div>
-</div>
-
-<div class="row" style="display:flex;flex-wrap:wrap;gap:.5rem 1.4rem;margin-top:.9rem;align-items:center">
- <span id="alert"></span>
- <button id="tone" type="button" style="border-radius:999px;padding:.4em 1em;background:var(--teal);color:#062a26;font-weight:600;border:0">test tone</button> <button id="probe" type="button" style="border-radius:999px;padding:.4em 1em;background:var(--card);color:var(--muted);font-weight:600;border:1px solid var(--rule)">audio probe</button>
- <span style="color:var(--muted);font-size:.9rem">drag knobs up/down · <kbd>P</kbd> push · <kbd>Q/E</kbd> turn ·
-  <kbd>H</kbd> HOME · <kbd>V/B</kbd> VOL−/+ · <kbd>,</kbd>/<kbd>.</kbd> &lt;/&gt; · <kbd>M/N</kbd> MASTER ·
-  <b style="color:var(--teal)">click anywhere to start the sound</b></span>
-</div>
-<div id="aidiag" style="margin-top:.4rem;color:var(--muted);font:600 .8rem ui-monospace,monospace"></div>
-
-<div class="help">
- <div><h2>chords</h2><table>
-  <tr><td>VOL−</td><td>PLAY</td></tr>
-  <tr><td>VOL+</td><td>ARP</td></tr>
-  <tr><td>&lt;</td><td>SAVE</td></tr>
-  <tr><td>&gt;</td><td>REC</td></tr>
-  <tr><td>VOL−+VOL+</td><td>HOME</td></tr>
-  <tr><td>&lt;+&gt;</td><td>SEQ</td></tr>
-  <tr><td>VOL−+&lt;</td><td>SEL</td></tr>
-  <tr><td>VOL++&gt;</td><td>ENV</td></tr>
-  <tr><td>VOL−+&gt;</td><td>LFO</td></tr>
-  <tr><td>VOL++&lt;</td><td>EDIT</td></tr>
-  <tr><td>HOME+VOL−</td><td>GLO</td></tr>
-  <tr><td>HOME+VOL+</td><td>FX</td></tr>
-  <tr><td>HOME+&lt; / &gt;</td><td>OCT− / OCT+</td></tr>
- </table></div>
- <div><h2>PARA</h2><table>
-  <tr><th>click</th><td>cycles PAGE · WORLD · K1..K4 · ALGO · KEY</td></tr>
-  <tr><th>turn</th><td>the focus's knob</td></tr>
-  <tr><th>hold 1 s</th><td>GLOBAL, then SAVE on release</td></tr>
-  <tr><th>hold 3 s</th><td>GLOBAL + SAVE held → factory defaults</td></tr>
-  <tr><th>KEY focus</th><td>VOL−/VOL+ play the cursor, &lt;/&gt; move it</td></tr>
- </table></div>
-</div>
+ <div class="row" style="">
+  <span id="alert"></span>
+  <button id="tone" type="button" class="test">test tone</button> <button id="probe" type="button" class="probe">audio probe</button>
+  <span style="color:var(--muted);font-size:.9rem">drag knobs up/down · <kbd>P</kbd> push · <kbd>Q/E</kbd> turn ·
+   <kbd>H</kbd> HOME · <kbd>V/B</kbd> VOL−/+ · <kbd>,</kbd>/<kbd>.</kbd> &lt;/&gt; · <kbd>M/N</kbd> MASTER ·
+   <b style="color:var(--teal)">click anywhere to start the sound</b></span>
+ </div>
+ <div id="aidiag"></div>
+ <div class="help">
+  <div><h2>chords</h2><table>
+   <tr><td>VOL−</td><td>PLAY</td></tr>
+   <tr><td>VOL+</td><td>ARP</td></tr>
+   <tr><td>&lt;</td><td>SAVE</td></tr>
+   <tr><td>&gt;</td><td>REC</td></tr>
+   <tr><td>VOL−+VOL+</td><td>HOME</td></tr>
+   <tr><td>&lt;+&gt;</td><td>SEQ</td></tr>
+   <tr><td>VOL−+&lt;</td><td>SEL</td></tr>
+   <tr><td>VOL++&gt;</td><td>ENV</td></tr>
+   <tr><td>VOL−+&gt;</td><td>LFO</td></tr>
+   <tr><td>VOL++&lt;</td><td>EDIT</td></tr>
+   <tr><td>HOME+VOL−</td><td>GLO</td></tr>
+   <tr><td>HOME+VOL+</td><td>FX</td></tr>
+   <tr><td>HOME+&lt; / &gt;</td><td>OCT− / OCT+</td></tr>
+  </table></div>
+  <div><h2>PARA</h2><table>
+   <tr><th>click</th><td>cycles PAGE · WORLD · K1..K4 · ALGO · KEY</td></tr>
+   <tr><th>turn</th><td>the focus's knob</td></tr>
+   <tr><th>hold 1 s</th><td>GLOBAL, then SAVE on release</td></tr>
+   <tr><th>hold 3 s</th><td>GLOBAL + SAVE held → factory defaults</td></tr>
+   <tr><th>KEY focus</th><td>VOL−/VOL+ play the cursor, &lt;/&gt; move it</td></tr>
+  </table></div>
+ </div>
 </main>
-
 <script>
 "use strict";
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
@@ -132,127 +133,237 @@ async function loadWasm(){
  const {instance}=await WebAssembly.instantiate(bytes,imports);
  ex=instance.exports; mem=ex.memory;
  ex.web_boot();
- document.getElementById('start').hidden=true;
 }
-function sendMask(){ if(ex) ex.web_pa(mask, Date.now(), 0, master); }
-function enc(d){ if(ex){ rot+=d*18; document.getElementById('knob-para').style.setProperty('--rot',(rot%360)+'deg'); ex.web_pa(mask, Date.now(), d, master); } }
-function setMaster(v){ master=Math.max(0,Math.min(4096,v)); if(ex) ex.web_pa(mask, Date.now(), 0, master); }
-function bit(b,on){ if(on)mask|=1<<b; else mask&=~(1<<b); const el=document.querySelector('[data-b="'+b+'"]'); if(el)el.classList.toggle('on',on); sendMask(); }
-
+function sendMask(){
+ if(!ex)return;
+ ex.web_pa(mask, Date.now(), 0, master);
+}
+function enc(d){
+ if(!ex)return;
+ rot+=d*18;
+ document.getElementById('knob-para').style.setProperty('--rot',(rot%360)+'deg');
+ ex.web_pa(mask, Date.now(), d, master);
+}
+function setMaster(v){
+ master=Math.max(0, Math.min(4096, v));
+ document.getElementById('knob-master').style.setProperty('--rot', Math.round(360*(1-master/4096))+'deg');
+ if(ex) ex.web_pa(mask, Date.now(), 0, master);
+}
+function bit(b, on){
+ if(on) mask|=1<<b; else mask&=~(1<<b);
+ const el=document.querySelector('[data-b="'+b+'"]');
+ if(el) el.classList.toggle('on', on);
+ sendMask();
+}
 document.querySelectorAll('.pad[data-b]').forEach(el=>{
  const b=+el.dataset.b;
- el.addEventListener('pointerdown',e=>{e.preventDefault();bit(b,true);});
+ el.addEventListener('pointerdown', e=>{ e.preventDefault(); bit(b, true); });
  ['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,()=>bit(b,false)));
 });
-function attachKnob(id,kind){ const el=document.getElementById(id); let down=false,y0=0,acc=0;
- el.addEventListener('pointerdown',e=>{e.preventDefault();down=true;y0=e.clientY;acc=0;el.classList.add('held');});
- window.addEventListener('pointermove',e=>{ if(!down)return; const dy=y0-e.clientY; y0=e.clientY;
-  if(kind==='para'){ acc+=dy; while(acc>=12){enc(1);acc-=12;} while(acc<=-12){enc(-1);acc+=12;} }
-  else setMaster(master+dy*24); });
- window.addEventListener('pointerup',()=>{ if(down){down=false;el.classList.remove('held');} });
- el.addEventListener('wheel',e=>{e.preventDefault(); if(kind==='para')enc(e.deltaY<0?1:-1); else setMaster(master+(e.deltaY<0?128:-128)); },{passive:false});
-}
-attachKnob('knob-para','para');
-attachKnob('knob-master','master');
-document.getElementById('knob-para').addEventListener('pointerdown',()=>bit(0,true));
-document.getElementById('knob-para').addEventListener('pointerup',()=>bit(0,false));
-window.addEventListener('keydown',e=>{
- const k=e.key.toLowerCase(), map={'p':0,'h':1,'v':2,'b':3,'q':4,',':4,'.':5};
- if(k==='q'||k==='e')enc(k==='q'?-1:1);
- else if(k==='m'||k==='n')setMaster(master+(k==='m'?-128:128));
- else if(k in map&&!e.repeat)bit(map[k],true);
-});
-window.addEventListener('keyup',e=>{const k=e.key.toLowerCase(),map={'p':0,'h':1,'v':2,'b':3,'q':4,',':4,'.':5};if(k in map)bit(map[k],false);});
-
-let actx=null, sp=null, audioPushed=0, lastAErr='', nextT=0;
-function audioInit(){
- if(!actx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return; actx=new AC(); }
- if(actx.state!=='running'){ try{ actx.resume(); }catch(e){} }
- startScriptAudio();
-}
-function startScriptAudio(){
- /* The local build played the simulator this way (and you heard it there):
-  * one 1024-frame AudioBufferSource per ~23 ms, drawn from the WASM's out_l /
-  * out_r, scheduled ahead on the audio clock. createScriptProcessor with a
-  * write-back is not needed: browsers have been dropping samples from it. */
- const N=1024;
- let oscBuf=null, oscSrc=null;
- const push=()=>{
-  if(!actx||!ex)return;
-  ex.web_render(N);                       // advance the device (out_l/out_r)
-  /* web_out_l()/_r() return byte offsets into the module memory (as in the
-   * upstream worklet), so build the views from memory, not from the numbers. */
-  const L=new Float32Array(mem.buffer, ex.web_out_l(), N);
-  const R=new Float32Array(mem.buffer, ex.web_out_r(), N);
-  if(!oscBuf){
-   oscBuf=actx.createBuffer(2,N,44100);
-   oscSrc=actx.createBufferSource(); oscSrc.buffer=oscBuf; oscSrc.connect(actx.destination);
+function attachKnob(id, kind){
+ const el=document.getElementById(id);
+ let down=false, y0=0, acc=0;
+ el.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  down=true; y0=e.clientY; acc=0;
+  el.classList.add('held');
+  if(kind==='para') bit(0, true);
+ });
+ window.addEventListener('pointermove', e=>{
+  if(!down)return;
+  const dy=y0-e.clientY; y0=e.clientY;
+  if(kind==='para'){
+   acc+=dy;
+   while(acc>=12){ enc(1); acc-=12; }
+   while(acc<=-12){ enc(-1); acc+=12; }
+  } else {
+   setMaster(master + dy*24);
   }
-  oscBuf.getChannelData(0).set(L);
-  oscBuf.getChannelData(1).set(R);
-  const now=actx.currentTime;
-  if(nextT<now+0.01)nextT=now+0.01;
-  oscSrc.start(nextT);
-  oscSrc=actx.createBufferSource(); oscSrc.buffer=oscBuf; oscSrc.connect(actx.destination);
-  nextT+=N/44100;
-  audioPushed+=N;
- };
- setInterval(push, 1000/1920|0);
+ });
+ window.addEventListener('pointerup', ()=>{
+  if(down){
+   down=false;
+   el.classList.remove('held');
+   if(kind==='para') bit(0, false);
+  }
+ });
+ el.addEventListener('wheel', e=>{
+  e.preventDefault();
+  if(kind==='para') enc(e.deltaY<0?1:-1);
+  else setMaster(master + (e.deltaY<0?128:-128));
+ }, {passive:false});
 }
-['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,audioInit));
+attachKnob('knob-para', 'para');
+attachKnob('knob-master', 'master');
 
-function drawLeds(){ if(!ex)return; const lit=ex.web_lit_buttons(), l=document.getElementById('leds'); l.innerHTML='';
- BTN.forEach((n,i)=>{ const d=document.createElement('div'); d.className='vled'; d.textContent=n; if(lit>>i&1)d.classList.add('on'); l.appendChild(d); }); }
-function frame(){ if(!ex)return;
- try{
-  const fb=ex.web_fb(); const u8=new Uint8Array(mem.buffer, fb, 240*240*2);
-  const im=ctx.createImageData(240,240);
-  for(let i=0;i<240*240;i++){ const raw=u8[2*i]|(u8[2*i+1]<<8), c=((raw&0xff)<<8)|(raw>>8);
-   im.data[4*i]=((c>>11)&31)<<3; im.data[4*i+1]=((c>>5)&63)<<2; im.data[4*i+2]=(c&31)<<3; im.data[4*i+3]=255; }
-  ctx.putImageData(im,0,0);
-  if(!firstFrame){firstFrame=true;document.getElementById('start').hidden=true;}
- }catch(e){}
-}
-let toneOn=false;
-function setTone(){
- toneOn=!toneOn;
- if(!actx)audioInit();
- if(toneOn&&actx){
-  const o=actx.createOscillator(), g=actx.createGain();
-  o.frequency.value=440; g.gain.value=0.08; o.connect(g); g.connect(actx.destination);
-  o.start(); o.stop(actx.currentTime+0.6);
+document.getElementById('knob-para').addEventListener('pointerdown', ()=>bit(0,true));
+document.getElementById('knob-para').addEventListener('pointerup', ()=>bit(0,false));
+
+window.addEventListener('keydown', e=>{
+ const k=e.key.toLowerCase();
+ const map={'p':0,'h':1,'v':2,'b':3,'q':4,',':4,'.':5};
+ if(k==='q'||k==='e') enc(k==='q'?-1:1);
+ else if(k==='m'||k==='n') setMaster(master + (k==='m'?-128:128));
+ else if(k in map && !e.repeat) bit(map[k], true);
+});
+window.addEventListener('keyup', e=>{
+ const k=e.key.toLowerCase();
+ const map={'p':0,'h':1,'v':2,'b':3,'q':4,',':4,'.':5};
+ if(k in map) bit(map[k], false);
+});
+
+let actx=null, audioPushed=0, lastErr='';
+function audioInit(){
+ if(!actx){
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC) return;
+  actx=new AC();
  }
- document.getElementById('tone').textContent=toneOn?'tone…':'test tone';
+ if(actx.state!=='running'){
+  try{ actx.resume(); }catch(e){}
+ }
 }
-/* prove the audio stack alone (no WASM involved): play a tone via a buffer
-   source and show whether the browser delivers it */
+/* Audio: pull from the WASM emulator's out_l/out_r and schedule it on the WebAudio
+   clock. Uses the upstream worklet pattern with memory-view reads and AudioBufferSource
+   nodes. Pull cadence is no larger than 2048 samples per push.  */
+const N_AUD=1024;
+let nextA=0, oscBuf=null, oscSrc=null, oscActive=false;
+function pushAudio(){
+ if(!actx || !ex) return;
+ ex.web_render(N_AUD);
+ /* web_out_l()/_r() return byte offsets into the module memory (as in the
+  * upstream worklet), so build the views from the module memory. */
+ const L=new Float32Array(mem.buffer, ex.web_out_l(), N_AUD);
+ const R=new Float32Array(mem.buffer, ex.web_out_r(), N_AUD);
+ if(!oscBuf){
+  oscBuf=actx.createBuffer(2, N_AUD, 44100);
+  oscSrc=actx.createBufferSource();
+  oscSrc.buffer=oscBuf;
+  oscSrc.connect(actx.destination);
+ }
+ oscBuf.getChannelData(0).set(L);
+ oscBuf.getChannelData(1).set(R);
+ const now=actx.currentTime;
+ /* Keep the source ahead of the pull by a few ms so a busy frame yields a clean
+  * gap rather than a crack inside a note. */
+ if(nextA < now - 0.008) nextA = now - 0.008;
+ oscSrc.start(nextA);
+ /* Recycle the source each push so it never runs past its end and never needs
+  * stop/start round-trips. */
+ if(oscActive){ try{ oscSrc.stop(); }catch(e){} }
+ oscSrc=actx.createBufferSource();
+ oscSrc.buffer=oscBuf;
+ oscSrc.connect(actx.destination);
+ oscSrc.start(nextA + N_AUD/44100);
+ nextA += N_AUD/44100;
+ audioPushed += N_AUD;
+ oscActive=true;
+}
+['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev, audioInit));
+
+let toneOn=false;
+function runTone(){
+ toneOn=!toneOn;
+ if(!actx) audioInit();
+ if(toneOn && actx){
+  const o=actx.createOscillator();
+  const g=actx.createGain();
+  o.frequency.value=440;
+  g.gain.value=0.08;
+  o.connect(g);
+  g.connect(actx.destination);
+  o.start();
+  o.stop(actx.currentTime + 0.6);
+ }
+ document.getElementById('tone').textContent = toneOn ? 'tone…' : 'test tone';
+}
 function audioProbe(){
- if(!actx)audioInit();
- if(!actx||actx.state!=='running')return 'context not running';
+ if(!actx) audioInit();
+ if(!actx || actx.state!=='running') return 'context not running';
  const src=actx.createBufferSource();
- src.buffer=actx.createBuffer(1,44100*2,44100);
+ src.buffer=actx.createBuffer(1, 44100*2, 44100);
  const d=src.buffer.getChannelData(0);
  for(let i=0;i<d.length;i++) d[i]=Math.sin(2*Math.PI*440*i/44100)*0.1;
- src.connect(actx.destination); src.start();
+ src.connect(actx.destination);
+ src.start();
  return 'probe playing 2 s';
 }
-document.getElementById("tone").onclick=setTone; document.getElementById("probe").onclick=()=>{ document.getElementById("alert").textContent=audioProbe(); };
-window.addEventListener('error',e=>{ const a=document.getElementById('alert'); a.textContent='JS: '+(e.message||e); });
-function status(){
- if(!ex)return; document.getElementById('chip-ms').textContent=ex.web_now()+' ms';
- let st='ON';
- if(actx){ st+=' · audio:'+actx.state;
-  if(actx.state==='running'&&ex.web_debug_ring_peak){ st+=' ('+ex.web_debug_ring_peak().toFixed(2)+' peak, '+audioPushed+' sched)'; }
+document.getElementById('tone').onclick = runTone;
+document.getElementById('probe').onclick = ()=>{ document.getElementById('alert').textContent = audioProbe(); };
+
+window.addEventListener('error', e=>{
+ const a=document.getElementById('alert');
+ if(a){
+  a.textContent = 'JS: ' + (e.message || e);
+  a.classList.add('error');
  }
- document.getElementById('chip-state').textContent=st;
- const diag=document.getElementById('aidiag');
- if(!actx) diag.textContent='audio: not started yet — click anywhere';
- else diag.textContent='audio: '+actx.state+' | pulled '+audioPushed+' frames | ring peak '+(ex.web_debug_ring_peak?ex.web_debug_ring_peak().toFixed(3):'?')+(lastAErr?' | last error: '+lastAErr:'');
+});
+
+function drawFrame(){
+ if(!ex) return;
+ try{
+  const fb=ex.web_fb();
+  const u8=new Uint8Array(mem.buffer, fb, 240*240*2);
+  const im=ctx.createImageData(240,240);
+  for(let i=0;i<240*240;i++){
+   const raw=u8[2*i] | (u8[2*i+1]<<8);
+   const c=((raw & 0xff) << 8) | (raw >>> 8);
+   im.data[4*i+0]=((c>>11)&31)<<3;
+   im.data[4*i+1]=((c>>5)&63)<<2;
+   im.data[4*i+2]=(c&31)<<3;
+   im.data[4*i+3]=255;
+  }
+  ctx.putImageData(im, 0, 0);
+  if(!firstFrame) firstFrame=true;
+ }catch(e){}
 }
+function drawLeds(){
+ if(!ex) return;
+ const lit=ex.web_lit_buttons();
+ const l=document.getElementById('leds');
+ l.innerHTML='';
+ BTN.forEach((n,i)=>{
+  const d=document.createElement('div');
+  d.className='vled';
+  d.textContent=n;
+  if(lit>>i & 1) d.classList.add('on');
+  l.appendChild(d);
+ });
+}
+function status(){
+ if(!ex) return;
+ document.getElementById('chip-ms').textContent = ex.web_now() + ' ms';
+ let st='off';
+ if(actx){
+  st = actx.state==='running' ? 'on' : actx.state;
+  if(ex.web_debug_ring_peak){
+   st += ' · peak ' + ex.web_debug_ring_peak().toFixed(2) + ' · pushed ' + audioPushed + ' frames';
+  }
+ }
+ document.getElementById('chip-state').textContent = st;
+ const diag=document.getElementById('aidiag');
+ if(!actx){
+  diag.textContent='audio: not started yet — click anywhere to start';
+ } else {
+  diag.textContent='audio: ' + actx.state +
+   ' | pulled ' + audioPushed + ' frames | ring peak ' +
+   (ex.web_debug_ring_peak ? ex.web_debug_ring_peak().toFixed(3) : '?') +
+   (lastErr ? ' | last error: ' + lastErr : '');
+ }
+}
+setTimeout(()=>{ drawFrame(); drawLeds(); status(); }, 0);
 loadWasm().then(()=>{
- setInterval(frame,200); setInterval(status,700); setInterval(drawLeds,700);
- frame(); status(); drawLeds();
+ const pr=setInterval(()=>{ drawFrame(); }, 120);
+ const sr=setInterval(()=>{ drawLeds(); status(); }, 600);
+ drawFrame(); drawLeds(); status();
+ window.addEventListener('beforeunload', ()=>{ clearInterval(pr); clearInterval(sr); if(oscActive){ try{ oscSrc.stop(); }catch(e){} } });
 })
- .catch(e=>{ document.getElementById('alert').textContent='failed to start the emulator: '+e.message; });
+.catch(e=>{
+ const a=document.getElementById('alert');
+ if(a){
+  a.textContent='failed to start the emulator: '+(e.message||e);
+  a.classList.add('error');
+ }
+});
 </script>
 </body></html>
