@@ -81,6 +81,20 @@ __attribute__((used, visibility("default"))) void web_pa(uint8_t d, uint32_t now
         master = mstr;
 }
 
+__attribute__((used, visibility("default"))) uint32_t web_debug_ring_fill(void) { return ring_w - ring_r; }
+__attribute__((used, visibility("default"))) float web_debug_ring_peak(void)
+{
+    float p = 0.0f;
+    uint32_t i;
+    for (i = 0; i < RING; i++) {
+        float v = ring[2 * i], w = ring[2 * i + 1];
+        if (v < 0) v = -v;
+        if (w < 0) w = -w;
+        if (v > p) p = v;
+        if (w > p) p = w;
+    }
+    return p;
+}
 __attribute__((used, visibility("default"))) uint16_t *web_fb(void) { return fb; }
 __attribute__((used, visibility("default"))) uint32_t web_blits(void) { return blits; }
 __attribute__((used, visibility("default"))) uint32_t web_now(void) { return now_ms; }

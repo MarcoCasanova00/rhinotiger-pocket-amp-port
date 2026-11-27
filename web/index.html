@@ -161,10 +161,10 @@ window.addEventListener('keydown',e=>{
 });
 window.addEventListener('keyup',e=>{const k=e.key.toLowerCase(),map={'p':0,'h':1,'v':2,'b':3,'q':4,',':4,'.':5};if(k in map)bit(map[k],false);});
 
-let actx=null,nextT=0;
+let actx=null,nextT=0,audioPushed=0;
 function audioInit(){
  if(!actx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return; actx=new AC(); nextT=actx.currentTime+0.1; }
- if(actx.state==='suspended')actx.resume();
+ if(actx.state!=='running'){ try{ actx.resume(); }catch(e){} }
 }
 ['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,audioInit));
 /* real-time scheduler: render as many frames as wall-clock time has passed,
@@ -181,6 +181,7 @@ function pump(){
   const n=Math.min(1024, Math.ceil(delta));
   ex.web_render(n);
   if(actx){
+   if(actx.state!=='running'){ try{ actx.resume(); }catch(e){} }
    const pend=nextT-actx.currentTime;
    if(pend<MAX_PENDING){
     try{
@@ -189,7 +190,7 @@ function pump(){
      ab.getChannelData(0).set(L); ab.getChannelData(1).set(R);
      const src=actx.createBufferSource(); src.buffer=ab; src.connect(actx.destination);
      if(nextT<actx.currentTime+0.05)nextT=actx.currentTime+0.05;
-     src.start(nextT); nextT+=n/44100;
+     src.start(nextT); nextT+=n/44100; audioPushed+=n;
     }catch(e){}
    }
   }
@@ -212,7 +213,11 @@ function frame(){ if(!ex)return;
 }
 function status(){
  if(!ex)return; document.getElementById('chip-ms').textContent=ex.web_now()+' ms';
- document.getElementById('chip-state').textContent='ON';
+ let st='ON';
+ if(actx){ st+=' · audio:'+actx.state;
+  if(actx.state==='running'&&ex.web_debug_ring_peak){ st+=' ('+ex.web_debug_ring_peak().toFixed(2)+' peak, '+audioPushed+' sched)'; }
+ }
+ document.getElementById('chip-state').textContent=st;
 }
 loadWasm().then(()=>{
  startPump();
